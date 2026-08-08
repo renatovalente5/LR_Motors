@@ -1,5 +1,4 @@
 {
-  "slug": "peugeot-2008-1-2-puretech-allure",
   "marca": "Peugeot",
   "modelo": "2008",
   "versao": "1.2 PureTech Allure",
@@ -9,6 +8,30 @@
   "publicado": true,
   "reservado": false,
   "estado": "disponivel",
+  "fotos": [
+    "assets/veiculos/2008/IMG_5368.jpg",
+    "assets/veiculos/2008/IMG_5370.jpg",
+    "assets/veiculos/2008/IMG_5372.jpg",
+    "assets/veiculos/2008/IMG_5373.jpg",
+    "assets/veiculos/2008/IMG_5374.jpg",
+    "assets/veiculos/2008/IMG_5394.jpg",
+    "assets/veiculos/2008/IMG_5397.jpg",
+    "assets/veiculos/2008/IMG_5389.jpg",
+    "assets/veiculos/2008/IMG_5388.jpg",
+    "assets/veiculos/2008/IMG_5387.jpg",
+    "assets/veiculos/2008/IMG_5386.jpeg",
+    "assets/veiculos/2008/IMG_5393.jpg",
+    "assets/veiculos/2008/IMG_5401.jpg",
+    "assets/veiculos/2008/IMG_5391.jpg",
+    "assets/veiculos/2008/IMG_5399.jpg",
+    "assets/veiculos/2008/IMG_5400.jpg",
+    "assets/veiculos/2008/IMG_5392.jpg",
+    "assets/veiculos/2008/IMG_5398.jpg",
+    "assets/veiculos/2008/IMG_5390.jpg",
+    "assets/veiculos/2008/IMG_5385.jpg",
+    "assets/veiculos/2008/IMG_5384.jpeg",
+    "assets/veiculos/2008/IMG_5403.jpeg"
+  ],
   "ano": 2024,
   "mes": "Fevereiro",
   "km": 59000,
@@ -17,7 +40,7 @@
   "potencia": 102,
   "cilindrada": 1199,
   "cor": "Cinzento",
-  "lugares": null,
+  "lugares": 5,
   "portas": 5,
   "origem": "Nacional",
   "garantia": "Garantia incluída",
@@ -34,13 +57,7 @@
     "Navegação GPS",
     "Sensores de estacionamento traseiros"
   ],
-  "fotos": [
-    "assets/veiculos/peugeot-2008-1-2-puretech-allure/01-1600.webp",
-    "assets/veiculos/peugeot-2008-1-2-puretech-allure/02-1600.webp",
-    "assets/veiculos/peugeot-2008-1-2-puretech-allure/03-1600.webp",
-    "assets/veiculos/peugeot-2008-1-2-puretech-allure/04-1600.webp",
-    "assets/veiculos/peugeot-2008-1-2-puretech-allure/05-1600.webp"
-  ],
   "destaque": true,
-  "ordem": 3
+  "ordem": 3,
+  "slug": "peugeot-2008-1-2-puretech-allure"
 }
