@@ -111,6 +111,19 @@
     border: 1px solid #C3CCDB; border-radius: 10px;
   }
   .campo input:focus-visible { outline: 2px solid var(--azul); outline-offset: 1px; border-color: var(--azul); }
+  .campo__caixa { position: relative; }
+  /* Espaço à direita para o botão não tapar o que está escrito. */
+  .campo__caixa input { padding-right: 3.2rem; }
+  .olho {
+    position: absolute; inset-block: 0; right: 2px;
+    display: grid; place-items: center;
+    /* 44px de alvo: um olho de 22px seria pequeno de mais para um dedo. */
+    width: 44px; padding: 0; border: 0; border-radius: 9px;
+    background: none; color: var(--suave); cursor: pointer;
+  }
+  .olho:hover { color: var(--tinta); }
+  .olho:focus-visible { outline: 2px solid var(--azul); outline-offset: -2px; }
+  .olho svg { width: 21px; height: 21px; }
   .campo input[aria-invalid="true"] { border-color: #A32020; }
   .ajuda { margin: .35rem 0 0; color: var(--suave); font-size: .85rem; }
   .ajuda code { background: var(--fundo); padding: .05rem .3rem; border-radius: 4px; }
@@ -179,7 +192,23 @@
 
     <div class="campo">
       <label for="senha">Senha</label>
-      <input id="senha" type="password" autocomplete="current-password">
+      <!-- O botão de ver a senha vive dentro do campo. É `type="button"` de
+           propósito: dentro de um formulário, um botão sem tipo submete-o. -->
+      <div class="campo__caixa">
+        <input id="senha" type="password" autocomplete="current-password">
+        <button class="olho" id="verSenha" type="button"
+                aria-label="Mostrar a senha" aria-pressed="false">
+          <svg class="olho__ver" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7-10-7-10-7Z"/><circle cx="12" cy="12" r="3.2"/>
+          </svg>
+          <svg class="olho__esconder" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+               stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true" hidden>
+            <path d="M9.9 5.2A9.9 9.9 0 0 1 12 5c6.4 0 10 7 10 7a18 18 0 0 1-3.1 4M6.2 6.7A18 18 0 0 0 2 12s3.6 7 10 7a9.7 9.7 0 0 0 4.2-.9"/>
+            <path d="M9.9 9.9a3.2 3.2 0 0 0 4.500 4.5M3 3l18 18"/>
+          </svg>
+        </button>
+      </div>
       <p class="ajuda">Fica guardada neste telemóvel; só a escreve uma vez.</p>
     </div>
 
@@ -671,6 +700,29 @@ function verificarPasta() {
 }
 
 campoPasta.addEventListener('input', verificarPasta);
+
+/* Ver a senha. Serve para conferir o que se escreveu — sobretudo à primeira,
+   com uma senha de 28 caracteres ao acaso e num teclado de telemóvel. */
+const botaoOlho = document.getElementById('verSenha');
+botaoOlho.addEventListener('click', () => {
+  const mostrar = campoSenha.type === 'password';
+  /* Trocar o `type` manda o cursor para o fim em vários browsers; guarda-se
+     onde ele estava e repõe-se, senão continuar a escrever escreve no sítio
+     errado. */
+  const inicio = campoSenha.selectionStart;
+  const fim = campoSenha.selectionEnd;
+  campoSenha.type = mostrar ? 'text' : 'password';
+  botaoOlho.setAttribute('aria-pressed', String(mostrar));
+  botaoOlho.setAttribute('aria-label', mostrar ? 'Esconder a senha' : 'Mostrar a senha');
+  /* toggleAttribute e não `.hidden = …`: a propriedade `hidden` vive em
+     HTMLElement e NÃO existe em SVGElement — atribuí-la a um <svg> cria uma
+     propriedade inventada que não mexe no atributo nem no ecrã, e os dois
+     ícones ficavam sempre como estavam. */
+  botaoOlho.querySelector('.olho__ver').toggleAttribute('hidden', mostrar);
+  botaoOlho.querySelector('.olho__esconder').toggleAttribute('hidden', !mostrar);
+  campoSenha.focus();
+  try { campoSenha.setSelectionRange(inicio, fim); } catch { /* type=text nem sempre deixa */ }
+});
 
 const base64 = (bloco) => new Promise((ok, falha) => {
   const l = new FileReader();
