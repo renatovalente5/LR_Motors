@@ -1,5 +1,4 @@
 {
-  "slug": "bmw-i4-edrive40-pack-desportivo-m-pro",
   "marca": "BMW",
   "modelo": "i4",
   "versao": "eDrive40 Pack Desportivo M Pro",
@@ -8,7 +7,14 @@
   "preco": 42000,
   "publicado": true,
   "reservado": false,
-  "estado": "disponivel",
+  "estado": "vendido",
+  "fotos": [
+    "assets/veiculos/bmw-i4-edrive40-pack-desportivo-m-pro/01-1600.webp",
+    "assets/veiculos/bmw-i4-edrive40-pack-desportivo-m-pro/02-1600.webp",
+    "assets/veiculos/bmw-i4-edrive40-pack-desportivo-m-pro/03-1600.webp",
+    "assets/veiculos/bmw-i4-edrive40-pack-desportivo-m-pro/04-1600.webp",
+    "assets/veiculos/bmw-i4-edrive40-pack-desportivo-m-pro/05-1600.webp"
+  ],
   "ano": 2023,
   "mes": "Junho",
   "km": 65000,
@@ -16,12 +22,10 @@
   "caixa": "Automática",
   "potencia": 340,
   "cor": "Preto",
-  "lugares": null,
   "portas": 5,
   "origem": "Importado",
   "registos_anteriores": 1,
   "garantia": "18 meses",
-  "descricao": "BMW i4 eDrive40 Pack Desportivo M Pro de 06/2023 com 65 000 km. Caixa automática, 340 cv, importado. Garantia de 18 meses.",
   "equipamento": [
     "AC automático",
     "Cruise Control adaptativo",
@@ -34,13 +38,8 @@
     "Sensores de estacionamento traseiros",
     "Sensores de estacionamento dianteiros"
   ],
-  "fotos": [
-    "assets/veiculos/bmw-i4-edrive40-pack-desportivo-m-pro/01-1600.webp",
-    "assets/veiculos/bmw-i4-edrive40-pack-desportivo-m-pro/02-1600.webp",
-    "assets/veiculos/bmw-i4-edrive40-pack-desportivo-m-pro/03-1600.webp",
-    "assets/veiculos/bmw-i4-edrive40-pack-desportivo-m-pro/04-1600.webp",
-    "assets/veiculos/bmw-i4-edrive40-pack-desportivo-m-pro/05-1600.webp"
-  ],
+  "descricao": "BMW i4 eDrive40 Pack Desportivo M Pro de 06/2023 com 65 000 km. Caixa automática, 340 cv, importado. Garantia de 18 meses.",
   "destaque": true,
-  "ordem": 2
+  "ordem": 2,
+  "slug": "bmw-i4-edrive40-pack-desportivo-m-pro"
 }
