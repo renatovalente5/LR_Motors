@@ -1,0 +1,62 @@
+{
+  "empresa": {
+    "nome_comercial": "LR Motors",
+    "denominacao_social": "Luís & Ricardo Motors, Lda",
+    "nif": "517541904",
+    "capital_social": "20.000,00 €",
+    "forma_juridica": "Sociedade por Quotas",
+    "cae": "45110 — Comércio de automóveis ligeiros"
+  },
+  "stand": {
+    "morada": "Rua 1, Lugar de Febros 52",
+    "codigo_postal": "4730-251",
+    "localidade": "Vila Verde",
+    "distrito": "Braga",
+    "pais": "Portugal",
+    "mapa": "https://maps.app.goo.gl/6PmhYMPwHr8iWwNo8",
+    "latitude": 41.6469,
+    "longitude": -8.4353
+  },
+  "contactos": {
+    "telefone_1": "961053363",
+    "telefone_1_texto": "961 053 363",
+    "telefone_2": "916228513",
+    "telefone_2_texto": "916 228 513",
+    "whatsapp": "351961053363",
+    "email": ""
+  },
+  "redes": {
+    "facebook": "https://www.facebook.com/profile.php?id=100073047242113",
+    "instagram": "https://www.instagram.com/_lrmotors_/",
+    "tiktok": ""
+  },
+  "horario": [
+    {
+      "dias": "Segunda a sexta",
+      "horas": "09:00 – 19:00"
+    },
+    {
+      "dias": "Sábado",
+      "horas": "09:00 – 13:00"
+    },
+    {
+      "dias": "Domingo",
+      "horas": "Fechado"
+    }
+  ],
+  "textos": {
+    "reclamo": "Carros, motos e off-road",
+    "hero_titulo": "Qualidade, confiança e transparência!",
+    "hero_texto": "Viaturas verificadas, garantia, financiamento e retoma",
+    "sobre_titulo": "Rigor, detalhe e transparência",
+    "sobre_texto": "Vendemos carros em Vila Verde, no distrito de Braga, desde 2015. Compramos, vendemos e trocamos carros, motos e todo-o-terreno, e temos oficina de mecânica própria — o que nos permite entregar cada viatura revista e pronta a andar.",
+    "locais": "Vila Verde, Braga",
+    "aviso_visita": "Com marcação, também mostramos a viatura em **Vila do Conde**."
+  },
+  "opcoes": {
+    "mostrar_vendidos": false
+  },
+  "tecnico": {
+    "worker_fotos": "https://lrmotors-fotos.renato-lima-valente-dcb.workers.dev"
+  }
+}

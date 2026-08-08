@@ -1,0 +1,18 @@
+name = "lrmotors-fotos"
+main = "enviar-fotos.js"
+compatibility_date = "2026-08-01"
+
+# Sem KV, sem D1, sem nada: este Worker não guarda estado. Recebe, verifica,
+# grava no repositório e acaba. Cabe folgadamente no plano gratuito da
+# Cloudflare (100 000 pedidos por dia; aqui são uns quantos por semana).
+
+# GITHUB_TOKEN e SENHA NÃO SE ESCREVEM AQUI. Este ficheiro vai para o
+# repositório, que é público. São postos como secrets:
+#
+#   npx wrangler secret put GITHUB_TOKEN
+#   npx wrangler secret put SENHA
+#
+# Ver README.md ao lado.
+
+[observability]
+enabled = true

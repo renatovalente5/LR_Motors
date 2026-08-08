@@ -1,0 +1,17 @@
+# Saída do build — gerada pela Action, nunca comitada
+_site/
+
+# Originais das fotos: pesados e substituíveis. Uma vez comitados ficam na
+# história do Git para sempre, e o repositório nunca mais encolhe.
+_fonte/originais/
+_fonte/recortes/
+
+.DS_Store
+node_modules/
+
+# Página do Standvirtual guardada em disco, usada uma vez pelo
+# scripts/importar-standvirtual.py. São ~1 MB entre o HTML e 57 imagens que o
+# site não serve — as fotografias boas vieram do CDN, não daqui. Se for preciso
+# reimportar, volta-se a guardar a página.
+Standvirtual - Comprar e vender carros usados.html
+Standvirtual - Comprar e vender carros usados_files/

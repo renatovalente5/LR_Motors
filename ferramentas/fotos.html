@@ -1,0 +1,763 @@
+<!doctype html>
+<html lang="pt">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<!--
+  Reduz fotografias antes de as carregar no backoffice.
+
+  Porque existe: o backoffice (Pages CMS) está alojado na Vercel, e a Vercel
+  recusa qualquer pedido com mais de 4,5 MB de corpo. A fotografia viaja
+  convertida em base64, que a engorda um terço, portanto o limite real é
+  ~3,3 MB por ficheiro. Acima disso o carregamento devolve 413 e o cliente vê
+  só "Failed to upload file". Não é um limite que se possa levantar do nosso
+  lado - é da Vercel, e está confirmado pelo autor do Pages CMS.
+
+  O que esta página faz: reduz as fotografias no proprio telemovel ou
+  computador, ANTES de subirem. Nada é enviado para lado nenhum - o trabalho é
+  todo feito no browser. Resultado tipico: 3,5 MB -> 1,1 MB.
+
+  Reduz o menos possivel, e não o mais possivel: o objectivo é caber, não
+  poupar. Ver a nota sobre 2048 px e qualidade 0,95 junto às constantes, mais
+  abaixo - foi medida, não escolhida a olho.
+
+  Efeito lateral util: passar pelo canvas apaga os metadados do ficheiro,
+  incluindo as coordenadas de GPS que o telemovel grava em cada fotografia.
+-->
+<meta name="robots" content="noindex, nofollow">
+<title>Reduzir fotografias | LR Motors</title>
+<link rel="icon" href="/assets/img/favicon.svg" type="image/svg+xml">
+<style>
+  :root {
+    --azul: #004AAD;
+    --tinta: #0E1726;
+    --suave: #5A6473;
+    --linha: #E3E7EE;
+    --fundo: #F5F7FA;
+    --verde: #0F7B4F;
+  }
+  * { box-sizing: border-box; }
+  /* O atributo `hidden` não esconde nada quando o CSS declara `display` para o
+     mesmo elemento — e o .btn declara. Sem esta linha, o botão de guardar
+     continuava à vista depois de escondido pelo JavaScript. */
+  [hidden] { display: none !important; }
+  body {
+    margin: 0; padding: 1.5rem 1rem 4rem;
+    font: 16px/1.55 system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+    color: var(--tinta); background: var(--fundo);
+    -webkit-text-size-adjust: 100%;
+  }
+  .envolve { max-width: 720px; margin-inline: auto; }
+  h1 { font-size: 1.5rem; margin: 0 0 .35rem; letter-spacing: -.02em; }
+  .sub { margin: 0 0 1.5rem; color: var(--suave); }
+
+  /* A zona de escolha é um <label> à volta de um input escondido: assim o
+     toque no telemovel abre a galeria sem precisar de JavaScript nenhum. */
+  .zona {
+    display: block; padding: 2rem 1.25rem; text-align: center; cursor: pointer;
+    background: #fff; border: 2px dashed #C3CCDB; border-radius: 16px;
+    transition: border-color .15s, background .15s;
+  }
+  .zona:hover, .zona:focus-within, .zona.sobre { border-color: var(--azul); background: #F7FAFF; }
+  .zona strong { display: block; font-size: 1.1rem; margin-bottom: .3rem; }
+  .zona span { color: var(--suave); font-size: .92rem; }
+  .zona input { position: absolute; width: 1px; height: 1px; opacity: 0; }
+
+  .barra {
+    display: none; align-items: center; gap: .75rem; flex-wrap: wrap;
+    margin-top: 1.25rem; padding: .9rem 1.1rem;
+    background: #fff; border: 1px solid var(--linha); border-radius: 12px;
+  }
+  .barra.ver { display: flex; }
+  .barra p { margin: 0; flex: 1 1 12rem; font-size: .95rem; }
+  .btn:disabled { opacity: .55; cursor: default; }
+  .btn:disabled:hover { background: var(--azul); }
+  .poupanca { color: var(--verde); font-weight: 600; }
+
+  .btn {
+    display: inline-flex; align-items: center; gap: .4rem;
+    padding: .6rem 1rem; border: 0; border-radius: 10px;
+    font: inherit; font-weight: 600; font-size: .93rem;
+    color: #fff; background: var(--azul); text-decoration: none; cursor: pointer;
+  }
+  .btn:hover { background: #003D8F; }
+  .btn--claro { color: var(--azul); background: #fff; border: 1px solid var(--linha); }
+  .btn--claro:hover { background: #F0F4FB; }
+
+  ul { list-style: none; margin: 1.25rem 0 0; padding: 0; display: grid; gap: .6rem; }
+  li {
+    display: grid; grid-template-columns: 64px 1fr auto; gap: .85rem; align-items: center;
+    padding: .6rem; background: #fff; border: 1px solid var(--linha); border-radius: 12px;
+  }
+  li img { width: 64px; height: 64px; object-fit: cover; border-radius: 8px; display: block; background: var(--fundo); }
+  .nome { font-weight: 600; font-size: .9rem; word-break: break-all; }
+  .medidas { color: var(--suave); font-size: .84rem; }
+  .medidas del { opacity: .7; }
+  .intacta { color: var(--verde); font-weight: 600; }
+  li.mau { grid-template-columns: 1fr; border-color: #E9B4B4; background: #FEF7F7; padding: .8rem .9rem; }
+  li.mau .medidas { color: #A32020; }
+
+  .envio {
+    margin-top: 1.5rem; padding: 1.15rem 1.25rem 1.35rem;
+    background: #fff; border: 1px solid var(--linha); border-radius: 14px;
+  }
+  .envio h2 { font-size: 1.05rem; margin: 0 0 .35rem; }
+  .envio__nota { margin: 0 0 1.1rem; color: var(--suave); font-size: .92rem; }
+  .campo { margin-bottom: 1rem; }
+  .campo label { display: block; font-weight: 600; font-size: .9rem; margin-bottom: .3rem; }
+  .campo input {
+    width: 100%; padding: .65rem .8rem; font: inherit; font-size: 1rem;
+    color: var(--tinta); background: #fff;
+    border: 1px solid #C3CCDB; border-radius: 10px;
+  }
+  .campo input:focus-visible { outline: 2px solid var(--azul); outline-offset: 1px; border-color: var(--azul); }
+  .campo input[aria-invalid="true"] { border-color: #A32020; }
+  .ajuda { margin: .35rem 0 0; color: var(--suave); font-size: .85rem; }
+  .ajuda code { background: var(--fundo); padding: .05rem .3rem; border-radius: 4px; }
+  .ajuda--aviso { color: #8A5A00; font-weight: 600; }
+  .ajuda--mau { color: #A32020; font-weight: 600; }
+  .btn--grande { width: 100%; justify-content: center; padding: .8rem 1rem; font-size: 1rem; }
+  .resultado { margin: .9rem 0 0; font-size: .93rem; }
+  .resultado--bom { color: var(--verde); font-weight: 600; }
+  .resultado--mau { color: #A32020; font-weight: 600; }
+
+  .dica {
+    margin-top: 1.5rem; padding: 1rem 1.15rem;
+    background: #fff; border: 1px solid var(--linha); border-left: 3px solid var(--azul);
+    border-radius: 12px; font-size: .93rem;
+  }
+  .dica h2 { font-size: .95rem; margin: 0 0 .5rem; }
+  .dica ol { margin: 0; padding-left: 1.15rem; }
+  .dica li { display: list-item; padding: 0; background: none; border: 0; margin-bottom: .3rem; }
+  .rodape { margin-top: 2rem; text-align: center; font-size: .85rem; color: var(--suave); }
+  .rodape a { color: var(--azul); }
+</style>
+</head>
+<body>
+<div class="envolve">
+
+  <h1>Reduzir fotografias</h1>
+  <p class="sub">
+    Escolha as fotografias do carro. As que já cabem no backoffice ficam
+    exactamente como estão; só as grandes de mais são reduzidas, e só o
+    suficiente para passarem. Não saem do seu telemóvel.
+  </p>
+
+  <label class="zona" id="zona">
+    <input type="file" id="ficheiros" accept="image/*" multiple>
+    <strong>Escolher fotografias</strong>
+    <span>Pode escolher várias de uma vez</span>
+  </label>
+
+  <div class="barra" id="barra">
+    <p id="resumo" role="status" aria-live="polite"></p>
+    <button class="btn" id="todas" type="button">Guardar todas</button>
+    <button class="btn btn--claro" id="limpar" type="button">Limpar</button>
+  </div>
+
+  <ul id="lista"></ul>
+
+  <!-- Envio directo para a biblioteca do backoffice. Só aparece quando o
+       endereço do Worker está configurado; sem ele, a página continua a servir
+       para preparar as fotografias e guardá-las no telemóvel. -->
+  <section class="envio" id="envio" hidden>
+    <h2>Enviar para o backoffice</h2>
+    <p class="envio__nota">
+      As fotografias vão direitas para a biblioteca do backoffice, numa pasta
+      só delas. Depois é abrir a viatura no backoffice e escolhê-las lá.
+    </p>
+
+    <div class="campo">
+      <label for="pasta">Nome da pasta</label>
+      <input id="pasta" type="text" autocapitalize="none" autocorrect="off" spellcheck="false"
+             inputmode="latin" aria-describedby="ajuda-pasta">
+      <p class="ajuda" id="ajuda-pasta">
+        Letras minúsculas, números e hífens. Dê-lhe o nome do carro para se
+        encontrar depois — por exemplo <code>bmw-serie-3</code>.
+      </p>
+    </div>
+
+    <div class="campo">
+      <label for="senha">Senha</label>
+      <input id="senha" type="password" autocomplete="current-password">
+      <p class="ajuda">Fica guardada neste telemóvel; só a escreve uma vez.</p>
+    </div>
+
+    <button class="btn btn--grande" id="enviar" type="button">Enviar</button>
+    <p class="resultado" id="resultado" role="status" aria-live="polite"></p>
+  </section>
+
+  <!-- Duas versões das instruções, porque são duas maneiras diferentes de
+       trabalhar: com o envio ligado, as fotografias vão sozinhas para o
+       backoffice; sem ele, são descarregadas e carregadas à mão. Mostrar os
+       passos do envio com o envio escondido era mandar o cliente procurar um
+       botão que não existe — foi o que aconteceu. -->
+  <div class="dica" id="comoEnviar" hidden>
+    <h2>Como usar</h2>
+    <ol>
+      <li>Escolha as fotografias acima e espere que fiquem prontas.</li>
+      <li>Dê um nome à pasta e carregue em <strong>Enviar</strong>. Ficam na
+        biblioteca do backoffice em um a três minutos.</li>
+      <li>No backoffice, abra a viatura, carregue em <strong>Fotografias</strong>
+        e escolha as da sua pasta — todas de uma vez.</li>
+    </ol>
+  </div>
+
+  <div class="dica" id="comoGuardar">
+    <h2>Como usar</h2>
+    <ol>
+      <li>Escolha as fotografias acima e espere que fiquem prontas.</li>
+      <li><strong>Guardar todas</strong> para as descarregar. No iPhone pode
+        antes carregar um segundo em cima de cada uma e escolher «Adicionar a
+        Fotografias».</li>
+      <li>No backoffice, abra a viatura, carregue em <strong>Fotografias</strong>
+        e escolha estas — todas de uma vez.</li>
+    </ol>
+  </div>
+
+  <p class="rodape">Ferramenta interna da LR Motors · <a href="/">voltar ao site</a></p>
+
+</div>
+
+<script>
+/* 2048 px e qualidade 0,95 — e não menos, apesar de o site só servir 1600 px.
+   ---------------------------------------------------------------------------
+   A fotografia é comprimida DUAS vezes: aqui, e outra vez na publicação, que a
+   reduz a 1600 px e grava em WebP. Comprimir duas vezes não é comprimir uma vez
+   mais forte: os defeitos da primeira passam a fazer parte da imagem que a
+   segunda tenta guardar.
+
+   Medido em quatro fotografias reais dos anúncios (o que o visitante acaba por
+   ver, comparado com o mesmo carro sem esta página pelo meio):
+
+       1600 px q82 ... custa 2,07 dB   ← primeira versão, apertada de mais
+       2048 px q92 ... custa 0,14 dB
+       2048 px q95 ... custa 0,01 dB   ← escolhido: sem diferença mensurável
+
+   Acima de 2048 px não se ganha nada: o site reduz a 1600 px de qualquer
+   maneira, e a medição não distingue 2048 de 2560 nem do original completo.
+   A 2048/q95 a maior das fotografias deu 1,3 MB — menos de metade do que o
+   backoffice aguenta, portanto a folga foi usada onde valia a pena. */
+const LADO_MAX = 2048;
+
+/* O upload falha acima de ~3,3 MB. 2,6 MB deixa margem para o browser gravar o
+   JPEG um pouco maior do que o previsto e para o cabeçalho do pedido. Só se
+   baixa a qualidade quando é preciso mesmo — na prática, quase nunca. */
+const ORCAMENTO = 2.6 * 1024 * 1024;
+const DEGRAUS = [0.95, 0.90, 0.85, 0.78, 0.70];
+
+const ficheiros = document.getElementById('ficheiros');
+const zona = document.getElementById('zona');
+const lista = document.getElementById('lista');
+const barra = document.getElementById('barra');
+const resumo = document.getElementById('resumo');
+
+let prontas = [];   // { nome, url, bytes }
+let antes = 0, depois = 0;
+
+/* Há para onde enviar? É o que decide se esta página é uma ferramenta de
+   enviar (o caso normal) ou de preparar e descarregar (o recurso, para quando
+   o Worker ainda não está instalado). O valor real é atribuído mais abaixo,
+   quando o endereço do Worker é lido. */
+let envioLigado = false;
+
+const kb = (n) => n >= 1048576
+  ? (n / 1048576).toFixed(1).replace('.', ',') + ' MB'
+  : Math.round(n / 1024) + ' KB';
+
+/* Desenhar num canvas e voltar a gravar é o que reduz a fotografia. Vem de
+   borla que o canvas não copia os metadados: as coordenadas de GPS que o
+   telemóvel grava em cada fotografia ficam para trás. */
+/* Tira os metadados de um JPEG sem lhe tocar na imagem.
+   ---------------------------------------------------------------------------
+   Uma fotografia que já cabe é devolvida tal e qual, para não levar uma segunda
+   compressão em cima. Só que "tal e qual" inclui o que o telemóvel lá escreveu:
+   modelo do aparelho, data, hora e as COORDENADAS DE GPS do sítio onde a foto
+   foi tirada. O repositório do site é público, portanto isso não fica bem lá.
+
+   Um JPEG é uma sequência de segmentos `FF <marca> <tamanho> <conteúdo>` até ao
+   início da imagem comprimida (SOS, `FF DA`). Os metadados vivem todos nos
+   segmentos APPn e no comentário; deitá-los fora é copiar o ficheiro sem eles.
+   Os bytes da imagem em si não são tocados — daí não haver perda nenhuma.
+
+   A excepção é a ORIENTAÇÃO, que também vive no EXIF. Se fosse à vida com o
+   resto, as fotografias tiradas na vertical passavam a aparecer deitadas. Por
+   isso lê-se antes de apagar e volta a escrever-se um EXIF mínimo só com ela. */
+function exifMinimo(orientacao) {
+  const buf = new ArrayBuffer(34);
+  const d = new DataView(buf);
+  d.setUint16(0, 32 + 2);                    // tamanho do segmento, com estes 2 bytes
+  for (const [i, c] of [...'Exif\0\0'].entries()) d.setUint8(2 + i, c.charCodeAt(0));
+  d.setUint16(8, 0x4949, true);              // "II": números em little-endian
+  d.setUint16(10, 42, true);                 // marca de água do formato TIFF
+  d.setUint32(12, 8, true);                  // onde começa a primeira tabela
+  d.setUint16(16, 1, true);                  // uma entrada só
+  d.setUint16(18, 0x0112, true);             // etiqueta: Orientation
+  d.setUint16(20, 3, true);                  // tipo: inteiro de 16 bits
+  d.setUint32(22, 1, true);                  // quantidade: 1
+  d.setUint16(26, orientacao, true);         // o valor, já aqui por ser pequeno
+  d.setUint32(30, 0, true);                  // não há mais tabelas
+  return new Uint8Array(buf);
+}
+
+function lerOrientacao(b) {
+  for (let i = 2; i + 4 < b.length && b[i] === 0xFF;) {
+    const marca = b[i + 1];
+    const tam = (b[i + 2] << 8) | b[i + 3];
+    if (marca === 0xDA || marca === 0xD9) break;
+    if (marca === 0xE1 && String.fromCharCode(...b.slice(i + 4, i + 8)) === 'Exif') {
+      const t = i + 10;                                       // início do bloco TIFF
+      const le = b[t] === 0x49;
+      const d = new DataView(b.buffer, b.byteOffset + t, b.length - t);
+      const ifd = d.getUint32(4, le);
+      const n = d.getUint16(ifd, le);
+      for (let e = 0; e < n; e++) {
+        const p = ifd + 2 + e * 12;
+        if (d.getUint16(p, le) === 0x0112) return d.getUint16(p + 8, le) || 1;
+      }
+      return 1;
+    }
+    i += 2 + tam;
+  }
+  return 1;
+}
+
+async function semMetadados(ficheiro) {
+  try {
+    const b = new Uint8Array(await ficheiro.arrayBuffer());
+    if (b[0] !== 0xFF || b[1] !== 0xD8) return ficheiro;       // não é JPEG: fica como está
+    const orientacao = lerOrientacao(b);
+    const pedacos = [new Uint8Array([0xFF, 0xD8])];
+    if (orientacao !== 1) pedacos.push(new Uint8Array([0xFF, 0xE1]), exifMinimo(orientacao));
+
+    let i = 2;
+    while (i + 4 <= b.length && b[i] === 0xFF) {
+      const marca = b[i + 1];
+      if (marca === 0xDA) { pedacos.push(b.subarray(i)); break; }   // daqui p'ra frente é imagem
+      const tam = 2 + ((b[i + 2] << 8) | b[i + 3]);
+      /* Só os segmentos que guardam dados sobre quem tirou a fotografia:
+         APP1 (o EXIF com o GPS, e também o XMP), APP13 (blocos do Photoshop,
+         onde vai o IPTC) e os comentários.
+
+         O APP2 fica, e é de propósito: é lá que vive o perfil de cor. As
+         fotografias do iPhone são em Display P3, e sem o perfil o browser
+         lê-as como se fossem sRGB — as cores do carro saem lavadas. Deitar
+         fora tudo o que começa por APP era a maneira fácil, e estragava-as. */
+      const privado = marca === 0xE1 || marca === 0xED || marca === 0xFE;
+      if (!privado) pedacos.push(b.subarray(i, i + tam));
+      i += tam;
+    }
+    const limpo = new Blob(pedacos, { type: 'image/jpeg' });
+    /* Se por alguma razão o resultado ficou maior, ou vazio, algo correu mal na
+       leitura dos segmentos — devolve-se o original, que é sempre seguro. */
+    return limpo.size > 0 && limpo.size <= ficheiro.size ? limpo : ficheiro;
+  } catch {
+    return ficheiro;
+  }
+}
+
+async function reduzir(ficheiro) {
+  let largura, altura, fonte;
+
+  /* `imageOrientation: 'from-image'` é o que impede as fotografias tiradas na
+     vertical de saírem deitadas — a rotação vive nos metadados, e o canvas
+     ignora-os a não ser que se peça. */
+  if (self.createImageBitmap) {
+    fonte = await createImageBitmap(ficheiro, { imageOrientation: 'from-image' });
+    largura = fonte.width; altura = fonte.height;
+  } else {
+    const url = URL.createObjectURL(ficheiro);
+    fonte = await new Promise((ok, falha) => {
+      const im = new Image();
+      im.onload = () => ok(im);
+      im.onerror = () => falha(new Error('formato não reconhecido'));
+      im.src = url;
+    });
+    URL.revokeObjectURL(url);
+    largura = fonte.naturalWidth; altura = fonte.naturalHeight;
+  }
+
+  /* Se a fotografia JÁ CABE, devolve-se tal e qual.
+     A melhor fotografia possível é a que só é comprimida uma vez, na
+     publicação. Voltar a gravá-la aqui não a melhorava — e chegou a piorá-la:
+     uma foto de 822 KB saía com 1,2 MB, maior e com mais uma compressão em
+     cima. Reduzir só faz sentido no que não passa no upload. */
+  if (ficheiro.size <= ORCAMENTO) {
+    if (fonte.close) fonte.close();
+    return { bloco: await semMetadados(ficheiro), largura, altura, intacta: true };
+  }
+
+  /* Desenhar e gravar. Só se volta a tentar com menos qualidade se o ficheiro
+     não couber no orçamento; e só se corta o tamanho se nem a qualidade mais
+     baixa chegar — uma fotografia de carro nunca lá chega, mas assim não há
+     hipótese de a página devolver algo que o backoffice recuse. */
+  for (const lado of [LADO_MAX, Math.round(LADO_MAX / 1.5)]) {
+    const escala = Math.min(1, lado / Math.max(largura, altura));
+    const tela = document.createElement('canvas');
+    tela.width = Math.round(largura * escala);
+    tela.height = Math.round(altura * escala);
+    const ctx = tela.getContext('2d');
+    ctx.imageSmoothingQuality = 'high';
+    ctx.drawImage(fonte, 0, 0, tela.width, tela.height);
+
+    for (const q of DEGRAUS) {
+      const bloco = await new Promise((ok) => tela.toBlob(ok, 'image/jpeg', q));
+      if (!bloco) throw new Error('não foi possível converter');
+      const ultimo = lado !== LADO_MAX && q === DEGRAUS.at(-1);
+      if (bloco.size <= ORCAMENTO || ultimo) {
+        if (fonte.close) fonte.close();
+        return { bloco, largura: tela.width, altura: tela.height };
+      }
+    }
+  }
+}
+
+function linha({ nome, aviso, url, original, nova, medidas, intacta }) {
+  const li = document.createElement('li');
+  if (aviso) {
+    li.className = 'mau';
+    li.innerHTML = `<div><div class="nome"></div><div class="medidas">${aviso}</div></div>`;
+    li.querySelector('.nome').textContent = nome;
+    return li;
+  }
+  /* Descarregar só faz sentido quando NÃO há para onde enviar. Com o envio
+     ligado, o caminho é um só — escolher, dar nome à pasta, enviar — e um
+     botão de guardar ao lado de cada fotografia é convite a fazer o trabalho
+     duas vezes. */
+  li.innerHTML = '<img alt="" loading="lazy">'
+    + '<div><div class="nome"></div><div class="medidas"></div></div>'
+    + (envioLigado ? '' : '<a class="btn btn--claro" download>Guardar</a>');
+  li.querySelector('img').src = url;
+  li.querySelector('.nome').textContent = nome;
+  if (!envioLigado) {
+    /* Sem isto, um leitor de ecrã anuncia cinquenta ligações todas chamadas
+       "Guardar" e não há forma de saber qual é qual. */
+    li.querySelector('a').setAttribute('aria-label', `Guardar ${nome}`);
+  }
+  /* Dizer qual foi mexida e qual não foi. Uma fotografia que já cabia sai daqui
+     exactamente como entrou, e o cliente tem de o poder ver — senão fica com a
+     ideia de que a página lhe estragou todas de igual maneira. */
+  li.querySelector('.medidas').innerHTML = intacta
+    ? `<strong>${kb(nova)}</strong> · ${medidas} · <span class="intacta">imagem intacta</span>`
+    : `<del>${kb(original)}</del> &rarr; <strong>${kb(nova)}</strong> · ${medidas}`;
+  const a = li.querySelector('a');
+  if (a) { a.href = url; a.download = nome; }
+  return li;
+}
+
+/* Sinal de cancelamento. `tratar()` é um ciclo assíncrono que pode levar meio
+   minuto com cinquenta fotografias; sem isto, o botão de limpar esvaziava a
+   lista e as fotografias voltavam a aparecer sozinhas, porque o ciclo continuava
+   a correr por cima do estado já limpo. */
+let geracao = 0;
+let aTrabalhar = false;
+
+async function tratar(escolhidas) {
+  const minha = ++geracao;
+  aTrabalhar = true;
+  actualizar();
+
+  let n = 0;
+  for (const f of escolhidas) {
+    if (geracao !== minha) return;                  // o cliente carregou em Limpar
+    n++;
+    progresso(n, escolhidas.length);
+
+    /* O SVG é apanhado à parte porque se disfarça bem: o browser diz que é
+       `image/svg+xml`, portanto passava no teste de baixo e ia falhar mais à
+       frente com uma mensagem a mandar tentar pelo iPhone — conselho inútil,
+       porque o problema não é o aparelho. E é sempre recusado: um SVG é um
+       documento que pode trazer JavaScript lá dentro, e serviria a partir do
+       domínio do stand. */
+    if (f.type === 'image/svg+xml' || /\.svgz?$/i.test(f.name)) {
+      lista.append(linha({
+        nome: f.name,
+        aviso: 'Um SVG é um desenho, não uma fotografia — o site não o aceita. '
+             + 'Se precisa mesmo desta imagem, guarde-a primeiro como JPEG ou PNG.',
+      }));
+      continue;
+    }
+
+    if (!f.type.startsWith('image/') && !/\.(jpe?g|jfif|png|heic|heif|webp|avif|gif|bmp|tiff?)$/i.test(f.name)) {
+      /* Não desaparecer em silêncio. Escolher um vídeo por engano na galeria do
+         iPhone é banal, e no arrastar para o computador o `accept` do input nem
+         sequer se aplica — o ficheiro entrava aqui e não deixava rasto nenhum. */
+      lista.append(linha({ nome: f.name, aviso: 'Isto não é uma fotografia — foi ignorado.' }));
+      continue;
+    }
+
+    let r;
+    try {
+      r = await reduzir(f);
+    } catch (e) {
+      /* O conselho tem de servir para o caso concreto. Um HEIC do iPhone aberto
+         no Chrome ou no Windows não se descodifica, e aí faz sentido dizer para
+         tentar pelo telemóvel; num ficheiro estragado, não faz nenhum. */
+      const heic = /\.hei[cf]$/i.test(f.name) || /hei[cf]/i.test(f.type);
+      lista.append(linha({
+        nome: f.name,
+        aviso: heic
+          ? 'Este formato do iPhone não abre neste computador. Faça a partir do '
+            + 'telemóvel, ou guarde a fotografia como JPEG primeiro.'
+          : 'Não consegui abrir este ficheiro — pode estar estragado ou não ser '
+            + 'mesmo uma fotografia.',
+      }));
+      continue;
+    }
+    if (geracao !== minha) return;
+
+    /* A que não foi mexida guarda o nome original — pode ser um PNG ou um WebP,
+       e trocar-lhe a extensão para .jpg daria um ficheiro que mente sobre o que
+       é. A convertida sai sempre em .jpg, que é o que o canvas produziu. */
+    const nome = r.intacta ? f.name : f.name.replace(/\.[^.]+$/, '') + '.jpg';
+    const url = URL.createObjectURL(r.bloco);
+    prontas.push({ nome, url, intacta: r.intacta });
+    /* Contabilizar só as que foram MESMO reduzidas: somar as intactas ao "antes"
+       e ao "depois" dava uma poupança colada à frase "N reduzidas" que não era a
+       poupança dessas N. */
+    if (!r.intacta) { antes += f.size; depois += r.bloco.size; }
+
+    lista.append(linha({
+      nome, url, original: f.size, nova: r.bloco.size, intacta: r.intacta,
+      medidas: `${r.largura}×${r.altura} px`,
+    }));
+    actualizar();
+  }
+
+  if (geracao === minha) { aTrabalhar = false; actualizar(); }
+}
+
+function progresso(feitas, total) {
+  if (total > 1) resumo.textContent = `A preparar ${feitas} de ${total}…`;
+  barra.classList.add('ver');
+}
+
+function actualizar() {
+  /* O botão de guardar tudo fica DESLIGADO enquanto há trabalho a decorrer.
+     Estava clicável desde a primeira fotografia pronta, dizia "todas" e
+     guardava só as que já lá estavam, sem nada indicar que faltavam as outras. */
+  const todas = document.getElementById('todas');
+  todas.disabled = aTrabalhar || !prontas.length;
+  todas.textContent = aTrabalhar ? 'A preparar…' : 'Guardar todas';
+  /* Com o envio ligado o botão está escondido, e o «A preparar…» tem de
+     aparecer noutro sítio — no de enviar, que é o que o cliente está a olhar. */
+  /* Por getElementById e não pela variável lá de baixo: esta função corre antes
+     de o resto do guião estar declarado. */
+  const env = document.getElementById('enviar');
+  if (env) {
+    env.disabled = aTrabalhar || !prontas.length;
+    if (!env.dataset.ocupado) env.textContent = aTrabalhar ? 'A preparar…' : 'Enviar';
+  }
+
+  if (!prontas.length && !aTrabalhar) { barra.classList.remove('ver'); return; }
+  barra.classList.add('ver');
+  if (aTrabalhar) return;                     // a contagem fica a cargo de progresso()
+
+  const mexidas = prontas.filter((f) => !f.intacta).length;
+  resumo.innerHTML = `<strong>${prontas.length}</strong> `
+    + (prontas.length === 1 ? 'fotografia pronta' : 'fotografias prontas')
+    + (mexidas
+      ? ` · ${mexidas} ${mexidas === 1 ? 'foi reduzida' : 'reduzidas'} `
+        + `<span class="poupanca">(${kb(antes)} &rarr; ${kb(depois)})</span>`
+      : ' · <span class="poupanca">todas já cabiam</span>');
+}
+
+ficheiros.addEventListener('change', () => {
+  tratar([...ficheiros.files]);
+  ficheiros.value = '';        // deixa voltar a escolher o mesmo ficheiro
+});
+
+/* Arrastar para cima da zona, no computador. */
+for (const ev of ['dragenter', 'dragover']) {
+  zona.addEventListener(ev, (e) => { e.preventDefault(); zona.classList.add('sobre'); });
+}
+for (const ev of ['dragleave', 'drop']) {
+  zona.addEventListener(ev, () => zona.classList.remove('sobre'));
+}
+zona.addEventListener('drop', (e) => {
+  e.preventDefault();
+  tratar([...e.dataTransfer.files]);
+});
+
+/* Guardar todas: descarregamentos seguidos são bloqueados se dispararem todos
+   no mesmo instante, daí o intervalo. No iPhone o Safari só deixa passar o
+   primeiro — por isso cada fotografia tem também o seu botão, e a dica em
+   baixo explica o caminho do «Adicionar a Fotografias». */
+let temporizadores = [];
+
+document.getElementById('todas').addEventListener('click', () => {
+  prontas.forEach((f, i) => temporizadores.push(setTimeout(() => {
+    const a = document.createElement('a');
+    a.href = f.url; a.download = f.nome;
+    document.body.append(a); a.click(); a.remove();
+  }, i * 350)));
+});
+
+/* ==========================================================================
+   Enviar para a biblioteca do backoffice.
+
+   O endereço do Worker é injectado no build a partir de data/definicoes.json.
+   Enquanto estiver vazio, esta parte não aparece e a página continua a servir
+   para preparar as fotografias e guardá-las no telemóvel.
+   ========================================================================== */
+const WORKER = '__WORKER_FOTOS__'.replace(/^__.*__$/, '');
+
+const envio = document.getElementById('envio');
+const campoPasta = document.getElementById('pasta');
+const campoSenha = document.getElementById('senha');
+const botaoEnviar = document.getElementById('enviar');
+const resultado = document.getElementById('resultado');
+const ajudaPasta = document.getElementById('ajuda-pasta');
+
+let pastasExistentes = null;
+
+if (WORKER) {
+  envioLigado = true;
+  envio.hidden = false;
+  document.getElementById('comoEnviar').hidden = false;
+  document.getElementById('comoGuardar').hidden = true;
+  document.getElementById('todas').hidden = true;
+  /* A senha fica no telemóvel do cliente e não no código — o código é público.
+     É só uma comodidade: quem a valida é o Worker. */
+  campoSenha.value = localStorage.getItem('lr:senha-fotos') || '';
+  proporPasta();
+  /* Escrita a senha pela primeira vez, já se pode ir buscar as pastas. */
+  campoSenha.addEventListener('change', () => { if (!pastasExistentes) proporPasta(); });
+}
+
+/* Propõe um nome de pasta que ainda não exista. A lista vem do Worker e não do
+   browser: a API pública do GitHub dá 60 pedidos por hora por endereço, e um
+   escritório inteiro atrás de um só IP esgota isso sem dar por ela.
+   Sem senha ainda, ou se falhar, propõe-se «carro-01» à mesma — o pior que
+   acontece é o cliente ver o aviso de que a pasta já existe. */
+async function proporPasta() {
+  if (campoSenha.value) {
+    try {
+      pastasExistentes = (await aoWorker('/pastas', {})).pastas;
+    } catch {
+      pastasExistentes = null;
+    }
+  }
+  let n = 1;
+  while (pastasExistentes && pastasExistentes.includes(`carro-${String(n).padStart(2, '0')}`)) n++;
+  const proposto = `carro-${String(n).padStart(2, '0')}`;
+  /* Não pisar o que o cliente tiver escrito entretanto — a lista chega tarde. */
+  if (!campoPasta.value || /^carro-\d\d$/.test(campoPasta.value)) campoPasta.value = proposto;
+  verificarPasta();
+}
+
+function verificarPasta() {
+  const nome = campoPasta.value.trim();
+  const forma = /^[a-z0-9]+(?:-[a-z0-9]+)*$/.test(nome) && nome.length <= 60;
+  campoPasta.setAttribute('aria-invalid', forma ? 'false' : 'true');
+
+  if (!nome) {
+    ajudaPasta.className = 'ajuda ajuda--mau';
+    ajudaPasta.textContent = 'Falta o nome da pasta.';
+  } else if (!forma) {
+    ajudaPasta.className = 'ajuda ajuda--mau';
+    ajudaPasta.textContent = 'Só letras minúsculas, números e hífens. Sem espaços nem acentos.';
+  } else if (pastasExistentes && pastasExistentes.includes(nome)) {
+    /* Aviso, não erro: juntar fotografias a um carro que já lá está é uma
+       coisa que se quer fazer. O que não se quer é fazê-lo sem dar por isso. */
+    ajudaPasta.className = 'ajuda ajuda--aviso';
+    ajudaPasta.textContent = `A pasta "${nome}" já existe — estas fotografias juntam-se às que lá estão.`;
+  } else {
+    ajudaPasta.className = 'ajuda';
+    ajudaPasta.innerHTML = 'Letras minúsculas, números e hífens. Dê-lhe o nome do carro para '
+      + 'se encontrar depois — por exemplo <code>bmw-serie-3</code>.';
+  }
+  return forma;
+}
+
+campoPasta.addEventListener('input', verificarPasta);
+
+const base64 = (bloco) => new Promise((ok, falha) => {
+  const l = new FileReader();
+  l.onload = () => ok(String(l.result).replace(/^[^,]*,/, ''));
+  l.onerror = () => falha(new Error('não consegui ler o ficheiro'));
+  l.readAsDataURL(bloco);
+});
+
+async function aoWorker(rota, corpo) {
+  const r = await fetch(WORKER.replace(/\/+$/, '') + rota, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ senha: campoSenha.value, ...corpo }),
+  });
+  const d = await r.json().catch(() => ({}));
+  if (!r.ok) throw new Error(d.erro || `erro ${r.status}`);
+  return d;
+}
+
+function dizer(texto, classe = '') {
+  resultado.className = 'resultado' + (classe ? ' resultado--' + classe : '');
+  resultado.textContent = texto;
+}
+
+botaoEnviar.addEventListener('click', async () => {
+  if (aTrabalhar) return dizer('Espere que as fotografias fiquem prontas.', 'mau');
+  if (!prontas.length) return dizer('Não há fotografias para enviar.', 'mau');
+  if (!verificarPasta()) { campoPasta.focus(); return dizer('Corrija o nome da pasta.', 'mau'); }
+  if (!campoSenha.value) { campoSenha.focus(); return dizer('Falta a senha.', 'mau'); }
+
+  botaoEnviar.disabled = true;
+  botaoEnviar.dataset.ocupado = '1';     // impede actualizar() de pisar o progresso
+  const pasta = campoPasta.value.trim();
+
+  try {
+    /* Uma fotografia por pedido. Assim o Worker nunca tem mais do que uma
+       fotografia em memória, e há por onde mostrar o progresso — que com
+       cinquenta fotografias num telemóvel não é detalhe nenhum. */
+    const enviados = [];
+    for (const [i, f] of prontas.entries()) {
+      botaoEnviar.textContent = `A enviar ${i + 1} de ${prontas.length}…`;
+      dizer(`${f.nome}…`);
+      const bloco = await (await fetch(f.url)).blob();
+      const r = await aoWorker('/blob', { nome: f.nome, conteudo: await base64(bloco) });
+      enviados.push({ nome: r.nome, sha: r.sha });
+    }
+
+    botaoEnviar.textContent = 'A gravar…';
+    const r = await aoWorker('/commit', { pasta, ficheiros: enviados });
+
+    /* Só se guarda a senha depois de o Worker a ter aceite: guardá-la mal é
+       escrita deixava o cliente preso a uma senha errada sem perceber porquê. */
+    localStorage.setItem('lr:senha-fotos', campoSenha.value);
+    if (pastasExistentes && !pastasExistentes.includes(pasta)) pastasExistentes.push(pasta);
+
+    dizer(`Enviadas ${r.quantas} ${r.quantas === 1 ? 'fotografia' : 'fotografias'} `
+        + `para a pasta "${r.pasta}". Aparecem na biblioteca do backoffice em `
+        + 'um a três minutos.', 'bom');
+    verificarPasta();
+  } catch (e) {
+    dizer(e.message || 'Não consegui enviar.', 'mau');
+    if (/senha/i.test(e.message || '')) campoSenha.focus();
+  } finally {
+    delete botaoEnviar.dataset.ocupado;
+    botaoEnviar.disabled = false;
+    botaoEnviar.textContent = 'Enviar';
+  }
+});
+
+document.getElementById('limpar').addEventListener('click', () => {
+  /* Pela ordem certa: primeiro travar o que está a decorrer, só depois deitar
+     fora os blobs. Cinquenta fotografias descarregam ao longo de 17 segundos;
+     revogar os URLs antes de cancelar os temporizadores deixava os que faltavam
+     a carregar em ligações mortas, sem erro nenhum à vista. */
+  geracao++;
+  aTrabalhar = false;
+  temporizadores.forEach(clearTimeout);
+  temporizadores = [];
+  prontas.forEach((f) => URL.revokeObjectURL(f.url));
+  prontas = []; antes = depois = 0;
+  lista.textContent = '';
+  actualizar();
+});
+
+/* Estado inicial: sem fotografias, nem «Guardar todas» nem «Enviar» têm o que
+   fazer. Sem esta chamada ficavam ligados até à primeira fotografia. */
+actualizar();
+</script>
+</body>
+</html>

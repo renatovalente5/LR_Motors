@@ -1,0 +1,105 @@
+# ============================================================================
+# Publica o site da LR Motors no GitHub Pages.
+#
+# Corre sempre que alguma coisa muda em `main` — incluindo o que o cliente
+# grava no backoffice — e também à mão, pelo botão "Run workflow".
+#
+# Nota: em Settings → Pages, a origem tem de estar em "GitHub Actions".
+# Se ficar na opção antiga, o GitHub tenta processar o repositório com Jekyll
+# e publica o código-fonte em vez do site gerado.
+# ============================================================================
+name: Publicar site
+
+on:
+  push:
+    branches: [main]
+    paths-ignore:
+      - 'README.md'
+      - 'PLANO.md'
+      - '_fonte/**'
+  workflow_dispatch:
+    inputs:
+      payload:
+        # O Pages CMS envia sempre este input ao disparar do backoffice. Se não
+        # estiver declarado, o GitHub recusa o dispatch com "unexpected input".
+        description: 'Contexto do Pages CMS — deixar vazio se disparar à mão'
+        required: false
+        default: ''
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Uma publicação de cada vez. Se o cliente gravar três anúncios seguidos, só o
+# último build interessa — os anteriores são cancelados em vez de ficarem em fila.
+concurrency:
+  group: pages
+  cancel-in-progress: true
+
+jobs:
+  construir:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+
+      - name: Instalar o Pillow
+        run: pip install --quiet Pillow
+
+      # O Pages CMS grava a foto exactamente como saiu do telemóvel — 3000 px e
+      # vários MB. Aqui geram-se as versões de 480/960/1600 px em WebP que o
+      # site serve. Os originais nunca chegam ao visitante.
+      - name: Preparar as fotografias
+        run: python3 scripts/otimizar-imagens.py --varrer
+
+      # O site tem domínio próprio, lrmotorsautomoveis.pt, e um domínio próprio
+      # serve na RAIZ. Enquanto isto esteve em `/LR_Motors`, tudo o que o HTML
+      # pedia — folha de estilo, JavaScript, fotografias, ligações entre páginas
+      # — apontava para `/LR_Motors/...`, que no domínio dá 404: o site esteve
+      # no ar sem estilos e sem navegação. Se um dia o domínio cair, o que muda
+      # aqui é BASE para /LR_Motors e SITE para o endereço github.io.
+      - name: Gerar o site
+        run: node scripts/gerar.mjs
+        env:
+          BASE: ''
+          SITE: https://lrmotorsautomoveis.pt
+
+      # Rede de segurança para o que partiu o site: se o HTML voltar a pedir
+      # caminhos com /LR_Motors/, a publicação falha aqui em vez de ir para o ar.
+      - name: Confirmar que os caminhos servem o domínio
+        run: |
+          test -f _site/CNAME || { echo "falta o CNAME no que vai ser publicado"; exit 1; }
+          if grep -rq '"/LR_Motors/' _site --include='*.html'; then
+            echo "há caminhos /LR_Motors/ no HTML — no domínio próprio dão 404"; exit 1
+          fi
+          echo "caminhos e CNAME conferidos"
+
+      - name: Verificar o resultado
+        run: |
+          test -f _site/index.html || { echo "falta o index.html"; exit 1; }
+          test -f _site/sitemap.xml || { echo "falta o sitemap"; exit 1; }
+          n=$(find _site/viaturas -mindepth 1 -maxdepth 1 -type d | wc -l)
+          echo "páginas de viatura geradas: $n"
+          test "$n" -gt 0 || { echo "nenhuma viatura gerada"; exit 1; }
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
+  publicar:
+    needs: construir
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deploy.outputs.page_url }}
+    steps:
+      - id: deploy
+        uses: actions/deploy-pages@v4
