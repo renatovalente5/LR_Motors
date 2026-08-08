@@ -68,6 +68,29 @@ const temPreco = (v) => typeof v.preco === 'number' && v.preco > 0;
 const precoTexto = (v) => temPreco(v) ? nEuro(v.preco) : 'Sob consulta';
 const nKm = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' km';
 
+/* Texto que o cliente escreve num campo de várias linhas do backoffice.
+   ---------------------------------------------------------------------------
+   Estava a ser posto dentro de um único <p>, e em HTML uma mudança de linha
+   não passa de um espaço: uma descrição escrita com parágrafos e uma lista de
+   extras — como as que o cliente copia do Standvirtual — saía toda seguida,
+   num bloco de texto de dez linhas sem uma pausa. Foi o que ele reportou.
+
+   Aqui: uma linha em branco separa parágrafos, uma mudança de linha simples
+   fica <br>, e o que estiver entre dois asteriscos aparece a negrito (o mesmo
+   que já se faz no aviso da visita).
+
+   A ordem importa. Escapa-se PRIMEIRO — senão um `<` escrito pelo cliente
+   passaria a marcação — e só depois se acrescenta o HTML que queremos. */
+function textoRico(bruto) {
+  const s = String(bruto ?? '').replace(/\r\n?/g, '\n').trim();
+  if (!s) return '';
+  return s.split(/\n{2,}/).map((paragrafo) => `<p>${
+    esc(paragrafo)
+      .replace(/\*\*([^*\n]+)\*\*/g, '<strong>$1</strong>')
+      .replace(/\n/g, '<br>')
+  }</p>`).join('');
+}
+
 const publicadas = todas.filter((v) => v.publicado !== false);
 const aVenda = publicadas.filter((v) => v.estado !== 'vendido');
 
@@ -1177,6 +1200,11 @@ function paginaViatura(v) {
 <script type="application/json" id="fotos-json">${JSON.stringify(fs_.map((f) => ({ src: f.src, srcset: f.srcset })))}</script>`
     : '<div class="galeria__principal" style="display:grid;place-items:center;color:var(--tinta-3)">Sem fotografias</div>';
 
+  /* Linhas vazias e espaços em volta fora: o campo é uma lista escrita à mão
+     no backoffice, e um Enter a mais deixava um marcador sozinho na página. */
+  const equipamento = (Array.isArray(v.equipamento) ? v.equipamento : [])
+    .map((x) => String(x ?? '').trim()).filter(Boolean);
+
   const aviso = v.estado === 'vendido'
     ? `<p class="painel__aviso painel__aviso--vendido">Esta viatura já foi vendida. Veja o <a href="${u('viaturas/')}">stock actual</a> ou diga-nos o que procura.</p>`
     : estaReservada(v)
@@ -1248,10 +1276,24 @@ function paginaViatura(v) {
           </dl>
         </div>
 
-        <div class="bloco">
+        <!-- Equipamento. A ordem é a que o cliente pediu: primeiro o que o
+             carro é (ficha técnica), depois o que traz, e só no fim o que o
+             stand tem a dizer sobre ele.
+
+             Esteve tempo demais fora do site: o campo existia no backoffice e
+             as onze viaturas tinham dez extras cada uma, vindos do
+             Standvirtual, que nunca chegaram a aparecer a ninguém. -->
+        ${equipamento.length ? `<div class="bloco">
+          <h2>Equipamento</h2>
+          <ul class="equipa">
+            ${equipamento.map((x) => `<li>${ic.check}<span>${esc(x)}</span></li>`).join('')}
+          </ul>
+        </div>` : ''}
+
+        ${textoRico(v.descricao) ? `<div class="bloco">
           <h2>Descrição</h2>
-          <p>${esc(v.descricao)}</p>
-        </div>
+          ${textoRico(v.descricao)}
+        </div>` : ''}
       </div>
 
     </div>

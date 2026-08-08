@@ -679,6 +679,26 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 .bloco { margin-top: clamp(1.8rem, 4vw, 2.6rem); }
 .bloco h2 { font-size: 1.22rem; font-weight: 800; letter-spacing: -.02em; margin-bottom: .9rem; }
 .bloco p { color: var(--tinta-2); max-width: 70ch; }
+/* Parágrafos seguidos precisam de respirar entre si. Sem isto, uma descrição
+   com três parágrafos lê-se como um bloco só — que era a queixa. */
+.bloco p + p { margin-top: .85rem; }
+
+/* Equipamento: colunas que se enchem sozinhas. Com trinta extras numa lista de
+   uma coluna a ficha ficava com meio metro de altura; com `auto-fill` são três
+   colunas no computador, duas no tablet e uma no telemóvel, sem media queries.
+   O `min(100%, 15rem)` é o que impede a coluna de ficar mais larga do que o
+   ecrã em telemóveis estreitos. */
+.equipa {
+  list-style: none; display: grid; gap: .55rem 1.1rem;
+  grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+}
+.equipa li {
+  display: grid; grid-template-columns: 17px 1fr; gap: .55rem; align-items: start;
+  color: var(--tinta-2); font-size: .96rem; line-height: 1.45;
+}
+/* O visto alinha com a PRIMEIRA linha do texto, não com o meio do item: em
+   extras de duas linhas, centrado, ficava a boiar. */
+.equipa svg { width: 17px; height: 17px; margin-top: .22em; color: var(--azul); }
 
 /* ========================================================== CONTACTO ==== */
 .contacto { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 2.2rem; }
