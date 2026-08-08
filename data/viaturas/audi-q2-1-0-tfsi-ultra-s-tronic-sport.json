@@ -1,5 +1,4 @@
 {
-  "slug": "audi-q2-1-0-tfsi-ultra-s-tronic-sport",
   "marca": "Audi",
   "modelo": "Q2",
   "versao": "1.0 TFSI ultra S tronic sport",
@@ -9,6 +8,24 @@
   "publicado": true,
   "reservado": false,
   "estado": "disponivel",
+  "fotos": [
+    "assets/veiculos/audi-q2-1-0-tfsi-ultra-s-tronic-sport/01-1600.webp",
+    "assets/veiculos/audi-q2-1-0-tfsi-ultra-s-tronic-sport/02-1600.webp",
+    "assets/veiculos/audi-q2-1-0-tfsi-ultra-s-tronic-sport/03-1600.webp",
+    "assets/veiculos/audi-q2-1-0-tfsi-ultra-s-tronic-sport/04-1600.webp",
+    "assets/veiculos/audi-q2-1-0-tfsi-ultra-s-tronic-sport/05-1600.webp",
+    "assets/veiculos/audi-q2/IMG_5837.jpg",
+    "assets/veiculos/audi-q2/IMG_5836.jpg",
+    "assets/veiculos/audi-q2/IMG_5842.jpeg",
+    "assets/veiculos/audi-q2/IMG_5851.jpeg",
+    "assets/veiculos/audi-q2/IMG_5832.jpg",
+    "assets/veiculos/audi-q2/IMG_5822.jpg",
+    "assets/veiculos/audi-q2/IMG_5824.jpg",
+    "assets/veiculos/audi-q2/IMG_5825.jpeg",
+    "assets/veiculos/audi-q2/IMG_5826.jpg",
+    "assets/veiculos/audi-q2/IMG_5827.jpg",
+    "assets/veiculos/audi-q2/IMG_5844.jpg"
+  ],
   "ano": 2018,
   "mes": "Janeiro",
   "km": 60000,
@@ -17,11 +34,9 @@
   "potencia": 116,
   "cilindrada": 999,
   "cor": "Preto",
-  "lugares": null,
   "portas": 5,
   "origem": "Importado",
   "garantia": "18 meses",
-  "descricao": "Audi Q2 1.0 TFSI ultra S tronic sport de 01/2018 com 60 000 km. Caixa automática, 116 cv, importado. Garantia de 18 meses.",
   "equipamento": [
     "AC automático bi-zona",
     "Cruise Control adaptativo",
@@ -34,13 +49,8 @@
     "Sensores de estacionamento traseiros",
     "Sensores de estacionamento dianteiros"
   ],
-  "fotos": [
-    "assets/veiculos/audi-q2-1-0-tfsi-ultra-s-tronic-sport/01-1600.webp",
-    "assets/veiculos/audi-q2-1-0-tfsi-ultra-s-tronic-sport/02-1600.webp",
-    "assets/veiculos/audi-q2-1-0-tfsi-ultra-s-tronic-sport/03-1600.webp",
-    "assets/veiculos/audi-q2-1-0-tfsi-ultra-s-tronic-sport/04-1600.webp",
-    "assets/veiculos/audi-q2-1-0-tfsi-ultra-s-tronic-sport/05-1600.webp"
-  ],
+  "descricao": "Garantia de 18 meses incluída no preço!\n\nAbsolutamente como NOVO!!\nApenas 60000 Km, motor 1.0 gasolina, 116cv, caixa automática, histórico de revisões, 2 chaves, manuais originais!\n\nPossibilidade de Financiamento e retoma;\n\nFull Extras\nCaixa Automática (modo Sport)\nCâmara traseira original (raro) \nCarPlay (Android e Apple) \nGPS (sistema de navegação)\nAudi connect\nAr condicionado Auto (independente)\nCruise control\nSensores estacionamento (C/gráfico)\nVolante desportivo C/ comandos Voz\nSensor Anticolisão\nBancos Desportivos\nApoio de braço\nVidros elétricos\nRetrovisores rebativeis\nSensores luz\nSensores chuva\nSensores Pressão Pneus\nComputador de bordo\nTranc/portas Auto\nISOFIX\nUSB\nAux\nPorta luvas C/CD e entrada cartões\nJantes e pneus novos\n\n*Pode ser visto zona Braga ou Vila do Conde!\n\nEste anúncio foi publicado por rotina informática. Todos os dados carecem de confirmação junto do comercial.\n",
   "destaque": false,
-  "ordem": 10
+  "ordem": 10,
+  "slug": "audi-q2-1-0-tfsi-ultra-s-tronic-sport"
 }
