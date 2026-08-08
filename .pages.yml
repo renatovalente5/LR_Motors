@@ -265,21 +265,30 @@ content:
           "Garantia incluída". Aparece como etiqueta no cartão e na ficha.
           Vazio mostra só a referência à garantia legal.
 
-      # ─────────── textos
-      - name: descricao
-        label: Descrição
-        type: text
-        description: >-
-          Duas ou três frases. Diga o que a ficha técnica não diz: estado,
-          histórico, extras que valham a pena. Se houver algum defeito
-          conhecido, é aqui que deve ficar escrito — é o que protege o stand.
+      # ─────────── o que traz, e o que se diz dele
       - name: equipamento
         label: Equipamento
         type: string
         list: true
         description: >-
           Um item por linha, curto. Exemplo: Câmara de marcha-atrás.
-          Não repita o que já está na ficha técnica.
+          Aparece na página da viatura entre a ficha técnica e a descrição,
+          em lista de duas ou três colunas com um visto em cada item.
+          Não repita o que já está na ficha técnica (ano, quilómetros,
+          combustível, caixa, potência, cor, portas) nem o que escrever na
+          descrição — é o mesmo carro contado três vezes.
+      - name: descricao
+        label: Descrição
+        type: text
+        description: >-
+          Duas ou três frases. Diga o que a ficha técnica não diz: estado,
+          histórico, o que faz esta viatura valer a pena. Se houver algum
+          defeito conhecido, é aqui que deve ficar escrito — é o que protege o
+          stand. Não precisa de repetir os extras: esses vão no campo
+          Equipamento, que aparece logo acima desta secção na página.
+          Os parágrafos e as mudanças de linha que escrever aqui aparecem no
+          site tal como os deixar. Para pôr uma frase a negrito, escreva-a
+          entre dois asteriscos de cada lado, assim: **Garantia incluída**.
 
       # ─────────── onde aparece na página inicial
       - name: destaque
