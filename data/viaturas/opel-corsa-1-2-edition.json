@@ -1,5 +1,4 @@
 {
-  "slug": "opel-corsa-1-2-edition",
   "marca": "Opel",
   "modelo": "Corsa",
   "versao": "1.2 Edition",
@@ -9,6 +8,29 @@
   "publicado": true,
   "reservado": false,
   "estado": "disponivel",
+  "fotos": [
+    "assets/veiculos/opel-corsa-1-2-edition/01-1600.webp",
+    "assets/veiculos/opel-corsa-1-2-edition/02-1600.webp",
+    "assets/veiculos/opel-corsa-1-2-edition/03-1600.webp",
+    "assets/veiculos/opel-corsa-1-2-edition/04-1600.webp",
+    "assets/veiculos/corsa/IMG_6995.jpg",
+    "assets/veiculos/corsa/IMG_6996.jpg",
+    "assets/veiculos/corsa/IMG_6990.jpg",
+    "assets/veiculos/corsa/IMG_6984.jpg",
+    "assets/veiculos/corsa/IMG_7004.jpg",
+    "assets/veiculos/corsa/IMG_7005.jpg",
+    "assets/veiculos/corsa/IMG_7006.jpg",
+    "assets/veiculos/corsa/IMG_7008.jpg",
+    "assets/veiculos/corsa/IMG_7009.jpg",
+    "assets/veiculos/corsa/IMG_7010.jpg",
+    "assets/veiculos/corsa/IMG_6997.jpg",
+    "assets/veiculos/corsa/IMG_6998.jpg",
+    "assets/veiculos/corsa/IMG_6999.jpg",
+    "assets/veiculos/corsa/IMG_7001.jpg",
+    "assets/veiculos/corsa/IMG_7002.jpg",
+    "assets/veiculos/corsa/IMG_6991.jpg",
+    "assets/veiculos/corsa/IMG_6988.jpg"
+  ],
   "ano": 2023,
   "mes": "Agosto",
   "km": 36969,
@@ -17,11 +39,9 @@
   "potencia": 75,
   "cilindrada": 1199,
   "cor": "Prateado",
-  "lugares": null,
   "portas": 5,
   "origem": "Nacional",
   "garantia": "18 meses",
-  "descricao": "Opel Corsa 1.2 Edition de 08/2023 com 36 969 km. Caixa manual, 75 cv, viatura nacional. Garantia de 18 meses.",
   "equipamento": [
     "AC manual",
     "Cruise Control",
@@ -34,13 +54,8 @@
     "Sensores de estacionamento traseiros",
     "Câmara de marcha-atrás"
   ],
-  "fotos": [
-    "assets/veiculos/opel-corsa-1-2-edition/01-1600.webp",
-    "assets/veiculos/opel-corsa-1-2-edition/02-1600.webp",
-    "assets/veiculos/opel-corsa-1-2-edition/03-1600.webp",
-    "assets/veiculos/opel-corsa-1-2-edition/04-1600.webp",
-    "assets/veiculos/opel-corsa-1-2-edition/05-1600.webp"
-  ],
+  "descricao": "Opel Corsa 1.2 Edition de 08/2023 com 36 969 km. Caixa manual, 75 cv, viatura nacional. Garantia de 18 meses.",
   "destaque": true,
-  "ordem": 6
+  "ordem": 6,
+  "slug": "opel-corsa-1-2-edition"
 }
