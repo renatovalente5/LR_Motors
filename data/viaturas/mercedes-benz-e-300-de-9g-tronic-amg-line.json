@@ -1,5 +1,4 @@
 {
-  "slug": "mercedes-benz-e-300-de-9g-tronic-amg-line",
   "marca": "Mercedes-Benz",
   "modelo": "E 300",
   "versao": "de 9G-TRONIC AMG Line",
@@ -9,6 +8,13 @@
   "publicado": true,
   "reservado": false,
   "estado": "disponivel",
+  "fotos": [
+    "assets/veiculos/mercedes-benz-e-300-de-9g-tronic-amg-line/01-1600.webp",
+    "assets/veiculos/mercedes-benz-e-300-de-9g-tronic-amg-line/02-1600.webp",
+    "assets/veiculos/mercedes-benz-e-300-de-9g-tronic-amg-line/03-1600.webp",
+    "assets/veiculos/mercedes-benz-e-300-de-9g-tronic-amg-line/04-1600.webp",
+    "assets/veiculos/mercedes-benz-e-300-de-9g-tronic-amg-line/05-1600.webp"
+  ],
   "ano": 2023,
   "mes": "Março",
   "km": 66000,
@@ -17,12 +23,10 @@
   "potencia": 306,
   "cilindrada": 1950,
   "cor": "Cinzento",
-  "lugares": null,
   "portas": 5,
   "origem": "Importado",
   "registos_anteriores": 1,
   "garantia": "18 meses",
-  "descricao": "Mercedes-Benz E 300 de 9G-TRONIC AMG Line de 03/2023 com 66 000 km. Caixa automática, 306 cv, importado. Garantia de 18 meses.",
   "equipamento": [
     "AC automático bi-zona",
     "Cruise Control adaptativo",
@@ -35,13 +39,8 @@
     "Navegação GPS",
     "Sensores de estacionamento traseiros"
   ],
-  "fotos": [
-    "assets/veiculos/mercedes-benz-e-300-de-9g-tronic-amg-line/01-1600.webp",
-    "assets/veiculos/mercedes-benz-e-300-de-9g-tronic-amg-line/02-1600.webp",
-    "assets/veiculos/mercedes-benz-e-300-de-9g-tronic-amg-line/03-1600.webp",
-    "assets/veiculos/mercedes-benz-e-300-de-9g-tronic-amg-line/04-1600.webp",
-    "assets/veiculos/mercedes-benz-e-300-de-9g-tronic-amg-line/05-1600.webp"
-  ],
+  "descricao": "Mercedes-Benz E 300 de 9G-TRONIC AMG Line de 03/2023 com 66 000 km. Caixa automática, 306 cv, importado. Garantia de 18 meses.",
   "destaque": true,
-  "ordem": 4
+  "ordem": 2,
+  "slug": "mercedes-benz-e-300-de-9g-tronic-amg-line"
 }
