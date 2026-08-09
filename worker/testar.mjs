@@ -18,7 +18,17 @@ let falharCom = null;
 
 globalThis.fetch = async (url, opcoes = {}) => {
   const caminho = String(url).replace('https://api.github.com', '');
-  chamadas.push({ caminho, metodo: opcoes.method || 'GET', corpo: opcoes.body ? JSON.parse(opcoes.body) : null });
+  /* O corpo do /git/blobs é agora um ReadableStream — o Worker monta o JSON à
+     volta da fotografia enquanto ela passa, sem a juntar em memória. Aqui
+     lê-se até ao fim, que é a única forma de confirmar que o JSON sai bem
+     formado e com a fotografia inteira lá dentro. */
+  let corpo = null;
+  if (opcoes.body instanceof ReadableStream) {
+    corpo = JSON.parse(await new Response(opcoes.body).text());
+  } else if (opcoes.body) {
+    corpo = JSON.parse(opcoes.body);
+  }
+  chamadas.push({ caminho, metodo: opcoes.method || 'GET', corpo });
   if (falharCom) return new Response(JSON.stringify({ message: 'nope' }), { status: falharCom });
   const r = (o) => new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } });
   if (caminho.endsWith('/git/blobs')) return r({ sha: 'a'.repeat(40) });
@@ -37,13 +47,33 @@ const WEBP = b64([0x52, 0x49, 0x46, 0x46, 0, 0, 0, 0, 0x57, 0x45, 0x42, 0x50, 1]
 const PDF = b64([0x25, 0x50, 0x44, 0x46, 0x2D, 1, 2, 3]);
 const SVG = b64([...Buffer.from('<svg onload="alert(1)"></svg>')]);
 
+/* O /blob tem um contrato diferente do resto: o corpo é o base64 em cru e o
+   nome e a senha vão em cabeçalhos. Não é preciosismo — é o que impede o Worker
+   de ter de ler a fotografia para memória e rebentar os 10 ms de CPU do plano
+   gratuito da Cloudflare. Ver o comentário em guardarBlob(). */
 async function pedir(rota, corpo, cabecalhos = { Origin: ORIGEM }) {
   chamadas = [];
-  const req = new Request('https://w.workers.dev' + rota, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', ...cabecalhos },
-    body: JSON.stringify(corpo),
-  });
+  const req = rota === '/blob'
+    ? new Request('https://w.workers.dev/blob', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'text/plain',
+          /* O browser não põe Content-Length no objecto Request — quem o põe é
+             a rede, ao enviar — mas o Worker recebe-o sempre. Sem ele aqui, o
+             teste não exercitava o mesmo caminho que a produção. Confirmado
+             contra o Worker a sério: 9 MB devolvem 413. */
+          'Content-Length': String((corpo.conteudo ?? '').length),
+          ...(corpo.senha === undefined ? {} : { 'X-Senha': corpo.senha }),
+          'X-Nome': corpo.nome ?? '',
+          ...cabecalhos,
+        },
+        body: corpo.conteudo ?? '',
+      })
+    : new Request('https://w.workers.dev' + rota, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', ...cabecalhos },
+        body: JSON.stringify(corpo),
+      });
   const res = await worker.fetch(req, ambiente);
   return { estado: res.status, corpo: await res.json().catch(() => ({})), cors: res.headers.get('Access-Control-Allow-Origin') };
 }
@@ -88,6 +118,16 @@ for (const [nome, conteudo, esperado] of [
 {
   const grande = Buffer.concat([Buffer.from([0xFF,0xD8,0xFF]), Buffer.alloc(9 * 1024 * 1024)]).toString('base64');
   ok('ficheiro > 8 MB = 413', (await pedir('/blob', { senha: SENHA, nome: 'g.jpg', conteudo: grande })).estado === 413);
+
+  /* E se não vier Content-Length nenhum, o corte tem de acontecer à mesma —
+     conta-se o que passa e trava-se a meio. */
+  const semTamanho = await worker.fetch(new Request('https://w.workers.dev/blob', {
+    method: 'POST',
+    headers: { 'Content-Type': 'text/plain', 'X-Senha': SENHA, 'X-Nome': 'g.jpg', Origin: ORIGEM },
+    body: grande,
+  }), ambiente);
+  ok('sem Content-Length, grande de mais é travado', semTamanho.status >= 400,
+     `foi ${semTamanho.status}`);
 }
 
 console.log('\n— nome da pasta —');

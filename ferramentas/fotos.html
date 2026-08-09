@@ -540,7 +540,9 @@ async function tratar(escolhidas) {
        é. A convertida sai sempre em .jpg, que é o que o canvas produziu. */
     const nome = r.intacta ? f.name : f.name.replace(/\.[^.]+$/, '') + '.jpg';
     const url = URL.createObjectURL(r.bloco);
-    prontas.push({ nome, url, intacta: r.intacta });
+    /* `sha` fica por preencher até a fotografia estar guardada no GitHub. É o
+       que marca o que já foi, para um envio interrompido poder continuar. */
+    prontas.push({ nome, url, intacta: r.intacta, bytes: r.bloco.size, sha: null });
     /* Contabilizar só as que foram MESMO reduzidas: somar as intactas ao "antes"
        e ao "depois" dava uma poupança colada à frase "N reduzidas" que não era a
        poupança dessas N. */
@@ -731,15 +733,60 @@ const base64 = (bloco) => new Promise((ok, falha) => {
   l.readAsDataURL(bloco);
 });
 
-async function aoWorker(rota, corpo) {
-  const r = await fetch(WORKER.replace(/\/+$/, '') + rota, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ senha: campoSenha.value, ...corpo }),
-  });
-  const d = await r.json().catch(() => ({}));
-  if (!r.ok) throw new Error(d.erro || `erro ${r.status}`);
-  return d;
+/* Um pedido ao Worker, com paciência.
+   ---------------------------------------------------------------------------
+   A primeira versão fazia um `fetch` e pronto: à primeira falha de rede, o
+   envio inteiro ia abaixo e o cliente tinha de recomeçar do zero. Num telemóvel
+   com 5G isso é garantido acontecer — basta o carro passar por um túnel, ou a
+   rede mudar de antena. Foi o que ele apanhou: «falhou ao fim de 4 fotos».
+
+   Agora: três tentativas por fotografia, com espera a crescer, e um limite de
+   tempo para não ficar pendurado para sempre. Só se repete o que vale a pena
+   repetir — uma senha errada ou um ficheiro recusado não melhoram à segunda. */
+const TENTATIVAS = 3;
+const ESPERA_MS = 90000;
+
+class ErroDeRede extends Error {}
+
+async function aoWorker(rota, { json, cru, nome } = {}) {
+  const url = WORKER.replace(/\/+$/, '') + rota;
+  let ultimo;
+
+  for (let n = 1; n <= TENTATIVAS; n++) {
+    const cancelar = new AbortController();
+    const relogio = setTimeout(() => cancelar.abort(), ESPERA_MS);
+    try {
+      /* O /blob leva a fotografia no corpo, em cru. Nome e senha vão em
+         cabeçalhos para o Worker não ter de ler o corpo para memória — é o
+         que o mantém dentro dos 10 ms de CPU do plano gratuito. */
+      const r = await fetch(url, cru
+        ? { method: 'POST', signal: cancelar.signal, body: cru,
+            headers: { 'Content-Type': 'text/plain', 'X-Senha': campoSenha.value, 'X-Nome': nome } }
+        : { method: 'POST', signal: cancelar.signal,
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ senha: campoSenha.value, ...json }) });
+
+      const d = await r.json().catch(() => ({}));
+      if (r.ok) return d;
+
+      const e = new Error(d.erro || `erro ${r.status}`);
+      e.estado = r.status;
+      /* 5xx é do lado de lá e costuma passar; 4xx é do pedido e não passa. */
+      if (r.status < 500 || n === TENTATIVAS) throw e;
+      ultimo = e;
+    } catch (e) {
+      if (e.estado && e.estado < 500) throw e;
+      /* `AbortError` e `TypeError` são as duas caras da mesma coisa: o pedido
+         não chegou a ter resposta. No Safari a mensagem é «Load failed», no
+         Chrome «Failed to fetch» — nenhuma delas serve para mostrar a ninguém. */
+      ultimo = new ErroDeRede(e.name === 'AbortError' ? 'demorou de mais' : 'sem resposta');
+      if (n === TENTATIVAS) throw ultimo;
+    } finally {
+      clearTimeout(relogio);
+    }
+    await new Promise((r) => setTimeout(r, n * 2000));
+  }
+  throw ultimo;
 }
 
 function dizer(texto, classe = '') {
@@ -757,21 +804,26 @@ botaoEnviar.addEventListener('click', async () => {
   botaoEnviar.dataset.ocupado = '1';     // impede actualizar() de pisar o progresso
   const pasta = campoPasta.value.trim();
 
+  const jaIam = prontas.filter((f) => f.sha).length;
+
   try {
-    /* Uma fotografia por pedido. Assim o Worker nunca tem mais do que uma
-       fotografia em memória, e há por onde mostrar o progresso — que com
-       cinquenta fotografias num telemóvel não é detalhe nenhum. */
-    const enviados = [];
+    /* Uma fotografia por pedido, e o `sha` de cada uma fica guardado NA
+       fotografia. É isso que permite continuar de onde ficou: se o envio for
+       interrompido à décima sétima, um segundo Enviar salta as dezasseis que
+       já lá estão em vez de as mandar outra vez. Antes recomeçava do zero —
+       com 5G, o cliente andou a enviar as mesmas fotografias várias vezes. */
     for (const [i, f] of prontas.entries()) {
+      if (f.sha) continue;
       botaoEnviar.textContent = `A enviar ${i + 1} de ${prontas.length}…`;
-      dizer(`${f.nome}…`);
+      dizer(`${f.nome} · ${kb(f.bytes || 0)}`);
       const bloco = await (await fetch(f.url)).blob();
-      const r = await aoWorker('/blob', { nome: f.nome, conteudo: await base64(bloco) });
-      enviados.push({ nome: r.nome, sha: r.sha });
+      const r = await aoWorker('/blob', { cru: await base64(bloco), nome: f.nome });
+      f.sha = r.sha;
     }
 
     botaoEnviar.textContent = 'A gravar…';
-    const r = await aoWorker('/commit', { pasta, ficheiros: enviados });
+    const enviados = prontas.map((f) => ({ nome: f.nome, sha: f.sha }));
+    const r = await aoWorker('/commit', { json: { pasta, ficheiros: enviados } });
 
     /* Só se guarda a senha depois de o Worker a ter aceite: guardá-la mal é
        escrita deixava o cliente preso a uma senha errada sem perceber porquê. */
@@ -779,12 +831,37 @@ botaoEnviar.addEventListener('click', async () => {
     if (pastasExistentes && !pastasExistentes.includes(pasta)) pastasExistentes.push(pasta);
 
     dizer(`Enviadas ${r.quantas} ${r.quantas === 1 ? 'fotografia' : 'fotografias'} `
-        + `para a pasta "${r.pasta}". Aparecem na biblioteca do backoffice em `
-        + 'um a três minutos.', 'bom');
+        + `para a pasta "${r.pasta}".`
+        + (jaIam ? ` (Continuei de onde tinha ficado: ${jaIam} já lá estavam.)` : '')
+        + ' Aparecem na biblioteca do backoffice em um a três minutos.', 'bom');
+
+    /* A lista é limpa depois de gravar. Sem isto, um segundo toque em Enviar
+       fazia um segundo commit com as mesmas fotografias — e o cliente, que
+       acabou de as ver desaparecer do ecrã, sabe que ficou feito. */
+    limparLista({ manterMensagem: true });
     verificarPasta();
   } catch (e) {
-    dizer(e.message || 'Não consegui enviar.', 'mau');
-    if (/senha/i.test(e.message || '')) campoSenha.focus();
+    /* A mensagem tem de dizer TRÊS coisas: o que aconteceu, o que já está
+       feito, e o que fazer a seguir. «Load failed» — que era o que aparecia —
+       não dizia nenhuma delas. */
+    const feitas = prontas.filter((f) => f.sha).length;
+    const faltam = prontas.length - feitas;
+
+    if (e instanceof ErroDeRede) {
+      dizer(
+        `A ligação falhou${e.message === 'demorou de mais' ? ' (demorou de mais)' : ''}. `
+        + (feitas
+          ? `${feitas} de ${prontas.length} já ficaram guardadas — carregue em Enviar `
+            + `outra vez e continuo nas ${faltam} que faltam, sem repetir as outras.`
+          : 'Não se perdeu nada. Verifique a rede e carregue em Enviar outra vez.')
+        + ' Se estiver com pouca rede, o Wi-Fi costuma resolver.', 'mau');
+    } else if (e.estado === 401) {
+      dizer('Senha errada. Confirme com o Renato — pode carregar no olho para a ver.', 'mau');
+      campoSenha.focus();
+    } else {
+      dizer((e.message || 'Não consegui enviar.')
+        + (feitas ? ` (${feitas} de ${prontas.length} já ficaram guardadas.)` : ''), 'mau');
+    }
   } finally {
     delete botaoEnviar.dataset.ocupado;
     botaoEnviar.disabled = false;
@@ -792,7 +869,7 @@ botaoEnviar.addEventListener('click', async () => {
   }
 });
 
-document.getElementById('limpar').addEventListener('click', () => {
+function limparLista({ manterMensagem = false } = {}) {
   /* Pela ordem certa: primeiro travar o que está a decorrer, só depois deitar
      fora os blobs. Cinquenta fotografias descarregam ao longo de 17 segundos;
      revogar os URLs antes de cancelar os temporizadores deixava os que faltavam
@@ -804,8 +881,11 @@ document.getElementById('limpar').addEventListener('click', () => {
   prontas.forEach((f) => URL.revokeObjectURL(f.url));
   prontas = []; antes = depois = 0;
   lista.textContent = '';
+  if (!manterMensagem) dizer('');
   actualizar();
-});
+}
+
+document.getElementById('limpar').addEventListener('click', () => limparLista());
 
 /* Estado inicial: sem fotografias, nem «Guardar todas» nem «Enviar» têm o que
    fazer. Sem esta chamada ficavam ligados até à primeira fotografia. */

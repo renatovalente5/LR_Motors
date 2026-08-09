@@ -63,7 +63,7 @@ const FORMATOS = [
 const cabecalhos = {
   'Access-Control-Allow-Origin': ORIGEM,
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Senha, X-Nome',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -139,36 +139,122 @@ async function listarPastas(ambiente) {
   return responder({ ok: true, pastas });
 }
 
-/* ------------------------------------------------------- passo 1: um ficheiro */
-async function guardarBlob(dados, ambiente) {
-  if (!ficheiroValido(dados.nome)) {
-    return responder({ erro: `Nome de ficheiro inválido: ${String(dados.nome).slice(0, 40)}` }, 400);
+/* ------------------------------------------------------- passo 1: um ficheiro
+ *
+ * A FOTOGRAFIA NUNCA CHEGA A ESTAR EM MEMÓRIA AQUI. Vale a pena explicar, que
+ * foi o que partiu isto em produção e não é evidente.
+ *
+ * O plano gratuito da Cloudflare dá 10 ms de CPU por pedido. Não é tempo de
+ * espera — é tempo de trabalho a sério — e uma fotografia de 1,8 MB são 2,4 MB
+ * de base64. Sobre esse texto, TUDO custa: um `JSON.parse` custa, um
+ * `request.text()` custa, um `replace` custa, e `Uint8Array.from(atob(x), …)`
+ * custa muito mais do que tudo o resto junto, porque são dois milhões de
+ * chamadas a uma função.
+ *
+ * A primeira versão fazia as três coisas. A Cloudflare matava o Worker a meio
+ * — «error code: 1102», resposta sem corpo, que no Safari do cliente aparecia
+ * como «Load failed». Medido: 15 falhas em 20 envios. Tirar o `Uint8Array.from`
+ * baixou para 7 em 20; só o `JSON.parse` ainda chegava para rebentar o
+ * orçamento. E falhava ao acaso, porque o tempo de CPU disponível varia — daí
+ * o cliente dizer que «às vezes funciona».
+ *
+ * Agora o corpo do pedido é o base64 em cru (o nome e a senha vão em
+ * cabeçalhos), e é reenviado para o GitHub aos pedaços, sem nunca ser juntado
+ * numa variável. Lê-se só o primeiro pedaço, para confirmar pelos bytes que
+ * aquilo é mesmo uma imagem. O resto passa ao lado do Worker.
+ *
+ * As duas verificações que faltavam também não precisam do ficheiro inteiro:
+ * o TAMANHO sai do Content-Length (4 caracteres de base64 = 3 bytes) e o
+ * FORMATO sai dos primeiros bytes. */
+async function guardarBlob(pedido, ambiente) {
+  const nome = pedido.headers.get('X-Nome') || '';
+  if (!ficheiroValido(nome)) {
+    return responder({ erro: `Nome de ficheiro inválido: ${nome.slice(0, 40)}` }, 400);
   }
-  if (typeof dados.conteudo !== 'string' || !dados.conteudo) {
-    return responder({ erro: `Não veio conteúdo em ${dados.nome}.` }, 400);
+  if (!pedido.body) return responder({ erro: `Não veio conteúdo em ${nome}.` }, 400);
+
+  const comprimento = Number(pedido.headers.get('Content-Length') || 0);
+  if (comprimento && Math.floor(comprimento / 4) * 3 > MAX_POR_FICHEIRO) {
+    return responder({ erro: `${nome} é grande de mais.` }, 413);
   }
 
-  let bruto;
+  const leitor = pedido.body.getReader();
+  const desistir = async (erro, estado = 400) => {
+    await leitor.cancel().catch(() => {});
+    return responder({ erro }, estado);
+  };
+
+  /* Juntar pedaços até haver 24 caracteres, e NÃO assumir que o primeiro já os
+     traz. Um fluxo pode entregar o corpo aos bocados do tamanho que lhe
+     apetecer — os limites não são nossos —, e com um primeiro pedaço pequeno
+     uma fotografia verdadeira seria recusada como se estivesse vazia. Foram os
+     testes que deram por isto, com imagens pequenas. */
+  const guardados = [];
+  let cabeca = '';
+  while (cabeca.length < 24) {
+    const { value, done } = await leitor.read();
+    if (done) break;
+    if (!value || !value.length) continue;
+    guardados.push(value);
+    /* O base64 é ASCII, portanto o byte n do corpo é o carácter n do texto. */
+    cabeca += String.fromCharCode(...value.subarray(0, 24 - cabeca.length));
+  }
+  if (!cabeca) return desistir(`Não veio conteúdo em ${nome}.`);
+
+  /* 24 caracteres de base64 dão 18 bytes, que chegam de sobra para distinguir
+     JPEG, PNG e WebP — o mais exigente precisa de 12. Descodifica-se só um
+     múltiplo de 4, senão o `atob` recusa o resto. */
+  let inicio;
   try {
-    bruto = Uint8Array.from(atob(dados.conteudo), (c) => c.charCodeAt(0));
+    const bytes = atob(cabeca.slice(0, Math.floor(cabeca.length / 4) * 4));
+    inicio = Uint8Array.from({ length: bytes.length }, (_, i) => bytes.charCodeAt(i));
   } catch {
-    return responder({ erro: `Não consegui ler ${dados.nome}.` }, 400);
+    return desistir(`Não consegui ler ${nome}.`);
   }
-  if (bruto.length > MAX_POR_FICHEIRO) {
-    return responder({ erro: `${dados.nome} é grande de mais.` }, 413);
-  }
-  if (!formatoDe(bruto)) {
-    return responder({ erro: `${dados.nome} não é uma imagem JPEG, PNG ou WebP.` }, 400);
+  if (!formatoDe(inicio)) {
+    return desistir(`${nome} não é uma imagem JPEG, PNG ou WebP.`);
   }
 
-  /* Um blob sozinho não altera nada no repositório: fica solto até um commit
-     lhe pegar, e o GitHub deita fora os que ninguém usa. Se o envio for a meio
-     interrompido, não fica nada por limpar. */
+  /* O JSON que o GitHub espera é montado à volta do corpo enquanto ele passa.
+     O primeiro pedaço já foi lido, por isso vai à frente; o resto sai do leitor
+     como veio. Em nenhum momento existe uma variável com a fotografia toda. */
+  const cod = new TextEncoder();
+  let contados = guardados.reduce((n, p) => n + p.length, 0);
+  /* Verificar JÁ AQUI o que se leu, e não só o que vier a seguir: um corpo
+     pequeno o suficiente chega todo num pedaço, o `pull` recebe logo o fim, e
+     a contagem nunca era comparada com nada. Deu 200 a um ficheiro de 9 MB. */
+  if (Math.floor(contados / 4) * 3 > MAX_POR_FICHEIRO) {
+    return desistir(`${nome} é grande de mais.`, 413);
+  }
+  const fluxo = new ReadableStream({
+    start(c) {
+      c.enqueue(cod.encode('{"encoding":"base64","content":"'));
+      for (const p of guardados) c.enqueue(p);   // o que já se leu para ver o formato
+    },
+    async pull(c) {
+      const { value, done } = await leitor.read();
+      if (done) {
+        c.enqueue(cod.encode('"}'));
+        return c.close();
+      }
+      /* Rede de segurança para quando não há Content-Length: conta-se o que
+         passa e trava-se a meio em vez de deixar entrar um ficheiro sem fim. */
+      contados += value.length;
+      if (Math.floor(contados / 4) * 3 > MAX_POR_FICHEIRO) {
+        await leitor.cancel().catch(() => {});
+        return c.error(new Error('ficheiro grande de mais'));
+      }
+      c.enqueue(value);
+    },
+    cancel: (r) => leitor.cancel(r),
+  });
+
   const b = await github(`/repos/${REPO}/git/blobs`, ambiente.GITHUB_TOKEN, {
     method: 'POST',
-    body: JSON.stringify({ content: dados.conteudo, encoding: 'base64' }),
+    body: fluxo,
+    duplex: 'half',
   });
-  return responder({ ok: true, nome: dados.nome, sha: b.sha });
+  return responder({ ok: true, nome, sha: b.sha });
 }
 
 /* ------------------------------------ passo 2: juntar tudo num único commit */
@@ -253,6 +339,23 @@ export default {
       return responder({ erro: 'O servidor ainda não está configurado.' }, 503);
     }
 
+    const rota = new URL(pedido.url).pathname;
+
+    /* O /blob é tratado à parte de propósito: o corpo dele é a fotografia, e
+       lê-lo para memória — nem que fosse só para tirar de lá a senha — é o
+       trabalho que estoirava o orçamento de CPU. Por isso a senha e o nome
+       vêm em cabeçalhos, e o corpo passa intocado. */
+    if (rota === '/blob') {
+      if (!senhaConfere(pedido.headers.get('X-Senha'), ambiente.SENHA)) {
+        return responder({ erro: 'Senha errada.' }, 401);
+      }
+      try {
+        return await guardarBlob(pedido, ambiente);
+      } catch (e) {
+        return avaria(e, rota);
+      }
+    }
+
     let dados;
     try {
       dados = await pedido.json();
@@ -264,26 +367,28 @@ export default {
       return responder({ erro: 'Senha errada.' }, 401);
     }
 
-    const rota = new URL(pedido.url).pathname;
     try {
       if (rota === '/pastas') return await listarPastas(ambiente);
-      if (rota === '/blob') return await guardarBlob(dados, ambiente);
       if (rota === '/commit') return await gravarCommit(dados, ambiente);
       return responder({ erro: 'não encontrado' }, 404);
     } catch (e) {
-      console.error('falhou', rota, e && e.message);
-      /* 409 é o caso concreto de alguém ter gravado no repositório entre o
-         princípio e o fim do envio — vale a pena dizê-lo, porque a solução é
-         simplesmente tentar outra vez. */
-      if (e && (e.estado === 409 || e.estado === 422)) {
-        return responder({
-          erro: 'Alguém gravou no site enquanto isto ia a meio. Carregue em Enviar outra vez.',
-        }, 409);
-      }
-      return responder({
-        erro: 'Não consegui gravar as fotografias. Tente daqui a um minuto; '
-            + 'se continuar assim, avise o Renato.',
-      }, 502);
+      return avaria(e, rota);
     }
   },
 };
+
+function avaria(e, rota) {
+  console.error('falhou', rota, e && e.message);
+  /* 409 é o caso concreto de alguém ter gravado no repositório entre o
+     princípio e o fim do envio — vale a pena dizê-lo, porque a solução é
+     simplesmente tentar outra vez. */
+  if (e && (e.estado === 409 || e.estado === 422)) {
+    return responder({
+      erro: 'Alguém gravou no site enquanto isto ia a meio. Carregue em Enviar outra vez.',
+    }, 409);
+  }
+  return responder({
+    erro: 'Não consegui gravar as fotografias. Tente daqui a um minuto; '
+        + 'se continuar assim, avise o Renato.',
+  }, 502);
+}
