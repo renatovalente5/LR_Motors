@@ -316,7 +316,20 @@ function fitaMarcas(marcas) {
      outras cópias — as repetições dentro da fila e a fila inteira do fim — são
      decoração: levam `aria-hidden` e saem da ordem de tabulação. Sem isto, com
      12 marcas e duas repetições, o teclado passava 48 vezes por 12 marcas. */
-  const item = (m, deco) => {
+  /* Quantas voltas ficam à vista no telemóvel.
+     ---------------------------------------------------------------------------
+     A faixa anda sozinha também em ecrã táctil, e para o laço fechar sem buraco
+     a fila tem de ser mais larga do que o ecrã — as duas filas são iguais e
+     recua-se uma largura inteira ao passar dela.
+
+     As quatro voltas que servem um monitor largo são de mais num telemóvel: a
+     arrastar via-se a mesma marca quatro vezes seguidas. Mas cortar para uma só
+     deixava a fila mais estreita do que um tablet ao alto. Nove cartões (uns
+     1500 px) passam qualquer ecrã táctil com folga, e com sete marcas em stock
+     dá duas voltas — repete-se de sete em sete, que já não salta à vista. */
+  const VOLTAS_TACTIL = Math.max(1, Math.ceil(9 / marcas.length));
+
+  const item = (m, deco, extra) => {
     const logo = logoMarca(m);
     /* Sem logótipo vai um monograma, não o nome escrito: o nome já está na
        linha de baixo, escrevê-lo duas vezes ficava redundante — e
@@ -327,7 +340,7 @@ function fitaMarcas(marcas) {
     const marca = logo
       ? `<span class="marca-cartao__logo"><svg viewBox="${logo.viewBox}" width="${md.w}" height="${md.h}" aria-hidden="true" focusable="false"><use href="#m-${chaveMarca(m)}"/></svg></span>`
       : `<span class="marca-cartao__logo marca-cartao__logo--sigla" aria-hidden="true">${esc(inicial(m))}</span>`;
-    return `<li class="fita__item"${deco ? ' aria-hidden="true"' : ''}><a class="marca-cartao" href="${u('viaturas/?marca=' + encodeURIComponent(m))}"${deco ? ' tabindex="-1"' : ''}>
+    return `<li class="fita__item${extra ? ' fita__item--extra' : ''}"${deco ? ' aria-hidden="true"' : ''}><a class="marca-cartao" href="${u('viaturas/?marca=' + encodeURIComponent(m))}"${deco ? ' tabindex="-1"' : ''}>
         ${marca}
         <span class="marca-cartao__nome">${esc(m)}</span>
       </a></li>`;
@@ -337,7 +350,7 @@ function fitaMarcas(marcas) {
   const fila = (primeira) => {
     const itens = [];
     for (let i = 0; i < repeticoes; i++) {
-      marcas.forEach((m) => itens.push(item(m, !(primeira && i === 0))));
+      marcas.forEach((m) => itens.push(item(m, !(primeira && i === 0), i >= VOLTAS_TACTIL)));
     }
     return `<ul class="fita__fila">${itens.join('')}</ul>`;
   };

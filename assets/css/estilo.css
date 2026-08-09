@@ -1191,16 +1191,19 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 .fita__fila { display: flex; gap: .8rem; padding-inline: .4rem; }
 .fita__item { flex: 0 0 auto; }
 
-/* No telemóvel não anda sozinha: só se arrasta com o dedo. Num ecrã táctil não
-   há rato para a parar, e uma fila que anda sozinha é uma fila em que se falha
-   o alvo. As cópias saem — são 48 cartões para 12 marcas, repetições que só
-   existiam para o laço nunca abrir um buraco; a arrastar, ver-se-ia a mesma
-   marca quatro vezes. */
+/* No telemóvel anda sozinha, tal como no computador — e continua a arrastar-se
+   com o dedo. Antes ficava parada: num ecrã táctil não há rato para a parar, e
+   uma fila que anda sozinha é uma fila em que se falha o alvo. Resolve-se com
+   o toque a travá-la (está no site.js) em vez de a desligar de todo.
+
+   O que NÃO se pode fazer é esconder a segunda fila: as duas são iguais e é
+   recuando uma largura inteira que o laço fecha sem buraco. Escondê-la deixava
+   a faixa a andar até acabar e a ficar num vazio.
+
+   Saem só as voltas a mais — no computador são quatro, para encher um monitor
+   largo; aqui bastam as que passem o ecrã, e o gerador marca as outras. */
 @media (hover: none) and (pointer: coarse) {
-  .fita { scroll-padding-inline: var(--gutter); }
-  .fita__item[aria-hidden="true"] { display: none; }
-  .fita__fila + .fita__fila { display: none; }
-  .fita__fila { padding-inline: var(--gutter); }
+  .fita__item--extra { display: none; }
 }
 
 .marca-cartao {
@@ -1235,10 +1238,11 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 .marca-cartao:hover .marca-cartao__logo--sigla { color: var(--azul); border-color: var(--azul); }
 .marca-cartao__nome { font-weight: 800; font-size: .95rem; letter-spacing: -.015em; }
 
-/* Quem pede menos movimento no sistema fica sem a animação — o bloco global no
-   topo deste ficheiro já lhe corta a duração. Mas aí a faixa ficaria parada com
-   metade das marcas fora do ecrã, por isso passa a ser uma tira que se arrasta
-   à mão, e a fila duplicada desaparece para não repetir marcas. */
+/* Quem pede menos movimento no sistema fica sem a faixa a andar — o site.js
+   nem sequer arranca o laço. Mas aí ficaria parada com metade das marcas fora
+   do ecrã, por isso passa a ser uma tira que se arrasta à mão. As cópias saem
+   todas: paradas só repetiriam marcas, e como a segunda fila é feita só de
+   cópias, o que fica é uma passagem única por cada marca. */
 @media (prefers-reduced-motion: reduce) {
   .fita { overflow-x: auto; scrollbar-width: thin; scrollbar-color: var(--borda-forte) transparent;
     -webkit-mask-image: none; mask-image: none; }

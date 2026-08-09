@@ -271,7 +271,12 @@
       if (cartao && cartao.scrollIntoView) cartao.scrollIntoView({ block: 'nearest', inline: 'nearest' });
     });
 
-    if (tactil || lento || filas.length < 2) return;
+    /* O ecrã táctil deixou de ser motivo para não andar. Andava só no
+       computador porque num telemóvel não há rato para a parar e uma fila em
+       movimento é uma fila em que se falha o alvo; a resposta certa não era
+       desligá-la, era o toque travá-la — que é o que acontece mais abaixo, no
+       `pointerdown`. Quem pedir menos movimento no sistema continua sem ela. */
+    if (lento || filas.length < 2) return;
 
     var VELOCIDADE = 0.55;               // px por frame, ~33 px/s a 60 Hz
     var parado = false, quadro = null, pos = 0;
@@ -301,17 +306,36 @@
       fita.addEventListener(ev, parar, { passive: true });
     });
     fita.addEventListener('mouseleave', seguir);
-    /* Depois de arrastar com o dedo ou de sair com o teclado, retoma-se com
-       calma para não fugir debaixo de quem ainda está a decidir. */
+
+    /* Levantar o dedo não quer dizer que a faixa parou.
+       -----------------------------------------------------------------------
+       No telemóvel, um arrasto deixa a zona a correr por inércia durante um
+       par de segundos depois do `pointerup`. Retomar a meio disso põe duas
+       coisas a mandar no mesmo `scrollLeft` ao mesmo tempo, e o que se vê é a
+       faixa a tremer ou a travar a fundo.
+
+       Por isso não se conta o tempo desde que o dedo saiu: espera-se que o
+       scroll esteja QUIETO. Enquanto houver movimento, adia-se. */
+    var ultimoMovimento = 0;
+    fita.addEventListener('scroll', function () {
+      if (parado) ultimoMovimento = Date.now();
+    }, { passive: true });
+
     var retomar = null;
-    ['pointerup', 'focusout'].forEach(function (ev) {
-      fita.addEventListener(ev, function () {
-        clearTimeout(retomar);
-        retomar = setTimeout(function () {
-          if (fita.contains(document.activeElement) || fita.matches(':hover')) return;
-          seguir();
-        }, 1500);
-      }, { passive: true });
+    var tentarSeguir = function () {
+      clearTimeout(retomar);
+      retomar = setTimeout(function () {
+        /* Ainda a deslizar por inércia: volta a tentar daqui a pouco. */
+        if (Date.now() - ultimoMovimento < 500) return tentarSeguir();
+        /* Com o dedo em cima de um cartão, ou com o teclado lá dentro, fica
+           parada — quem está a escolher não quer o alvo a fugir. */
+        if (fita.contains(document.activeElement)) return;
+        if (window.matchMedia('(hover: hover)').matches && fita.matches(':hover')) return;
+        seguir();
+      }, 900);
+    };
+    ['pointerup', 'pointercancel', 'focusout'].forEach(function (ev) {
+      fita.addEventListener(ev, tentarSeguir, { passive: true });
     });
     quadro = requestAnimationFrame(andar);
   })();
