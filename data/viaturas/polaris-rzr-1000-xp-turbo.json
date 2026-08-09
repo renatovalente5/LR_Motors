@@ -1,0 +1,26 @@
+{
+  "marca": "Polaris ",
+  "modelo": "RZR",
+  "versao": "XP 1000 TURBO ",
+  "tipo": "off-road",
+  "preco": 17900,
+  "publicado": true,
+  "reservado": false,
+  "estado": "disponivel",
+  "fotos": [
+    "assets/veiculos/IMG_7953.jpeg"
+  ],
+  "ano": 2017,
+  "mes": "Março",
+  "km": 9000,
+  "combustivel": "Gasolina",
+  "caixa": "Automática",
+  "potencia": 180,
+  "cilindrada": 1000,
+  "lugares": 2,
+  "origem": "Nacional",
+  "descricao": "Viatura nacional, em excelente estado, com muitos extras.\nPronto para entrega imediata! ",
+  "destaque": true,
+  "ordem": 1,
+  "slug": "polaris-rzr-1000-xp-turbo"
+}
