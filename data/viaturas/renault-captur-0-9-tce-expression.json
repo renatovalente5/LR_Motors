@@ -1,5 +1,4 @@
 {
-  "slug": "renault-captur-0-9-tce-expression",
   "marca": "Renault",
   "modelo": "Captur",
   "versao": "0.9 TCE Expression",
@@ -9,6 +8,31 @@
   "publicado": true,
   "reservado": false,
   "estado": "disponivel",
+  "fotos": [
+    "assets/veiculos/renault-captur-0-9-tce-expression/01-1600.webp",
+    "assets/veiculos/renault-captur-0-9-tce-expression/02-1600.webp",
+    "assets/veiculos/renault-captur-0-9-tce-expression/03-1600.webp",
+    "assets/veiculos/renault-captur-0-9-tce-expression/04-1600.webp",
+    "assets/veiculos/renault-captur-0-9-tce-expression/05-1600.webp",
+    "assets/veiculos/captur/IMG_7837.jpg",
+    "assets/veiculos/captur/IMG_7838.jpg",
+    "assets/veiculos/captur/IMG_7855.jpg",
+    "assets/veiculos/captur/IMG_7853.jpg",
+    "assets/veiculos/captur/IMG_7852.jpg",
+    "assets/veiculos/captur/IMG_7849.jpg",
+    "assets/veiculos/captur/IMG_7850.jpg",
+    "assets/veiculos/captur/IMG_7851.jpg",
+    "assets/veiculos/captur/IMG_7854.jpg",
+    "assets/veiculos/captur/IMG_7857.jpg",
+    "assets/veiculos/captur/IMG_7839.jpg",
+    "assets/veiculos/captur/IMG_7840.jpg",
+    "assets/veiculos/captur/IMG_7846.jpg",
+    "assets/veiculos/captur/IMG_7848.jpg",
+    "assets/veiculos/captur/IMG_7847.jpg",
+    "assets/veiculos/captur/IMG_7841.jpg",
+    "assets/veiculos/captur/IMG_7845.jpg",
+    "assets/veiculos/captur/IMG_7843.jpg"
+  ],
   "ano": 2018,
   "mes": "Março",
   "km": 94000,
@@ -17,12 +41,10 @@
   "potencia": 90,
   "cilindrada": 898,
   "cor": "Azul",
-  "lugares": null,
   "portas": 5,
   "origem": "Nacional",
   "registos_anteriores": 1,
   "garantia": "18 meses",
-  "descricao": "Renault Captur 0.9 TCE Expression de 03/2018 com 94 000 km. Caixa manual, 90 cv, viatura nacional. Garantia de 18 meses.",
   "equipamento": [
     "AC automático",
     "Cruise Control",
@@ -35,13 +57,8 @@
     "Arranque sem chave",
     "Entrada sem chave"
   ],
-  "fotos": [
-    "assets/veiculos/renault-captur-0-9-tce-expression/01-1600.webp",
-    "assets/veiculos/renault-captur-0-9-tce-expression/02-1600.webp",
-    "assets/veiculos/renault-captur-0-9-tce-expression/03-1600.webp",
-    "assets/veiculos/renault-captur-0-9-tce-expression/04-1600.webp",
-    "assets/veiculos/renault-captur-0-9-tce-expression/05-1600.webp"
-  ],
+  "descricao": "Garantia de 18 meses incluída no preço! \n\nAbsolutamente impecável!\nViatura Nacional, histórico de revisões, pneus novos, 94000km, 2018, 2 chaves, muito económico e versátil!\n\nPossibilidade de financiamento e Retoma\n\nEcrã touch\nGPS\nBancos traseiros ajustáveis em profundidade\nVolante multifunções\nApoio de braço condutor\nKeylessGo (chave no bolso)\nAr condicionado\nSensores luz\nSensores traseiros\nEspelhos em preto rebatíveis\nCruise Control\nModo Eco\n4 Vidros elétricos\nComputador de bordo\nMala dois níveis\nStart Stop\nPneu suplente\nISOFIX\n\n*Pode ser visto em Braga ou Vila do Conde\n\nEste anúncio foi publicado por rotina informática. Todos os dados carecem de confirmação junto do comercial.\n",
   "destaque": true,
-  "ordem": 1
+  "ordem": 1,
+  "slug": "renault-captur-0-9-tce-expression"
 }
