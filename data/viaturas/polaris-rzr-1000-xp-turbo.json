@@ -19,6 +19,7 @@
   "cilindrada": 1000,
   "lugares": 2,
   "origem": "Nacional",
+  "garantia": "Garantia",
   "descricao": "Viatura nacional, em excelente estado, com muitos extras.\nPronto para entrega imediata! ",
   "destaque": true,
   "ordem": 5,
