@@ -1,5 +1,4 @@
 {
-  "slug": "audi-a1-sportback-1-6-tdi-sport",
   "marca": "Audi",
   "modelo": "A1 Sportback",
   "versao": "1.6 TDI Sport",
@@ -9,6 +8,26 @@
   "publicado": true,
   "reservado": false,
   "estado": "disponivel",
+  "fotos": [
+    "assets/veiculos/audi-a1-sportback-1-6-tdi-sport/01-1600.webp",
+    "assets/veiculos/audi-a1-sportback-1-6-tdi-sport/02-1600.webp",
+    "assets/veiculos/audi-a1-sportback-1-6-tdi-sport/03-1600.webp",
+    "assets/veiculos/audi-a1-sportback-1-6-tdi-sport/04-1600.webp",
+    "assets/veiculos/audi-a1-sportback-1-6-tdi-sport/05-1600.webp",
+    "assets/veiculos/audi-a1/IMG_5418.jpg",
+    "assets/veiculos/audi-a1/IMG_5416.jpeg",
+    "assets/veiculos/audi-a1/IMG_5427.jpg",
+    "assets/veiculos/audi-a1/IMG_5425.jpg",
+    "assets/veiculos/audi-a1/IMG_5426.jpeg",
+    "assets/veiculos/audi-a1/IMG_5431.jpg",
+    "assets/veiculos/audi-a1/IMG_5424.jpg",
+    "assets/veiculos/audi-a1/IMG_5423.jpg",
+    "assets/veiculos/audi-a1/IMG_5419.jpg",
+    "assets/veiculos/audi-a1/IMG_5421.jpg",
+    "assets/veiculos/audi-a1/IMG_5420.jpg",
+    "assets/veiculos/audi-a1/IMG_5422.jpg",
+    "assets/veiculos/audi-a1/IMG_5415.jpg"
+  ],
   "ano": 2012,
   "mes": "Outubro",
   "km": 162046,
@@ -17,11 +36,8 @@
   "potencia": 90,
   "cilindrada": 1598,
   "cor": "Branco",
-  "lugares": null,
   "portas": 5,
-  "origem": "",
   "garantia": "18 meses",
-  "descricao": "Audi A1 Sportback 1.6 TDI Sport de 10/2012 com 162 046 km. Caixa manual, 90 cv. Garantia de 18 meses.",
   "equipamento": [
     "AC manual",
     "Cruise Control",
@@ -34,13 +50,8 @@
     "Arranque sem chave",
     "Fixação para cadeira de criança"
   ],
-  "fotos": [
-    "assets/veiculos/audi-a1-sportback-1-6-tdi-sport/01-1600.webp",
-    "assets/veiculos/audi-a1-sportback-1-6-tdi-sport/02-1600.webp",
-    "assets/veiculos/audi-a1-sportback-1-6-tdi-sport/03-1600.webp",
-    "assets/veiculos/audi-a1-sportback-1-6-tdi-sport/04-1600.webp",
-    "assets/veiculos/audi-a1-sportback-1-6-tdi-sport/05-1600.webp"
-  ],
+  "descricao": "Garantia de 18 meses incluída no preço! \n\nCarro em excelente estado de conservação, pintura c/nova, interior estimado, histórico de revisões, manuais originais, apenas 162.046 km.\n\nPossibilidade de financiamento e retoma!\n\nGPS\nAr condicionado\nABS/ESP/Controlo de tração\nSistema Start/Stop\nBanco desportivo dianteiro\nSuspensão desportiva\nVolante e manete em pele\nVolante desportivo\nRádio\nVidros elétricos dianteiros\nApoio de braço frente\nISOFIX\nAirbags frontais, laterais e de cabeça\nFaróis de nevoeiro\nFixação de cadeiras de criança\nAssistente de travagem\nDistribuição eletrónica de travagem\nControlo de pressão dos pneus\nEstofos em tecido\n\nPode ser visto em Vila do Conde ou Braga!\n\nTodas as informações presentes neste anúncio devem ser confirmadas com o vendedor.",
   "destaque": false,
-  "ordem": 8
+  "ordem": 8,
+  "slug": "audi-a1-sportback-1-6-tdi-sport"
 }
