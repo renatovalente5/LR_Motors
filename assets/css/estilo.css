@@ -679,20 +679,41 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 /* Duas colunas de linhas, e não uma grelha de cartões: quinze caixas com
    contorno próprio faziam uma manta de retalhos e obrigavam a saltar o olho de
    caixa em caixa. Assim compara-se a direito, como numa ficha de papel. */
-.specs { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 0 clamp(1.5rem, 4vw, 3rem); }
+/* `align-items: start` é o que impede as células de uma fila de crescerem
+   juntas. Sem isto, a célula do ano — que tem o mês numa segunda linha — puxava
+   a dos quilómetros com ela, e essa ficava com o traço lá em baixo e um vazio no
+   meio: o aspecto de ter uma segunda linha vazia.
+
+   Só a célula do ano tem duas linhas. As outras têm a altura do seu conteúdo, e
+   o traço fica onde deve ficar: debaixo do texto. Em troca, os traços das duas
+   colunas deixam de estar à mesma altura a partir da primeira fila — e isso é o
+   que se quer, porque cada coluna passa a ler-se como a sua própria lista. */
+.specs {
+  display: grid; grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0 clamp(1.5rem, 4vw, 3rem); align-items: start;
+}
 .spec {
   display: flex; align-items: baseline; justify-content: space-between; gap: 1rem;
   padding: .72rem 0; border-bottom: 1px solid var(--borda);
 }
 .spec dt { color: var(--tinta-2); font-size: .92rem; }
 .spec dd { margin: 0; font-weight: 700; text-align: right; }
-/* O mês, antes do ano: menor e sem o negrito do valor. O ano é o que se procura
-   nesta linha; o mês é a precisão a seguir. Em `em` e não em `rem` para
-   acompanhar o tamanho da célula se ele mudar. A cor é --tinta-2, que dá 7,47:1
-   em branco — passa AA em texto pequeno, ao contrário da --tinta-3. */
-.spec__antes { font-size: .82em; font-weight: 500; color: var(--tinta-2); }
-/* O mês vive debaixo do ano, dentro da mesma célula: mais pequeno, sem peso e
-   em tom secundário, para o ano continuar a ser o que se lê primeiro. */
+/* O mês, debaixo do ano e na mesma célula: menor, sem peso e em tom secundário,
+   para o ano continuar a ser o que se lê primeiro. A cor é --tinta-2, que dá
+   7,47:1 em branco — passa AA em texto pequeno, ao contrário da --tinta-3. Em
+   `em` e não `rem`, para acompanhar o tamanho da célula se ele mudar. */
+/* O mês numa segunda linha, dentro da célula do ano e no fluxo normal — é a
+   única célula da ficha com duas linhas, e é para ser. Esteve fora do fluxo,
+   para a fila não crescer, e a troca não valia: obrigava a reservar espaço em
+   todas as células, e então TODAS pareciam ter duas linhas. Quem resolve o
+   crescimento é o `align-items: start` da grelha, acima.
+
+   `nowrap` porque «Setembro» num telemóvel estreito partia-se em duas, e um mês
+   partido a meio não se lê. */
+.spec__depois {
+  display: block; margin-top: .1rem; white-space: nowrap;
+  font-size: .82em; font-weight: 500; color: var(--tinta-2);
+}
 @media (max-width: 620px) { .specs { grid-template-columns: 1fr; } }
 
 .bloco { margin-top: clamp(1.8rem, 4vw, 2.6rem); }

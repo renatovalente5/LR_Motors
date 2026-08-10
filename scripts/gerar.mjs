@@ -29,9 +29,40 @@ const def = JSON.parse(readFileSync(join(RAIZ, 'data/definicoes.json'), 'utf8'))
    trata — cada anúncio é uma entrada própria, cria-se e apaga-se sozinha, e dois
    anúncios editados ao mesmo tempo não colidem no mesmo ficheiro. */
 const PASTA_VIATURAS = join(RAIZ, 'data/viaturas');
+/* Espaços a mais fora, à entrada e num sítio só.
+   ---------------------------------------------------------------------------
+   O cliente escreve estes campos à mão, ou cola-os do Standvirtual, e vêm com
+   espaços atrás — «Land Rover », «Smart », «Polaris », «18 meses - Iva
+   dedutível ». Nenhum deles se vê no ecrã, e todos contam:
+
+   - a MARCA é o que agrupa a faixa «Escolha pela marca» e o filtro. «Land
+     Rover » e «Land Rover» são duas marcas diferentes para o código: bastava
+     ele escrever a segunda viatura sem o espaço para aparecerem dois cartões
+     da mesma marca e duas opções iguais no filtro;
+   - a etiqueta da garantia e o nome do modelo saíam com o espaço no meio do
+     HTML, o que dá espaçamentos estranhos ao lado da pontuação.
+
+   Limpa-se na leitura e não em cada uso: são vinte sítios a mostrar estes
+   campos, e a próxima vez que alguém acrescentar um esquecia-se. */
+function limparCampos(v) {
+  const limpo = {};
+  for (const [k, val] of Object.entries(v)) {
+    /* U+2028 e U+2029 são separadores de linha do Unicode e vêm em texto colado
+       de outros programas — há um na descrição do Corsa. Não são `\n`, por isso
+       escapavam à divisão em parágrafos, e a mesma descrição vai também para a
+       meta e para o JSON-LD, onde nada os trata. Normalizam-se aqui, à entrada,
+       e não em cada sítio que os pudesse encontrar. */
+    if (typeof val === 'string') limpo[k] = val.replace(/[\u2028\u2029]/g, '\n').trim();
+    else if (Array.isArray(val)) {
+      limpo[k] = val.map((x) => (typeof x === 'string' ? x.trim() : x)).filter((x) => x !== '');
+    } else limpo[k] = val;
+  }
+  return limpo;
+}
+
 const todas = (existsSync(PASTA_VIATURAS) ? readdirSync(PASTA_VIATURAS) : [])
   .filter((f) => f.endsWith('.json'))
-  .map((f) => JSON.parse(readFileSync(join(PASTA_VIATURAS, f), 'utf8')))
+  .map((f) => limparCampos(JSON.parse(readFileSync(join(PASTA_VIATURAS, f), 'utf8'))))
   .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
 
 /* O site vive em renatovalente5.github.io/LR_Motors/ enquanto não houver
@@ -100,6 +131,8 @@ const nKm = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' km';
    A ordem importa. Escapa-se PRIMEIRO — senão um `<` escrito pelo cliente
    passaria a marcação — e só depois se acrescenta o HTML que queremos. */
 function textoRico(bruto) {
+  /* Os separadores de linha do Unicode já vêm normalizados de limparCampos();
+     aqui trata-se só do `\r` do Windows. */
   const s = String(bruto ?? '').replace(/\r\n?/g, '\n').trim();
   if (!s) return '';
   return s.split(/\n{2,}/).map((paragrafo) => `<p>${
@@ -1189,17 +1222,14 @@ function paginaViatura(v) {
   const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   const nMes = MESES.indexOf(String(v.mes || '').trim()) + 1;
-  /* Duas peças, e não um texto só: o mês vai mais pequeno e sem negrito. O ano
-     é o que se procura nesta linha — «2024» diz quase tudo, e o mês é a
-     precisão a seguir. Sem mês, fica só o ano e uma peça basta.
+  /* O ano em cima e o MÊS POR BAIXO, em letra pequena — «2024» com «Março»
+     debaixo. É o que o cliente quer ler; o formato 02/2024 esteve aqui e saiu.
 
-     Os espaços à volta da barra são NÃO SEPARÁVEIS (U+00A0). Com espaços
-     normais, a célula é estreita e alinhada à direita, e «02 /» podia ficar numa
-     linha e «2024» na seguinte — uma data partida em duas lê-se como duas
-     coisas. Ao olho é um espaço igual; ao browser é a proibição de quebrar ali. */
+     Duas peças e não um texto só, para o gerador continuar a escapar as duas e
+     não haver por aqui maneira de o backoffice meter marcação numa ficha. */
   const matricula = v.ano
-    ? (nMes ? { antes: `${String(nMes).padStart(2, '0')}\u00A0/\u00A0`, valor: String(v.ano) }
-            : String(v.ano))
+    ? (v.mes ? { valor: String(v.ano), depois: String(v.mes).trim() }
+             : String(v.ano))
     : null;
 
   const specs = [
@@ -1341,7 +1371,7 @@ function paginaViatura(v) {
                  dava-o como resultado. Perdi um diagnóstico com isso. -->
             ${specs.map(([r, val]) => {
               const dd = val && typeof val === 'object'
-                ? `<span class="spec__antes">${esc(val.antes)}</span>${esc(val.valor)}`
+                ? `${esc(val.valor)}<span class="spec__depois">${esc(val.depois)}</span>`
                 : esc(val);
               return `<div class="spec"><dt>${esc(r)}</dt><dd>${dd}</dd></div>`;
             }).join('')}

@@ -1,19 +1,30 @@
 # Logótipos das marcas
 
-Doze ficheiros, de **duas origens diferentes**. A distinção importa e não deve
-ser apagada por quem mexer nisto.
+Quarenta e sete ficheiros, de **três origens diferentes**. A distinção importa
+e não deve ser apagada por quem mexer nisto.
 
 | Origem | Ficheiros |
 |---|---|
-| Simple Icons (CC0) | `audi` `bmw` `citroen` `kia` `nissan` `opel` `peugeot` `renault` `smart` |
+| Simple Icons (CC0) | `astonmartin` `audi` `bentley` `bmw` `cadillac` `chevrolet` `citroen` `dacia` `dsautomobiles` `ducati` `ferrari` `fiat` `ford` `honda` `hyundai` `infiniti` `iveco` `jeep` `kia` `ktm` `lada` `lamborghini` `maserati` `mazda` `mg` `mini` `mitsubishi` `nissan` `opel` `peugeot` `polestar` `porsche` `renault` `seat` `skoda` `smart` `subaru` `suzuki` `tesla` `toyota` `vespa` `volkswagen` `volvo` |
 | Desenhados neste projecto | `mercedesbenz` `polaris` |
-| Letras de uma fonte do sistema | `jaguar` |
+| Letras de uma fonte do sistema | `jaguar` `landrover` |
 
-Todos são monocromáticos e de caminho único. **Nem todos são quadrados**: nove
-são emblemas com `viewBox` 1:1, e três são mais largos do que altos — o
-`polaris` a 1,73:1, o `kia` a 4,25:1 e o `jaguar` a 6,25:1, que são wordmarks.
-O CSS trata disso com `height: 32px; width: auto; max-width: 96px`: os emblemas
-saem 32×32 e os wordmarks esticam até 96 px de largo.
+**Trinta e quatro foram trazidos de uma vez**, e não porque estivessem em stock.
+A colecção só tinha as nove marcas que existiam no stand no dia em que foi
+feita, e no dia em que o cliente pôs um Land Rover apareceu-lhe um monograma na
+faixa. Ter o ficheiro cá não mostra a marca no site — a faixa é gerada a partir
+das viaturas à venda, e é isso que garante a regra 2 mais abaixo. Ter o ficheiro
+cá só garante que, quando a marca aparecer no stock, não aparece um monograma.
+
+Todos são monocromáticos. **Nem todos são quadrados**: 43 são emblemas com
+`viewBox` 1:1, e quatro são mais largos do que altos — o `polaris` a 1,73:1, o
+`kia` a 4,25:1, o `landrover` a 4,27:1 e o `jaguar` a 5,81:1.
+
+Quem os mede é o `medidaLogo()` do gerador, por ÁREA e não por altura:
+`AREA_LOGO = 32 × 32` e `LARG_MAX_LOGO = 64`. Um emblema quadrado sai 32×32; o
+`jaguar` sai 64×11 e o `landrover` 64×15, os dois travados pelo tecto da
+largura. **O tecto são 64 px e não 96** — esta nota disse 96 durante um tempo e
+estava errada; a conta é a do código.
 
 **Porque é que isto importa:** enquanto o `kia` esteve numa caixa quadrada, a
 tinta do wordmark ocupava 5,65 de 24 unidades de altura e a 32 px ficava com
@@ -102,6 +113,25 @@ nenhum, o único Jaguar disponível no Wikimedia é o logótipo de 1966 (seria
 factualmente errado ao lado de um XF de 2013) e o Polaris de lá está declarado
 como CC BY-SA por utilizadores anónimos, que não têm legitimidade para licenciar
 o logótipo de uma empresa. **Nada foi copiado dessas fontes.**
+
+## O `landrover`
+
+**Não existe no Simple Icons** — procurado nos 3453 ícones da colecção, tal como
+a Jaguar, a Mercedes-Benz e a Polaris. Foi construído aqui, e como o `jaguar`:
+contornos de letras reais extraídos com `fontTools`, não desenho à mão.
+
+É o emblema — a elipse cheia com «LAND ROVER» vazado, que é o que o badge é —
+e não só o nome, ao contrário do `jaguar`. A razão é aritmética e foi medida:
+com o tecto de 64 px, «LAND ROVER» em wordmark tem onze caracteres e sai com
+letras de **6 px**, ilegível; «JAGUAR» tem seis e sai com 11 px, que se lê. Em
+emblema o `landrover` sai 64×15 e a letra vazada, em contraste máximo, lê-se
+melhor do que o wordmark. Foram comparados os três lado a lado ao tamanho real
+antes de escolher.
+
+As letras são da Arial Bold, uma fonte do sistema, com o espaçamento aberto a
+0,08 em. Não é a fonte oficial da marca; é uma aproximação próxima. A elipse é
+geométrica nossa. **Não é arte oficial** — se um dia houver material licenciado
+do fabricante, substitui-se pelo nome do ficheiro e o gerador apanha-o sozinho.
 
 ## Marca sem ficheiro
 
