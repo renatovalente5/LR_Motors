@@ -364,6 +364,21 @@ export default {
         }, 409);
       }
       if (!senhaConfere(pedido.headers.get('X-Senha'), ambiente.SENHA)) {
+        /* Deixar rasto de uma senha recusada, SEM a escrever.
+           ------------------------------------------------------------------
+           Isto já aconteceu duas vezes e as duas fui a adivinhar, porque não
+           havia registo nenhum de um 401 — só o cliente a dizer «dá senha
+           errada» e eu a inventar teorias. O comprimento e a versão chegam
+           para distinguir os três casos que interessam:
+
+             0 caracteres      -> o campo chegou vazio
+             o comprimento certo mas recusada -> erro de escrita, ou o
+                                  gestor de senhas do iPhone a meter outra
+             versão em falta   -> página velha, de antes do contrato mudar
+
+           O VALOR nunca vai para o registo: um registo é para se ler, e uma
+           senha lida deixa de ser senha. */
+        registarRecusa(pedido);
         return responder({ erro: 'Senha errada.' }, 401);
       }
       try {
@@ -393,6 +408,17 @@ export default {
     }
   },
 };
+
+/* Só o que serve para diagnosticar, e nada que sirva para entrar. */
+function registarRecusa(pedido) {
+  const dada = pedido.headers.get('X-Senha');
+  console.error('senha recusada', JSON.stringify({
+    caracteres: dada === null ? 'cabeçalho ausente' : dada.length,
+    versao: pedido.headers.get('X-Versao') || 'nenhuma',
+    espacos_nas_pontas: typeof dada === 'string' && dada !== dada.trim(),
+    aparelho: (pedido.headers.get('User-Agent') || '').slice(0, 60),
+  }));
+}
 
 function avaria(e, rota) {
   console.error('falhou', rota, e && e.message);

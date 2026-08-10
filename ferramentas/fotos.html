@@ -195,7 +195,13 @@
       <!-- O botão de ver a senha vive dentro do campo. É `type="button"` de
            propósito: dentro de um formulário, um botão sem tipo submete-o. -->
       <div class="campo__caixa">
-        <input id="senha" type="password" autocomplete="current-password">
+        <!-- `autocomplete="off"`, e não "current-password": esta senha é
+             guardada por nós no próprio telemóvel, e não é preciso que o
+             gestor de senhas do iPhone se meta nisto. Metendo-se, pode
+             preencher o campo com outra senha guardada para este domínio, e o
+             que o cliente vê é «senha errada» sem ter escrito nada. -->
+        <input id="senha" type="password" autocomplete="off"
+               spellcheck="false" autocapitalize="none">
         <button class="olho" id="verSenha" type="button"
                 aria-label="Mostrar a senha" aria-pressed="false">
           <svg class="olho__ver" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -760,6 +766,12 @@ const VERSAO = '2';
 
 class ErroDeRede extends Error {}
 
+/* Espaços em volta fora. Uma senha de 28 caracteres é colada de um WhatsApp
+   ou de um email, e vem quase sempre com um espaço atrás — e um espaço atrás
+   é, para quem escreve o código, uma senha diferente. Não é adivinhar o que o
+   cliente quis: é não o castigar por uma coisa que não se vê no ecrã. */
+const senhaEscrita = () => campoSenha.value.trim();
+
 async function aoWorker(rota, { json, cru, nome } = {}) {
   const url = WORKER.replace(/\/+$/, '') + rota;
   let ultimo;
@@ -774,10 +786,10 @@ async function aoWorker(rota, { json, cru, nome } = {}) {
       const r = await fetch(url, cru
         ? { method: 'POST', signal: cancelar.signal, body: cru,
             headers: { 'Content-Type': 'text/plain', 'X-Versao': VERSAO,
-                       'X-Senha': campoSenha.value, 'X-Nome': nome } }
+                       'X-Senha': senhaEscrita(), 'X-Nome': nome } }
         : { method: 'POST', signal: cancelar.signal,
             headers: { 'Content-Type': 'application/json', 'X-Versao': VERSAO },
-            body: JSON.stringify({ senha: campoSenha.value, ...json }) });
+            body: JSON.stringify({ senha: senhaEscrita(), ...json }) });
 
       const d = await r.json().catch(() => ({}));
       if (r.ok) return d;
@@ -820,7 +832,7 @@ botaoEnviar.addEventListener('click', async () => {
   if (aTrabalhar) return dizer('Espere que as fotografias fiquem prontas.', 'mau');
   if (!prontas.length) return dizer('Não há fotografias para enviar.', 'mau');
   if (!verificarPasta()) { campoPasta.focus(); return dizer('Corrija o nome da pasta.', 'mau'); }
-  if (!campoSenha.value) { campoSenha.focus(); return dizer('Falta a senha.', 'mau'); }
+  if (!senhaEscrita()) { campoSenha.focus(); return dizer('Falta a senha.', 'mau'); }
 
   botaoEnviar.disabled = true;
   botaoEnviar.dataset.ocupado = '1';     // impede actualizar() de pisar o progresso
@@ -849,7 +861,7 @@ botaoEnviar.addEventListener('click', async () => {
 
     /* Só se guarda a senha depois de o Worker a ter aceite: guardá-la mal é
        escrita deixava o cliente preso a uma senha errada sem perceber porquê. */
-    localStorage.setItem('lr:senha-fotos', campoSenha.value);
+    localStorage.setItem('lr:senha-fotos', senhaEscrita());
     if (pastasExistentes && !pastasExistentes.includes(pasta)) pastasExistentes.push(pasta);
 
     dizer(`Enviadas ${r.quantas} ${r.quantas === 1 ? 'fotografia' : 'fotografias'} `
