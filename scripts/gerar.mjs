@@ -1191,9 +1191,14 @@ function paginaViatura(v) {
   const nMes = MESES.indexOf(String(v.mes || '').trim()) + 1;
   /* Duas peças, e não um texto só: o mês vai mais pequeno e sem negrito. O ano
      é o que se procura nesta linha — «2024» diz quase tudo, e o mês é a
-     precisão a seguir. Sem mês, fica só o ano e uma peça basta. */
+     precisão a seguir. Sem mês, fica só o ano e uma peça basta.
+
+     Os espaços à volta da barra são NÃO SEPARÁVEIS (U+00A0). Com espaços
+     normais, a célula é estreita e alinhada à direita, e «02 /» podia ficar numa
+     linha e «2024» na seguinte — uma data partida em duas lê-se como duas
+     coisas. Ao olho é um espaço igual; ao browser é a proibição de quebrar ali. */
   const matricula = v.ano
-    ? (nMes ? { antes: `${String(nMes).padStart(2, '0')}/`, valor: String(v.ano) }
+    ? (nMes ? { antes: `${String(nMes).padStart(2, '0')}\u00A0/\u00A0`, valor: String(v.ano) }
             : String(v.ano))
     : null;
 
