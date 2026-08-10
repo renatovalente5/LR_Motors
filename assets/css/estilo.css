@@ -686,6 +686,11 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 }
 .spec dt { color: var(--tinta-2); font-size: .92rem; }
 .spec dd { margin: 0; font-weight: 700; text-align: right; }
+/* O mês, antes do ano: menor e sem o negrito do valor. O ano é o que se procura
+   nesta linha; o mês é a precisão a seguir. Em `em` e não em `rem` para
+   acompanhar o tamanho da célula se ele mudar. A cor é --tinta-2, que dá 7,47:1
+   em branco — passa AA em texto pequeno, ao contrário da --tinta-3. */
+.spec__antes { font-size: .82em; font-weight: 500; color: var(--tinta-2); }
 /* O mês vive debaixo do ano, dentro da mesma célula: mais pequeno, sem peso e
    em tom secundário, para o ano continuar a ser o que se lê primeiro. */
 @media (max-width: 620px) { .specs { grid-template-columns: 1fr; } }

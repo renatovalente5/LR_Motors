@@ -174,20 +174,27 @@ content:
 
       # ─────────── ficha técnica
       - name: ano
-        label: Ano da primeira matrícula
+        label: Ano
         type: number
-        description: Obrigatório por lei, com o mês abaixo. Como vem no livrete.
+        description: >-
+          O ano da primeira matrícula, como vem no livrete. Obrigatório por lei
+          na venda de usados. Na ficha aparece com o mês à frente: 03/2024.
       # O mês é campo próprio e não parte de uma data escrita à mão: escolhido
-      # de uma lista não há enganos de formato, e é assim que aparece na ficha —
-      # por baixo do ano, em letra pequena. Substituiu o antigo campo «Data da
-      # primeira matrícula», que guardava a mesma coisa que este mais o ano e
+      # de uma lista não há enganos de formato. Substituiu o antigo campo «Data
+      # da primeira matrícula», que guardava a mesma coisa que este mais o ano e
       # podia acabar a dizer um ano diferente do campo ao lado.
+      #
+      # Os rótulos são «Ano» e «Mês», curtos, por decisão do cliente. Estiveram
+      # «Ano da primeira matrícula» e «Mês da primeira matrícula»; o que a lei
+      # obriga a prestar está dito na ajuda, que é onde se lê sem encher o
+      # formulário.
       - name: mes
-        label: Mês da primeira matrícula
+        label: Mês
         type: select
         description: >-
-          Aparece por baixo do ano na ficha técnica. Deixe vazio se não souber —
-          fica só o ano.
+          O mês da primeira matrícula. Aparece à frente do ano na ficha técnica,
+          em letra mais pequena: 03/2024. Deixe vazio se não souber — fica só o
+          ano.
         options:
           values:
             - { name: Janeiro, label: Janeiro }

@@ -1189,15 +1189,21 @@ function paginaViatura(v) {
   const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   const nMes = MESES.indexOf(String(v.mes || '').trim()) + 1;
+  /* Duas peças, e não um texto só: o mês vai mais pequeno e sem negrito. O ano
+     é o que se procura nesta linha — «2024» diz quase tudo, e o mês é a
+     precisão a seguir. Sem mês, fica só o ano e uma peça basta. */
   const matricula = v.ano
-    ? (nMes ? `${String(nMes).padStart(2, '0')}/${v.ano}` : String(v.ano))
+    ? (nMes ? { antes: `${String(nMes).padStart(2, '0')}/`, valor: String(v.ano) }
+            : String(v.ano))
     : null;
 
   const specs = [
-    /* O rótulo deixa de ser «Ano»: com «03/2024» na célula, chamar-lhe ano era
-       dizer uma coisa e mostrar outra. «1.ª matrícula» é o termo do livrete e é
-       o que o campo é mesmo. */
-    ['1.ª matrícula', matricula], ['Quilómetros', v.km != null ? nKm(v.km) : null],
+    /* «Ano», por decisão do cliente. Eu tinha posto «1.ª matrícula» quando o
+       mês entrou na célula, por achar que «Ano: 03/2024» dizia uma coisa e
+       mostrava outra; ele preferiu «Ano», e o mês vai mais pequeno e sem
+       negrito precisamente para o ano continuar a ser o que se lê. Fica escrito
+       para ninguém «corrigir» isto outra vez. */
+    ['Ano', matricula], ['Quilómetros', v.km != null ? nKm(v.km) : null],
     ['Combustível', v.combustivel], ['Caixa', v.caixa],
     ['Potência', v.potencia ? v.potencia + ' cv' : null],
     ['Carroçaria', v.carrocaria], ['Cor', v.cor],
@@ -1315,17 +1321,25 @@ function paginaViatura(v) {
         <div class="bloco">
           <h2>Ficha técnica</h2>
           <dl class="specs">
-            <!-- Todos os valores passam pelo esc(). Havia aqui uma saída para
-                 passar marcação em cru, que existia só para pôr o mês em letra
-                 pequena debaixo do ano; com o mês em «03/2024» deixou de ser
-                 precisa, e menos uma saída dessas é menos uma maneira de
-                 injectar marcação numa ficha.
+            <!-- Um valor pode vir em DUAS peças, quando parte dele tem menos
+                 peso do que o resto — é o caso do mês, que acompanha o ano mas
+                 não é o que se procura na linha.
 
-                 Sem nomes de etiquetas escritos por extenso neste comentário:
-                 ele vai no HTML publicado, e uma procura por etiquetas mortas
-                 na ficha dava-o como resultado. Perdi um diagnóstico com isso. -->
-            ${specs.map(([r, val]) =>
-              `<div class="spec"><dt>${esc(r)}</dt><dd>${esc(val)}</dd></div>`).join('')}
+                 O que NÃO se faz é voltar a deixar passar marcação em cru para
+                 aqui. Havia essa saída e foi tirada de propósito: quem escolhe
+                 é a estrutura (duas peças ou uma), e quem escapa continua a ser
+                 este sítio, sempre. Assim o backoffice não tem por onde meter
+                 marcação numa ficha técnica.
+
+                 Sem nomes de etiquetas por extenso neste comentário: ele vai no
+                 HTML publicado, e uma procura por etiquetas mortas na ficha
+                 dava-o como resultado. Perdi um diagnóstico com isso. -->
+            ${specs.map(([r, val]) => {
+              const dd = val && typeof val === 'object'
+                ? `<span class="spec__antes">${esc(val.antes)}</span>${esc(val.valor)}`
+                : esc(val);
+              return `<div class="spec"><dt>${esc(r)}</dt><dd>${dd}</dd></div>`;
+            }).join('')}
           </dl>
         </div>
 
