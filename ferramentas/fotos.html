@@ -1057,7 +1057,13 @@ function linhaDaPasta(p, aoApagar) {
      site serve e o cartão de partilha, e a pasta do Peugeot tem 20 fotografias
      em 89 ficheiros. «89» não corresponde a nada que o cliente reconheça. */
   const n = p.fotografias != null ? p.fotografias : p.ficheiros;
-  const quantas = `${n} fotografia${n === 1 ? '' : 's'}`;
+  /* Zero fotografias e dezasseis ficheiros não é contradição: as pastas que
+     vieram da importação do Standvirtual só têm as versões que o site serve, e
+     nunca tiveram o original. Dizer «0 fotografias» ao lado de um botão de
+     apagar não se entende — mais vale dizer o que lá está. */
+  const quantas = n === 0
+    ? `${p.ficheiros} ficheiro${p.ficheiros === 1 ? '' : 's'}, só versões geradas`
+    : `${n} fotografia${n === 1 ? '' : 's'}`;
   conta.textContent = presa
     ? `${quantas} · em uso `
       + `${p.viaturas.length === 1 ? 'na viatura' : 'nas viaturas'} ${p.viaturas.join(', ')}`
