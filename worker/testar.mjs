@@ -86,7 +86,18 @@ const ok = (nome, cond, extra = '') => {
 
 console.log('\n— autenticação —');
 ok('senha errada = 401', (await pedir('/blob', { senha: 'x', nome: 'a.jpg', conteudo: JPEG })).estado === 401);
-ok('sem senha = 401', (await pedir('/blob', { nome: 'a.jpg', conteudo: JPEG })).estado === 401);
+/* Duas coisas diferentes, e a diferença importa ao cliente:
+   - uma página ACTUAL sem senha, ou com a senha errada, é 401;
+   - um pedido sem senha NEM versão é uma página velha em cache, que enviava a
+     senha no corpo. Dizer-lhe «senha errada» manda-a atrás do que está certo. */
+ok('página actual sem senha = 401', (await pedir('/blob',
+  { nome: 'a.jpg', conteudo: JPEG }, { Origin: ORIGEM, 'X-Versao': '2' })).estado === 401);
+{
+  const velha = await pedir('/blob', { nome: 'a.jpg', conteudo: JPEG });
+  ok('página velha = 409 e não 401', velha.estado === 409, `foi ${velha.estado}`);
+  ok('página velha é mandada recarregar', velha.corpo.desactualizada === true
+    && /desactualizada/i.test(velha.corpo.erro || ''), JSON.stringify(velha.corpo));
+}
 ok('senha certa passa', (await pedir('/blob', { senha: SENHA, nome: 'a.jpg', conteudo: JPEG })).estado === 200);
 {
   const r = await pedir('/blob', { senha: SENHA, nome: 'a.jpg', conteudo: JPEG }, { Origin: 'https://mau.example' });

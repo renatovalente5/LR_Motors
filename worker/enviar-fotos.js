@@ -63,7 +63,7 @@ const FORMATOS = [
 const cabecalhos = {
   'Access-Control-Allow-Origin': ORIGEM,
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-  'Access-Control-Allow-Headers': 'Content-Type, X-Senha, X-Nome',
+  'Access-Control-Allow-Headers': 'Content-Type, X-Senha, X-Nome, X-Versao',
   'Access-Control-Max-Age': '86400',
 };
 
@@ -346,6 +346,23 @@ export default {
        trabalho que estoirava o orçamento de CPU. Por isso a senha e o nome
        vêm em cabeçalhos, e o corpo passa intocado. */
     if (rota === '/blob') {
+      /* UMA PÁGINA VELHA NÃO É UMA SENHA ERRADA.
+         --------------------------------------------------------------------
+         A senha do /blob mudou de sítio: vinha no corpo em JSON, passou a vir
+         no cabeçalho X-Senha, para o Worker não ter de ler a fotografia toma
+         memória. Quem tivesse a página aberta de antes continuou a enviá-la
+         no corpo — e o Worker, que já só olha para o cabeçalho, respondia
+         «Senha errada».
+
+         Foi o que aconteceu ao cliente: passou a manhã a desconfiar da senha,
+         que estava certa. Uma mensagem errada custa mais do que a avaria. */
+      if (!pedido.headers.get('X-Senha') && !pedido.headers.get('X-Versao')) {
+        return responder({
+          desactualizada: true,
+          erro: 'A página está desactualizada. Feche-a e abra outra vez '
+              + 'lrmotorsautomoveis.pt/fotos/ — a senha está certa.',
+        }, 409);
+      }
       if (!senhaConfere(pedido.headers.get('X-Senha'), ambiente.SENHA)) {
         return responder({ erro: 'Senha errada.' }, 401);
       }

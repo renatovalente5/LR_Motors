@@ -746,6 +746,18 @@ const base64 = (bloco) => new Promise((ok, falha) => {
 const TENTATIVAS = 3;
 const ESPERA_MS = 90000;
 
+/* A versão do contrato com o Worker.
+   ---------------------------------------------------------------------------
+   Sobe quando muda a FORMA como esta página fala com o Worker — não quando
+   muda o aspecto. Serve para o Worker distinguir uma página actual de uma que
+   ficou em cache: sem isto, uma página velha a enviar a senha no corpo levava
+   com «Senha errada», e o cliente passou a manhã a desconfiar de uma senha que
+   estava certa.
+
+   2 = senha e nome em cabeçalhos, fotografia em cru no corpo.
+   1 = tudo num JSON só (as páginas que ficaram por aí ainda fazem isto). */
+const VERSAO = '2';
+
 class ErroDeRede extends Error {}
 
 async function aoWorker(rota, { json, cru, nome } = {}) {
@@ -761,13 +773,23 @@ async function aoWorker(rota, { json, cru, nome } = {}) {
          que o mantém dentro dos 10 ms de CPU do plano gratuito. */
       const r = await fetch(url, cru
         ? { method: 'POST', signal: cancelar.signal, body: cru,
-            headers: { 'Content-Type': 'text/plain', 'X-Senha': campoSenha.value, 'X-Nome': nome } }
+            headers: { 'Content-Type': 'text/plain', 'X-Versao': VERSAO,
+                       'X-Senha': campoSenha.value, 'X-Nome': nome } }
         : { method: 'POST', signal: cancelar.signal,
-            headers: { 'Content-Type': 'application/json' },
+            headers: { 'Content-Type': 'application/json', 'X-Versao': VERSAO },
             body: JSON.stringify({ senha: campoSenha.value, ...json }) });
 
       const d = await r.json().catch(() => ({}));
       if (r.ok) return d;
+
+      /* O Worker diz que esta página é velha: recarrega-se em vez de mandar o
+         cliente fazê-lo. Só uma vez — se voltasse a acontecer depois de
+         recarregar, era um laço, e mais valia mostrar-lhe a mensagem. */
+      if (d.desactualizada && !sessionStorage.getItem('lr:recarregada')) {
+        sessionStorage.setItem('lr:recarregada', '1');
+        location.reload();
+        await new Promise(() => {});          // fica aqui até a página sair
+      }
 
       const e = new Error(d.erro || `erro ${r.status}`);
       e.estado = r.status;
@@ -890,6 +912,35 @@ document.getElementById('limpar').addEventListener('click', () => limparLista())
 /* Estado inicial: sem fotografias, nem «Guardar todas» nem «Enviar» têm o que
    fazer. Sem esta chamada ficavam ligados até à primeira fotografia. */
 actualizar();
+
+/* Dar-se conta de estar velha, ao abrir.
+   ---------------------------------------------------------------------------
+   O GitHub Pages manda guardar esta página por 10 minutos, mas um separador
+   deixado aberto no telemóvel não volta a pedi-la — pode ficar dias com o
+   código de outro dia. Foi assim que o cliente ficou com a versão que enviava
+   a senha no corpo, e a levar «Senha errada» por uma senha certa.
+
+   Isto vai buscar a página ao servidor, sem passar pela cache, e compara a
+   versão. Se for outra, recarrega — antes de ele perder dez minutos a preparar
+   fotografias para depois falhar no fim. Uma vez só, para não haver laço; e se
+   não houver rede, fica calado, que não é disto que ele precisa de saber. */
+(async () => {
+  const marca = (chave, valor) => {
+    try { return valor === undefined ? sessionStorage.getItem(chave)
+                                     : sessionStorage.setItem(chave, valor); }
+    catch { return null; }                    // navegação privada bloqueia isto
+  };
+  if (marca('lr:recarregada')) return;
+  try {
+    const r = await fetch(location.pathname, { cache: 'reload' });
+    if (!r.ok) return;
+    const lá = (await r.text()).match(/const VERSAO = '([^']*)'/);
+    if (lá && lá[1] !== VERSAO) {
+      marca('lr:recarregada', '1');
+      location.reload();
+    }
+  } catch { /* sem rede: não há nada de útil a dizer sobre isto */ }
+})();
 </script>
 </body>
 </html>
