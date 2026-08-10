@@ -1316,9 +1316,14 @@ function paginaViatura(v) {
           <h2>Ficha técnica</h2>
           <dl class="specs">
             <!-- Todos os valores passam pelo esc(). Havia aqui uma saída para
-                 passar HTML em cru, que existia só para o <small> do mês; com o
-                 mês em «03/2024» deixou de ser preciso, e menos uma saída
-                 dessas é menos uma maneira de injectar marcação numa ficha. -->
+                 passar marcação em cru, que existia só para pôr o mês em letra
+                 pequena debaixo do ano; com o mês em «03/2024» deixou de ser
+                 precisa, e menos uma saída dessas é menos uma maneira de
+                 injectar marcação numa ficha.
+
+                 Sem nomes de etiquetas escritos por extenso neste comentário:
+                 ele vai no HTML publicado, e uma procura por etiquetas mortas
+                 na ficha dava-o como resultado. Perdi um diagnóstico com isso. -->
             ${specs.map(([r, val]) =>
               `<div class="spec"><dt>${esc(r)}</dt><dd>${esc(val)}</dd></div>`).join('')}
           </dl>
