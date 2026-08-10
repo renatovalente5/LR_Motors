@@ -120,18 +120,31 @@ o logótipo de uma empresa. **Nada foi copiado dessas fontes.**
 a Jaguar, a Mercedes-Benz e a Polaris. Foi construído aqui, e como o `jaguar`:
 contornos de letras reais extraídos com `fontTools`, não desenho à mão.
 
-É o emblema — a elipse cheia com «LAND ROVER» vazado, que é o que o badge é —
-e não só o nome, ao contrário do `jaguar`. A razão é aritmética e foi medida:
-com o tecto de 64 px, «LAND ROVER» em wordmark tem onze caracteres e sai com
-letras de **6 px**, ilegível; «JAGUAR» tem seis e sai com 11 px, que se lê. Em
-emblema o `landrover` sai 64×15 e a letra vazada, em contraste máximo, lê-se
-melhor do que o wordmark. Foram comparados os três lado a lado ao tamanho real
-antes de escolher.
+É o emblema e não só o nome, ao contrário do `jaguar`. A razão é aritmética e
+foi medida: com o tecto de 64 px, «LAND ROVER» em wordmark tem onze caracteres
+e sai com letras de **6 px**, ilegível; «JAGUAR» tem seis e sai com 11 px, que
+se lê.
 
-As letras são da Arial Bold, uma fonte do sistema, com o espaçamento aberto a
-0,08 em. Não é a fonte oficial da marca; é uma aproximação próxima. A elipse é
-geométrica nossa. **Não é arte oficial** — se um dia houver material licenciado
-do fabricante, substitui-se pelo nome do ficheiro e o gerador apanha-o sozinho.
+**Duas tentativas.** A primeira foi uma elipse cheia com o nome numa linha,
+vazado. Estava errada na forma, e o cliente mandou o logótipo verdadeiro: são
+**dois anéis concêntricos**, o nome em **duas linhas** («LAND» sobre «ROVER»),
+em itálico, e **duas marcas em cunha** — uma depois de LAND a apontar para a
+direita, outra antes de ROVER a apontar para a esquerda.
+
+A segunda versão é essa, e as proporções vieram da imagem que ele mandou
+(598×315 = 1,90:1; ficou em 1,95:1 para dar folga às letras). As letras são da
+**Arial Bold Italic**, uma fonte do sistema, extraídas com `fontTools`. Os
+parâmetros do desenho estão em `landrover.params.json`, ao lado — quem quiser
+mexer na espessura dos anéis ou no tamanho da letra não tem de os adivinhar a
+partir do caminho.
+
+Duas coisas que se aprenderam a fazê-lo: as cunhas grandes e encostadas às
+palavras leem-se como **hífenes** («LAND-» «-ROVER»), por isso são pequenas e
+afastadas; e anéis grossos roubam o espaço às letras, por isso são finos.
+
+**Não é arte oficial.** É uma aproximação geométrica nossa, como a Mercedes e a
+Polaris. Se um dia houver material licenciado do fabricante, substitui-se pelo
+nome do ficheiro e o gerador apanha-o sozinho.
 
 ## Marca sem ficheiro
 
