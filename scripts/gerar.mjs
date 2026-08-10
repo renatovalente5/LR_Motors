@@ -1206,30 +1206,32 @@ function paginaViatura(v) {
     : estaReservada(v) ? 'https://schema.org/LimitedAvailability'
     : 'https://schema.org/InStock';
 
-  /* Mês e ano na mesma linha, como se lê num livrete: 03/2024.
+  /* Mês e ano na mesma linha, como se lê num livrete: 03 / 2025.
      ---------------------------------------------------------------------------
-     Esteve o mês por baixo do ano, em letra pequena, e antes disso numa linha
-     «Data da matrícula» à parte. A informação é sempre a mesma — mês e ano da
-     primeira matrícula, que é o que o DL 74/93 obriga a prestar — mas assim
-     lê-se de uma vez e no formato em que estas datas se escrevem.
+     Esta linha já foi de três maneiras, e esta é a que o cliente escolheu. O mês
+     esteve numa linha «Data da matrícula» à parte, e esteve por baixo do ano em
+     letra pequena — que obrigava a célula do ano a ter duas linhas e, com a
+     grelha de duas colunas, arrastava a dos quilómetros com ela.
 
-     O mês é guardado por NOME («Março»), porque é escolhido de uma lista no
-     backoffice e é assim que o cliente o reconhece. Aqui passa a número, com o
-     zero à frente: «3/2024» ao lado de «03/2024» noutra viatura ficava
-     desalinhado, e uma ficha técnica lê-se em coluna.
+     Duas peças, e não um texto só: o mês vai mais pequeno e sem o negrito do
+     ano, que é o que se procura nesta linha. E são duas peças escapadas pelo
+     gerador, não marcação vinda dos dados — o backoffice não tem por aqui
+     maneira de meter HTML numa ficha técnica.
 
-     Se houver mês mas não ano, não se escreve «03/» — mostra-se o que há. */
+     Os espaços à volta da barra são NÃO SEPARÁVEIS (U+00A0): a célula é estreita
+     e alinhada à direita, e com espaços normais «03 /» podia ficar numa linha e
+     «2025» na seguinte. Uma data partida em duas lê-se como duas coisas.
+
+     O mês é guardado por NOME no backoffice, escolhido de uma lista, porque é
+     assim que o cliente o reconhece; a conversão para número é aqui. Com zero à
+     frente, senão «3 / 2025» ao lado de «03 / 2025» ficava desalinhado. */
   const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
     'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
   const nMes = MESES.indexOf(String(v.mes || '').trim()) + 1;
-  /* O ano em cima e o MÊS POR BAIXO, em letra pequena — «2024» com «Março»
-     debaixo. É o que o cliente quer ler; o formato 02/2024 esteve aqui e saiu.
-
-     Duas peças e não um texto só, para o gerador continuar a escapar as duas e
-     não haver por aqui maneira de o backoffice meter marcação numa ficha. */
   const matricula = v.ano
-    ? (v.mes ? { valor: String(v.ano), depois: String(v.mes).trim() }
-             : String(v.ano))
+    ? (nMes
+        ? { antes: `${String(nMes).padStart(2, '0')}\u00A0/\u00A0`, valor: String(v.ano) }
+        : String(v.ano))
     : null;
 
   const specs = [
@@ -1371,7 +1373,7 @@ function paginaViatura(v) {
                  dava-o como resultado. Perdi um diagnóstico com isso. -->
             ${specs.map(([r, val]) => {
               const dd = val && typeof val === 'object'
-                ? `${esc(val.valor)}<span class="spec__depois">${esc(val.depois)}</span>`
+                ? `<span class="spec__antes">${esc(val.antes)}</span>${esc(val.valor)}`
                 : esc(val);
               return `<div class="spec"><dt>${esc(r)}</dt><dd>${dd}</dd></div>`;
             }).join('')}
