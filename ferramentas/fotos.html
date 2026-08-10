@@ -142,6 +142,23 @@
   .dica h2 { font-size: .95rem; margin: 0 0 .5rem; }
   .dica ol { margin: 0; padding-left: 1.15rem; }
   .dica li { display: list-item; padding: 0; background: none; border: 0; margin-bottom: .3rem; }
+  /* Escolher uma pasta que já existe. Fichas pequenas, embrulhadas — com vinte
+     e quatro pastas, uma lista em coluna empurrava o botão de enviar para fora
+     do ecrã. A que está escolhida fica marcada, para não haver dúvida sobre
+     para onde vão as fotografias. */
+  .pasta-escolha { margin-top: .55rem; }
+  .pasta-escolha__rotulo { display: block; font-size: .84rem; color: var(--suave); margin-bottom: .4rem; }
+  .pasta-escolha__lista { display: flex; flex-wrap: wrap; gap: .35rem; }
+  .pasta-ficha {
+    padding: .32rem .6rem; font: inherit; font-size: .84rem; font-weight: 600;
+    color: var(--azul); background: #fff; border: 1px solid var(--linha);
+    border-radius: 999px; cursor: pointer; max-width: 100%; overflow: hidden;
+    text-overflow: ellipsis; white-space: nowrap;
+  }
+  .pasta-ficha:hover { background: #F0F4FB; border-color: var(--azul); }
+  .pasta-ficha[aria-pressed="true"] { color: #fff; background: var(--azul); border-color: var(--azul); }
+  .pasta-ficha__conta { font-weight: 400; opacity: .75; }
+
   /* Arrumar pastas: deliberadamente discreto. É a única coisa nesta página que
      apaga trabalho, e não tem que competir com o botão de enviar. */
   .pastas {
@@ -220,6 +237,16 @@
       <label for="pasta">Nome da pasta</label>
       <input id="pasta" type="text" autocapitalize="none" autocorrect="off" spellcheck="false"
              inputmode="latin" aria-describedby="ajuda-pasta">
+      <!-- Acrescentar a uma pasta que já existe sempre funcionou — as
+           fotografias juntam-se às que lá estão — mas obrigava a escrever o
+           nome à letra. Com nomes como
+           `renault-captur-blue-dci-115-edc-business-edition`, num teclado de
+           telemóvel, isso não é uma opção: um erro e o que se ganha é uma pasta
+           nova quase igual. Daí a lista, preenchida quando a página abre. -->
+      <div class="pasta-escolha" id="pastaEscolha" hidden>
+        <span class="pasta-escolha__rotulo">Ou juntar a uma que já existe:</span>
+        <div class="pasta-escolha__lista" id="pastaEscolhaLista"></div>
+      </div>
       <p class="ajuda" id="ajuda-pasta">
         Letras minúsculas, números e hífens. Dê-lhe o nome do carro para se
         encontrar depois — por exemplo <code>bmw-serie-3</code>.
@@ -690,25 +717,25 @@ const WORKER = '__WORKER_FOTOS__'.replace(/^__.*__$/, '');
 const envio = document.getElementById('envio');
 const campoPasta = document.getElementById('pasta');
 const campoSenha = document.getElementById('senha');
+
+/* Espaços em volta fora. Uma senha de 28 caracteres é colada de um WhatsApp ou
+   de um email, e vem quase sempre com um espaço atrás — e um espaço atrás é,
+   para quem escreve o código, uma senha diferente.
+
+   FICA AQUI, e não mais abaixo junto ao envio, por uma razão que custou caro:
+   estava declarada depois do arranque que a usa, e um `const` antes da sua
+   linha não é undefined — é um erro. O erro caía no `catch` do proporPasta(),
+   que o engolia, e o resultado era a página a agir como se não existisse pasta
+   nenhuma: propunha sempre carro-01, nunca avisava que a pasta já existia, e
+   umas fotografias podiam juntar-se a outras sem ninguém dar por isso. Esteve
+   assim em produção meio dia. */
+const senhaEscrita = () => campoSenha.value.trim();
 const botaoEnviar = document.getElementById('enviar');
 const resultado = document.getElementById('resultado');
 const ajudaPasta = document.getElementById('ajuda-pasta');
 
 let pastasExistentes = null;
 
-if (WORKER) {
-  envioLigado = true;
-  envio.hidden = false;
-  document.getElementById('comoEnviar').hidden = false;
-  document.getElementById('comoGuardar').hidden = true;
-  document.getElementById('todas').hidden = true;
-  /* A senha fica no telemóvel do cliente e não no código — o código é público.
-     É só uma comodidade: quem a valida é o Worker. */
-  campoSenha.value = localStorage.getItem('lr:senha-fotos') || '';
-  proporPasta();
-  /* Escrita a senha pela primeira vez, já se pode ir buscar as pastas. */
-  campoSenha.addEventListener('change', () => { if (!pastasExistentes) proporPasta(); });
-}
 
 /* Propõe um nome de pasta que ainda não exista. A lista vem do Worker e não do
    browser: a API pública do GitHub dá 60 pedidos por hora por endereço, e um
@@ -719,8 +746,13 @@ async function proporPasta() {
   if (campoSenha.value) {
     try {
       pastasExistentes = (await aoWorker('/pastas', {})).pastas;
-    } catch {
+    } catch (e) {
       pastasExistentes = null;
+      /* Uma falha de rede aqui não é para mostrar ao cliente — o pior que
+         acontece é ver o aviso de que a pasta já existe. Mas um erro do próprio
+         código não pode desaparecer em silêncio, que foi o que aconteceu: um
+         ReferenceError ficou meio dia escondido neste catch. */
+      if (!(e instanceof ErroDeRede) && !e.estado) console.error('proporPasta:', e);
     }
   }
   let n = 1;
@@ -728,7 +760,41 @@ async function proporPasta() {
   const proposto = `carro-${String(n).padStart(2, '0')}`;
   /* Não pisar o que o cliente tiver escrito entretanto — a lista chega tarde. */
   if (!campoPasta.value || /^carro-\d\d$/.test(campoPasta.value)) campoPasta.value = proposto;
+  desenharEscolhaDePasta();
   verificarPasta();
+}
+
+/* As pastas que já existem, para se tocar em vez de escrever.
+   ---------------------------------------------------------------------------
+   Juntar fotografias a uma pasta que já existe sempre funcionou — o Worker
+   parte da árvore actual e acrescenta, não substitui. O que não funcionava era
+   chegar lá: obrigava a escrever o nome à letra, e com nomes como
+   `renault-captur-blue-dci-115-edc-business-edition` num teclado de telemóvel
+   isso é uma pasta nova quase igual à espera de acontecer.
+
+   As mais recentes primeiro: a pasta a que se quer juntar mais fotografias é,
+   quase sempre, a do carro em que se esteve a trabalhar. */
+function desenharEscolhaDePasta() {
+  const caixa = document.getElementById('pastaEscolha');
+  const lista = document.getElementById('pastaEscolhaLista');
+  if (!caixa || !lista) return;
+  if (!pastasExistentes || !pastasExistentes.length) { caixa.hidden = true; return; }
+
+  caixa.hidden = false;
+  lista.textContent = '';
+  for (const nome of [...pastasExistentes].reverse()) {
+    const b = document.createElement('button');
+    b.type = 'button';
+    b.className = 'pasta-ficha';
+    b.textContent = nome;
+    b.setAttribute('aria-pressed', String(campoPasta.value.trim() === nome));
+    b.addEventListener('click', () => {
+      campoPasta.value = nome;
+      desenharEscolhaDePasta();
+      verificarPasta();
+    });
+    lista.append(b);
+  }
 }
 
 function verificarPasta() {
@@ -755,7 +821,7 @@ function verificarPasta() {
   return forma;
 }
 
-campoPasta.addEventListener('input', verificarPasta);
+campoPasta.addEventListener('input', () => { desenharEscolhaDePasta(); verificarPasta(); });
 
 /* Ver a senha. Serve para conferir o que se escreveu — sobretudo à primeira,
    com uma senha de 28 caracteres ao acaso e num teclado de telemóvel. */
@@ -813,12 +879,6 @@ const ESPERA_MS = 90000;
 const VERSAO = '2';
 
 class ErroDeRede extends Error {}
-
-/* Espaços em volta fora. Uma senha de 28 caracteres é colada de um WhatsApp
-   ou de um email, e vem quase sempre com um espaço atrás — e um espaço atrás
-   é, para quem escreve o código, uma senha diferente. Não é adivinhar o que o
-   cliente quis: é não o castigar por uma coisa que não se vê no ecrã. */
-const senhaEscrita = () => campoSenha.value.trim();
 
 async function aoWorker(rota, { json, cru, nome } = {}) {
   const url = WORKER.replace(/\/+$/, '') + rota;
@@ -993,10 +1053,15 @@ function linhaDaPasta(p, aoApagar) {
   nome.textContent = p.nome;
   const conta = document.createElement('div');
   conta.className = presa ? 'pasta__presa' : 'pasta__conta';
+  /* Fotografias, não ficheiros: ao lado de cada uma vivem as três versões que o
+     site serve e o cartão de partilha, e a pasta do Peugeot tem 20 fotografias
+     em 89 ficheiros. «89» não corresponde a nada que o cliente reconheça. */
+  const n = p.fotografias != null ? p.fotografias : p.ficheiros;
+  const quantas = `${n} fotografia${n === 1 ? '' : 's'}`;
   conta.textContent = presa
-    ? `${p.ficheiros} ficheiro${p.ficheiros === 1 ? '' : 's'} · em uso `
+    ? `${quantas} · em uso `
       + `${p.viaturas.length === 1 ? 'na viatura' : 'nas viaturas'} ${p.viaturas.join(', ')}`
-    : `${p.ficheiros} ficheiro${p.ficheiros === 1 ? '' : 's'}`;
+    : quantas;
   esq.append(nome, conta);
   li.append(esq);
 
@@ -1010,7 +1075,7 @@ function linhaDaPasta(p, aoApagar) {
   botao.addEventListener('click', () => {
     li.classList.add('pasta--confirmar');
     botao.remove();
-    conta.textContent = `Apagar as ${p.ficheiros} fotografias desta pasta? Não se recuperam.`;
+    conta.textContent = `Apagar ${quantas} desta pasta? Não se recuperam.`;
     const sim = document.createElement('button');
     sim.type = 'button'; sim.className = 'pasta__sim'; sim.textContent = 'Sim, apagar';
     const nao = document.createElement('button');
@@ -1024,7 +1089,7 @@ function linhaDaPasta(p, aoApagar) {
       sim.textContent = 'A apagar…';
       try {
         const r = await aoWorker('/apagar-pasta', { json: { pasta: p.nome, sim: p.nome } });
-        aoApagar(`Apaguei a pasta "${r.pasta}" e as ${r.apagados} fotografias que tinha.`);
+        aoApagar(`Apaguei a pasta "${r.pasta}" e os ${r.apagados} ficheiros que tinha.`);
       } catch (e) {
         aoApagar(e.message || 'Não consegui apagar.', true);
       }
@@ -1060,6 +1125,7 @@ async function carregarPastas(mensagem, mau) {
     /* A lista de pastas existentes serve também para o aviso do nome ao enviar;
        aproveita-se o que já se sabe em vez de pedir outra vez. */
     pastasExistentes = r.pastas.map((p) => p.nome);
+    desenharEscolhaDePasta();
     verificarPasta();
     for (const p of r.pastas) listaPastas.append(linhaDaPasta(p, carregarPastas));
   } catch (e) {
@@ -1074,6 +1140,37 @@ if (WORKER) {
   secaoPastas.addEventListener('toggle', () => {
     if (secaoPastas.open) carregarPastas();
   });
+}
+
+/* O ARRANQUE FICA NO FIM, e não junto às variáveis que liga.
+   ---------------------------------------------------------------------------
+   Estava a seguir à declaração do campo da senha, e a chamada ao proporPasta()
+   usava — indirectamente, pelo aoWorker() — constantes declaradas mais abaixo.
+   Um `const` antes da sua linha não é undefined: é um ReferenceError. E o erro
+   caía num `catch` que o engolia, portanto a página não se queixava de nada —
+   simplesmente agia como se não existisse pasta nenhuma. Propunha sempre
+   carro-01 mesmo com carro-01 já lá, nunca avisava que a pasta existia, e umas
+   fotografias podiam juntar-se a outras sem ninguém dar por isso.
+
+   Esteve assim meio dia em produção, e foi por isso que o cliente perguntou se
+   não era possível carregar para uma pasta que já existe. Era: a página é que
+   nunca lhe disse que elas existiam.
+
+   Corrigi primeiro só a constante que dei com ela, e havia mais três a seguir.
+   Por isso não é aqui uma constante que muda de sítio — é o arranque que passa
+   para depois de tudo o que ele usa, onde este erro deixa de ser possível. */
+if (WORKER) {
+  envioLigado = true;
+  envio.hidden = false;
+  document.getElementById('comoEnviar').hidden = false;
+  document.getElementById('comoGuardar').hidden = true;
+  document.getElementById('todas').hidden = true;
+  /* A senha fica no telemóvel do cliente e não no código — o código é público.
+     É só uma comodidade: quem a valida é o Worker. */
+  campoSenha.value = localStorage.getItem('lr:senha-fotos') || '';
+  proporPasta();
+  /* Escrita a senha pela primeira vez, já se pode ir buscar as pastas. */
+  campoSenha.addEventListener('change', () => { if (!pastasExistentes) proporPasta(); });
 }
 
 /* Estado inicial: sem fotografias, nem «Guardar todas» nem «Enviar» têm o que

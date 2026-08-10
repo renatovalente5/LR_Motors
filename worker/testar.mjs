@@ -45,6 +45,13 @@ globalThis.fetch = async (url, opcoes = {}) => {
     return r({ tree: [
       { type: 'blob', path: 'assets/veiculos/livre/01.jpg' },
       { type: 'blob', path: 'assets/veiculos/livre/02.jpg' },
+      /* As versões que o site serve, e o cartão de partilha. Existem ao lado de
+         cada fotografia e multiplicam a contagem por quatro — o cliente tem de
+         ver fotografias, não ficheiros. */
+      { type: 'blob', path: 'assets/veiculos/livre/01-480.webp' },
+      { type: 'blob', path: 'assets/veiculos/livre/01-960.webp' },
+      { type: 'blob', path: 'assets/veiculos/livre/01-1600.webp' },
+      { type: 'blob', path: 'assets/veiculos/livre/og.jpg' },
       { type: 'blob', path: 'assets/veiculos/usada/01.jpg' },
       { type: 'blob', path: 'assets/veiculos/solta.jpg' },
       { type: 'blob', path: 'scripts/gerar.mjs' },
@@ -236,8 +243,9 @@ console.log('\n— apagar pastas —');
 {
   const lista = await pedir('/pastas-detalhe', { senha: SENHA });
   const pastas = lista.corpo.pastas || [];
-  ok('lista as pastas com a contagem', lista.estado === 200
-    && pastas.find((x) => x.nome === 'livre')?.ficheiros === 2, JSON.stringify(pastas));
+  const livre = pastas.find((x) => x.nome === 'livre');
+  ok('conta FOTOGRAFIAS e não ficheiros', lista.estado === 200
+    && livre?.fotografias === 2 && livre?.ficheiros === 6, JSON.stringify(livre));
   ok('diz que viaturas usam cada pasta',
     JSON.stringify(pastas.find((x) => x.nome === 'usada')?.viaturas) === '["bmw-i4"]',
     JSON.stringify(pastas));
@@ -258,11 +266,13 @@ console.log('\n— apagar pastas —');
     JSON.stringify(chamadas.map((c) => c.metodo + ' ' + c.caminho)));
 
   const feito = await pedir('/apagar-pasta', { senha: SENHA, pasta: 'livre', sim: 'livre' });
-  ok('apaga uma pasta livre', feito.estado === 200 && feito.corpo.apagados === 2,
+  ok('apaga uma pasta livre', feito.estado === 200 && feito.corpo.apagados === 6,
     JSON.stringify(feito.corpo));
   const arvore = chamadas.find((c) => c.caminho.endsWith('/git/trees') && c.metodo === 'POST');
-  ok('apaga só o que está dentro dessa pasta',
-    arvore && arvore.corpo.tree.length === 2
+  /* Ao apagar vão TODOS os ficheiros, variantes incluídas — a contagem de
+     fotografias é para mostrar, não para decidir o que se apaga. */
+  ok('apaga também as versões geradas',
+    arvore && arvore.corpo.tree.length === 6
     && arvore.corpo.tree.every((x) => x.path.startsWith('assets/veiculos/livre/') && x.sha === null),
     JSON.stringify(arvore && arvore.corpo.tree));
   ok('um commit só, e sem force',

@@ -256,19 +256,30 @@ async function listarPastasDetalhe(ambiente) {
   const arvore = await github(
     `/repos/${REPO}/git/trees/${commitBase.tree.sha}?recursive=1`, ambiente.GITHUB_TOKEN);
 
+  /* Contar FOTOGRAFIAS, não ficheiros. Ao lado de cada fotografia vivem as
+     versões que o site serve (-480, -960, -1600 em WebP) e o cartão de partilha
+     og.jpg, e isso multiplica a conta por quatro ou cinco: a pasta do Peugeot
+     tem 20 fotografias e 89 ficheiros. Dizer «89» a quem está a decidir se
+     apaga é dizer-lhe um número que não corresponde a nada que ele reconheça. */
+  const VARIANTE = /-(?:480|960|1600)\.webp$/;
   const conta = new Map();
   for (const x of (arvore.tree || [])) {
     if (x.type !== 'blob' || !x.path.startsWith(PASTA_BASE + '/')) continue;
     const resto = x.path.slice(PASTA_BASE.length + 1);
     if (!resto.includes('/')) continue;                    // ficheiro solto na raiz
     const pasta = resto.split('/')[0];
-    conta.set(pasta, (conta.get(pasta) || 0) + 1);
+    const nome = resto.slice(pasta.length + 1);
+    if (!conta.has(pasta)) conta.set(pasta, { fotografias: 0, ficheiros: 0 });
+    const c = conta.get(pasta);
+    c.ficheiros++;
+    if (!VARIANTE.test(nome) && nome !== 'og.jpg') c.fotografias++;
   }
 
   const emUso = await pastasEmUso(ambiente);
   const pastas = [...conta.entries()]
-    .map(([nome, ficheiros]) => ({
-      nome, ficheiros, viaturas: [...(emUso.get(nome) || [])].sort(),
+    .map(([nome, c]) => ({
+      nome, fotografias: c.fotografias, ficheiros: c.ficheiros,
+      viaturas: [...(emUso.get(nome) || [])].sort(),
     }))
     .sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
   return responder({ ok: true, pastas });
