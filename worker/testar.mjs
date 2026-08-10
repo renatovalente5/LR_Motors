@@ -32,6 +32,24 @@ globalThis.fetch = async (url, opcoes = {}) => {
   if (falharCom) return new Response(JSON.stringify({ message: 'nope' }), { status: falharCom });
   const r = (o) => new Response(JSON.stringify(o), { status: 200, headers: { 'Content-Type': 'application/json' } });
   if (caminho.endsWith('/git/blobs')) return r({ sha: 'a'.repeat(40) });
+  /* Repositório de mentira, para os testes de apagar pastas: a "livre" não é
+     usada por ninguém, a "usada" está no anúncio do bmw-i4. */
+  if (caminho.includes('/contents/data/viaturas?')) {
+    return r([{ name: 'bmw-i4.json', path: 'data/viaturas/bmw-i4.json' }]);
+  }
+  if (caminho.includes('/contents/data/viaturas/bmw-i4.json')) {
+    const v = { slug: 'bmw-i4', fotos: ['assets/veiculos/usada/01.jpg'] };
+    return r({ content: Buffer.from(JSON.stringify(v)).toString('base64') });
+  }
+  if (caminho.includes('/git/trees/') && caminho.includes('recursive')) {
+    return r({ tree: [
+      { type: 'blob', path: 'assets/veiculos/livre/01.jpg' },
+      { type: 'blob', path: 'assets/veiculos/livre/02.jpg' },
+      { type: 'blob', path: 'assets/veiculos/usada/01.jpg' },
+      { type: 'blob', path: 'assets/veiculos/solta.jpg' },
+      { type: 'blob', path: 'scripts/gerar.mjs' },
+    ] });
+  }
   if (caminho.includes('/git/ref/heads/')) return r({ object: { sha: 'b'.repeat(40) } });
   if (caminho.includes('/git/commits/')) return r({ tree: { sha: 'c'.repeat(40) } });
   if (caminho.endsWith('/git/trees')) return r({ sha: 'd'.repeat(40) });
@@ -210,6 +228,54 @@ console.log('\n— configuração em falta —');
   /* 503 e não 500: a Cloudflare troca o corpo das respostas 500 pela sua
      própria página de erro e a mensagem em JSON nunca chegaria à página. */
   ok('sem GITHUB_TOKEN = 503', res.status === 503, `foi ${res.status}`);
+}
+
+
+
+console.log('\n— apagar pastas —');
+{
+  const lista = await pedir('/pastas-detalhe', { senha: SENHA });
+  const pastas = lista.corpo.pastas || [];
+  ok('lista as pastas com a contagem', lista.estado === 200
+    && pastas.find((x) => x.nome === 'livre')?.ficheiros === 2, JSON.stringify(pastas));
+  ok('diz que viaturas usam cada pasta',
+    JSON.stringify(pastas.find((x) => x.nome === 'usada')?.viaturas) === '["bmw-i4"]',
+    JSON.stringify(pastas));
+  ok('não conta ficheiros soltos na raiz como pasta',
+    !pastas.some((x) => x.nome === 'solta.jpg'), JSON.stringify(pastas));
+
+  const semConfirmar = await pedir('/apagar-pasta', { senha: SENHA, pasta: 'livre' });
+  ok('sem confirmar o nome não apaga', semConfirmar.estado === 400, `foi ${semConfirmar.estado}`);
+
+  const confirmadoMal = await pedir('/apagar-pasta', { senha: SENHA, pasta: 'livre', sim: 'outra' });
+  ok('confirmação errada não apaga', confirmadoMal.estado === 400, `foi ${confirmadoMal.estado}`);
+
+  const emUso = await pedir('/apagar-pasta', { senha: SENHA, pasta: 'usada', sim: 'usada' });
+  ok('RECUSA apagar uma pasta em uso', emUso.estado === 409, `foi ${emUso.estado}`);
+  ok('e diz qual é a viatura', /bmw-i4/.test(emUso.corpo.erro || ''), emUso.corpo.erro);
+  ok('não escreveu nada ao recusar',
+    !chamadas.some((c) => c.metodo === 'POST' && c.caminho.endsWith('/git/commits')),
+    JSON.stringify(chamadas.map((c) => c.metodo + ' ' + c.caminho)));
+
+  const feito = await pedir('/apagar-pasta', { senha: SENHA, pasta: 'livre', sim: 'livre' });
+  ok('apaga uma pasta livre', feito.estado === 200 && feito.corpo.apagados === 2,
+    JSON.stringify(feito.corpo));
+  const arvore = chamadas.find((c) => c.caminho.endsWith('/git/trees') && c.metodo === 'POST');
+  ok('apaga só o que está dentro dessa pasta',
+    arvore && arvore.corpo.tree.length === 2
+    && arvore.corpo.tree.every((x) => x.path.startsWith('assets/veiculos/livre/') && x.sha === null),
+    JSON.stringify(arvore && arvore.corpo.tree));
+  ok('um commit só, e sem force',
+    chamadas.filter((c) => c.metodo === 'POST' && c.caminho.endsWith('/git/commits')).length === 1
+    && chamadas.find((c) => c.metodo === 'PATCH').corpo.force === false);
+
+  for (const mau of ['../scripts', '..', 'a/b', 'Livre', 'com espaço']) {
+    const r2 = await pedir('/apagar-pasta', { senha: SENHA, pasta: mau, sim: mau });
+    ok(`recusa apagar "${mau}"`, r2.estado === 400, `foi ${r2.estado}`);
+  }
+
+  const inexistente = await pedir('/apagar-pasta', { senha: SENHA, pasta: 'naoexiste', sim: 'naoexiste' });
+  ok('pasta que não existe = 404', inexistente.estado === 404, `foi ${inexistente.estado}`);
 }
 
 console.log(`\n${passou} passaram · ${falhou} falharam\n`);

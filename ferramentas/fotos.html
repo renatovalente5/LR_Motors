@@ -142,6 +142,42 @@
   .dica h2 { font-size: .95rem; margin: 0 0 .5rem; }
   .dica ol { margin: 0; padding-left: 1.15rem; }
   .dica li { display: list-item; padding: 0; background: none; border: 0; margin-bottom: .3rem; }
+  /* Arrumar pastas: deliberadamente discreto. É a única coisa nesta página que
+     apaga trabalho, e não tem que competir com o botão de enviar. */
+  .pastas {
+    margin-top: 1.5rem; padding: .5rem 1.15rem 1.15rem;
+    background: #fff; border: 1px solid var(--linha); border-radius: 12px;
+  }
+  .pastas > summary {
+    padding: .7rem 0; font-weight: 600; font-size: .95rem; cursor: pointer;
+    color: var(--suave);
+  }
+  .pastas > summary:hover { color: var(--tinta); }
+  .pastas .ajuda { margin: 0 0 .9rem; }
+  .pasta {
+    display: grid; grid-template-columns: 1fr auto; gap: .5rem 1rem; align-items: center;
+    padding: .65rem 0; border-top: 1px solid var(--linha);
+  }
+  .pasta__nome { font-weight: 600; font-size: .93rem; word-break: break-all; }
+  .pasta__conta { color: var(--suave); font-size: .84rem; }
+  .pasta__presa { color: var(--verde); font-size: .84rem; font-weight: 600; }
+  .pasta__apagar {
+    padding: .45rem .8rem; font-size: .86rem; font-weight: 600;
+    color: #A32020; background: #fff; border: 1px solid #E9B4B4; border-radius: 9px;
+    cursor: pointer; font-family: inherit;
+  }
+  .pasta__apagar:hover { background: #FEF7F7; }
+  .pasta__apagar:disabled { opacity: .5; cursor: default; }
+  .pasta--confirmar { background: #FEF7F7; margin-inline: -1.15rem; padding-inline: 1.15rem; }
+  .pasta__sim {
+    padding: .45rem .8rem; font-size: .86rem; font-weight: 700;
+    color: #fff; background: #A32020; border: 0; border-radius: 9px;
+    cursor: pointer; font-family: inherit;
+  }
+  .pasta__nao {
+    padding: .45rem .7rem; font-size: .86rem; color: var(--suave);
+    background: none; border: 0; cursor: pointer; font-family: inherit; text-decoration: underline;
+  }
   .rodape { margin-top: 2rem; text-align: center; font-size: .85rem; color: var(--suave); }
   .rodape a { color: var(--azul); }
 </style>
@@ -249,6 +285,18 @@
         e escolha estas — todas de uma vez.</li>
     </ol>
   </div>
+
+  <!-- Arrumar a biblioteca. O backoffice apaga fotografias uma a uma, e nunca
+       pastas: uma pasta de 26 fotografias eram 26 confirmações. Fica fechado
+       por omissão — quem vem aqui vem carregar fotografias, não arrumar. -->
+  <details class="pastas" id="pastas" hidden>
+    <summary>Arrumar as pastas da biblioteca</summary>
+    <p class="ajuda">
+      As pastas que estão a ser usadas por alguma viatura não se apagam daqui —
+      tire primeiro as fotografias do anúncio, no campo Fotografias do backoffice.
+    </p>
+    <div id="listaPastas" aria-live="polite"></div>
+  </details>
 
   <p class="rodape">Ferramenta interna da LR Motors · <a href="/">voltar ao site</a></p>
 
@@ -920,6 +968,113 @@ function limparLista({ manterMensagem = false } = {}) {
 }
 
 document.getElementById('limpar').addEventListener('click', () => limparLista());
+
+/* Arrumar as pastas da biblioteca.
+   ---------------------------------------------------------------------------
+   Só aparece se houver para onde enviar, porque é o mesmo Worker que apaga. A
+   lista é buscada quando se ABRE a secção, não ao carregar a página: custa um
+   pedido por anúncio para saber quais estão em uso, e quem vem carregar
+   fotografias não tem de pagar isso.
+
+   A segunda confirmação é aqui, com o nome da pasta a ser devolvido ao Worker
+   por quem confirmou. Não é teatro: é a única coisa entre um toque distraído e
+   26 fotografias apagadas. */
+const secaoPastas = document.getElementById('pastas');
+const listaPastas = document.getElementById('listaPastas');
+
+function linhaDaPasta(p, aoApagar) {
+  const li = document.createElement('div');
+  li.className = 'pasta';
+  const presa = p.viaturas && p.viaturas.length;
+
+  const esq = document.createElement('div');
+  const nome = document.createElement('div');
+  nome.className = 'pasta__nome';
+  nome.textContent = p.nome;
+  const conta = document.createElement('div');
+  conta.className = presa ? 'pasta__presa' : 'pasta__conta';
+  conta.textContent = presa
+    ? `${p.ficheiros} ficheiro${p.ficheiros === 1 ? '' : 's'} · em uso `
+      + `${p.viaturas.length === 1 ? 'na viatura' : 'nas viaturas'} ${p.viaturas.join(', ')}`
+    : `${p.ficheiros} ficheiro${p.ficheiros === 1 ? '' : 's'}`;
+  esq.append(nome, conta);
+  li.append(esq);
+
+  if (presa) return li;                    // sem botão: não há daqui caminho para apagar
+
+  const botao = document.createElement('button');
+  botao.type = 'button';
+  botao.className = 'pasta__apagar';
+  botao.textContent = 'Apagar';
+  botao.setAttribute('aria-label', `Apagar a pasta ${p.nome}`);
+  botao.addEventListener('click', () => {
+    li.classList.add('pasta--confirmar');
+    botao.remove();
+    conta.textContent = `Apagar as ${p.ficheiros} fotografias desta pasta? Não se recuperam.`;
+    const sim = document.createElement('button');
+    sim.type = 'button'; sim.className = 'pasta__sim'; sim.textContent = 'Sim, apagar';
+    const nao = document.createElement('button');
+    nao.type = 'button'; nao.className = 'pasta__nao'; nao.textContent = 'Não';
+    const acoes = document.createElement('div');
+    acoes.append(sim, nao);
+    li.append(acoes);
+    nao.addEventListener('click', () => carregarPastas());
+    sim.addEventListener('click', async () => {
+      sim.disabled = nao.disabled = true;
+      sim.textContent = 'A apagar…';
+      try {
+        const r = await aoWorker('/apagar-pasta', { json: { pasta: p.nome, sim: p.nome } });
+        aoApagar(`Apaguei a pasta "${r.pasta}" e as ${r.apagados} fotografias que tinha.`);
+      } catch (e) {
+        aoApagar(e.message || 'Não consegui apagar.', true);
+      }
+    });
+  });
+  li.append(botao);
+  return li;
+}
+
+/* Duas leituras ao mesmo tempo escreviam as duas na lista, e as pastas
+   apareciam a dobrar — dois toques seguidos no título bastavam. Cada leitura
+   leva um número; se entretanto começou outra, a antiga desiste em silêncio. */
+let leituraDePastas = 0;
+
+async function carregarPastas(mensagem, mau) {
+  const minha = ++leituraDePastas;
+  listaPastas.textContent = '';
+  if (mensagem) {
+    const p = document.createElement('p');
+    p.className = 'resultado ' + (mau ? 'resultado--mau' : 'resultado--bom');
+    p.textContent = mensagem;
+    listaPastas.append(p);
+  }
+  const espera = document.createElement('p');
+  espera.className = 'ajuda';
+  espera.textContent = 'A ver o que está na biblioteca…';
+  listaPastas.append(espera);
+  try {
+    const r = await aoWorker('/pastas-detalhe', { json: {} });
+    if (minha !== leituraDePastas) return;          // já há uma leitura mais nova
+    espera.remove();
+    if (!r.pastas.length) { espera.textContent = 'A biblioteca está vazia.'; listaPastas.append(espera); return; }
+    /* A lista de pastas existentes serve também para o aviso do nome ao enviar;
+       aproveita-se o que já se sabe em vez de pedir outra vez. */
+    pastasExistentes = r.pastas.map((p) => p.nome);
+    verificarPasta();
+    for (const p of r.pastas) listaPastas.append(linhaDaPasta(p, carregarPastas));
+  } catch (e) {
+    if (minha !== leituraDePastas) return;
+    espera.className = 'resultado resultado--mau';
+    espera.textContent = e.message || 'Não consegui ler a biblioteca.';
+  }
+}
+
+if (WORKER) {
+  secaoPastas.hidden = false;
+  secaoPastas.addEventListener('toggle', () => {
+    if (secaoPastas.open) carregarPastas();
+  });
+}
 
 /* Estado inicial: sem fotografias, nem «Guardar todas» nem «Enviar» têm o que
    fazer. Sem esta chamada ficavam ligados até à primeira fotografia. */

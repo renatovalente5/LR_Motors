@@ -126,6 +126,113 @@ async function github(caminho, token, opcoes = {}) {
   return corpo;
 }
 
+/* ---------------------------------------------------- apagar uma pasta inteira
+ *
+ * O Pages CMS não sabe fazer isto: apaga ficheiros um a um, e uma pasta de 26
+ * fotografias são 26 confirmações. Uma pasta é uma pasta.
+ *
+ * A parte que importa aqui não é apagar — é RECUSAR. Já aconteceu neste site o
+ * cliente apagar uma fotografia que estava num anúncio publicado e o site ficar
+ * com uma imagem partida sem ninguém dar por isso. Por isso, antes de apagar,
+ * lê-se todos os anúncios e vê-se se algum aponta para lá dentro. Se apontar,
+ * não se apaga e diz-se qual é a viatura.
+ *
+ * O `sim` no pedido é a segunda tranca: obriga a página a mandar o nome da
+ * pasta outra vez, escrito por quem confirmou. Um toque distraído não apaga
+ * 26 fotografias. */
+async function pastasEmUso(ambiente) {
+  const lista = await github(
+    `/repos/${REPO}/contents/data/viaturas?ref=${RAMO}`, ambiente.GITHUB_TOKEN);
+  const jsons = (Array.isArray(lista) ? lista : []).filter((x) => x.name.endsWith('.json'));
+
+  /* Um pedido por anúncio. Com trinta viaturas são trinta subpedidos, e um
+     Worker do plano gratuito aguenta cinquenta — mas acima disso preferimos
+     recusar a deixar passar um «não está em uso» que não foi verificado. */
+  if (jsons.length > 40) {
+    const e = new Error('viaturas de mais para verificar em segurança');
+    e.estado = 507;
+    throw e;
+  }
+
+  const emUso = new Map();
+  await Promise.all(jsons.map(async (f) => {
+    const v = await github(
+      `/repos/${REPO}/contents/${f.path}?ref=${RAMO}`, ambiente.GITHUB_TOKEN);
+    let dados;
+    try { dados = JSON.parse(atob(v.content.replace(/\n/g, ''))); } catch { return; }
+    for (const c of (Array.isArray(dados.fotos) ? dados.fotos : [])) {
+      const limpo = String(c).replace(/^\/+/, '');
+      if (!limpo.startsWith(PASTA_BASE + '/')) continue;
+      const pasta = limpo.slice(PASTA_BASE.length + 1).split('/')[0];
+      if (!pasta || !limpo.includes('/', PASTA_BASE.length + 1)) continue;
+      if (!emUso.has(pasta)) emUso.set(pasta, new Set());
+      emUso.get(pasta).add(dados.slug || f.name.replace(/\.json$/, ''));
+    }
+  }));
+  return emUso;
+}
+
+async function apagarPasta(dados, ambiente) {
+  if (!pastaValida(dados.pasta)) {
+    return responder({ erro: 'Nome de pasta inválido.' }, 400);
+  }
+  if (dados.sim !== dados.pasta) {
+    return responder({ erro: 'Falta confirmar o nome da pasta.' }, 400);
+  }
+
+  const emUso = await pastasEmUso(ambiente);
+  if (emUso.has(dados.pasta)) {
+    const quais = [...emUso.get(dados.pasta)];
+    return responder({
+      erro: `Não apaguei nada: estas fotografias estão a ser usadas `
+          + `${quais.length === 1 ? 'na viatura' : 'nas viaturas'} ${quais.join(', ')}. `
+          + 'Tire-as primeiro do anúncio, no campo Fotografias, e depois apague a pasta.',
+      emUso: quais,
+    }, 409);
+  }
+
+  /* Enumerar o que lá está. A árvore recursiva vem num pedido só. */
+  const ref = await github(`/repos/${REPO}/git/ref/heads/${RAMO}`, ambiente.GITHUB_TOKEN);
+  const base = ref.object.sha;
+  const commitBase = await github(`/repos/${REPO}/git/commits/${base}`, ambiente.GITHUB_TOKEN);
+  const arvoreToda = await github(
+    `/repos/${REPO}/git/trees/${commitBase.tree.sha}?recursive=1`, ambiente.GITHUB_TOKEN);
+
+  const prefixo = `${PASTA_BASE}/${dados.pasta}/`;
+  const dentro = (arvoreToda.tree || []).filter((x) => x.type === 'blob' && x.path.startsWith(prefixo));
+  if (!dentro.length) {
+    return responder({ erro: `A pasta "${dados.pasta}" já não existe.` }, 404);
+  }
+
+  /* `sha: null` numa entrada da árvore é como se apaga um caminho no Git. O Git
+     não guarda pastas: tirados os ficheiros, a pasta deixa de existir sozinha. */
+  const arvore = await github(`/repos/${REPO}/git/trees`, ambiente.GITHUB_TOKEN, {
+    method: 'POST',
+    body: JSON.stringify({
+      base_tree: commitBase.tree.sha,
+      tree: dentro.map((x) => ({ path: x.path, mode: '100644', type: 'blob', sha: null })),
+    }),
+  });
+
+  const n = dentro.length;
+  const commit = await github(`/repos/${REPO}/git/commits`, ambiente.GITHUB_TOKEN, {
+    method: 'POST',
+    body: JSON.stringify({
+      message: `Apaga a pasta ${dados.pasta} (${n} ficheiro${n === 1 ? '' : 's'})`
+        + '\n\nApagada pela página /fotos/. Confirmado antes de apagar que'
+        + '\nnenhuma viatura publicada usava estas fotografias.',
+      tree: arvore.sha,
+      parents: [base],
+    }),
+  });
+  await github(`/repos/${REPO}/git/refs/heads/${RAMO}`, ambiente.GITHUB_TOKEN, {
+    method: 'PATCH',
+    body: JSON.stringify({ sha: commit.sha, force: false }),
+  });
+
+  return responder({ ok: true, pasta: dados.pasta, apagados: n, commit: commit.sha.slice(0, 7) });
+}
+
 /* ----------------------------- que pastas já existem, para propor um nome livre */
 async function listarPastas(ambiente) {
   /* Vem daqui e não do browser de propósito. A API pública do GitHub dá 60
@@ -136,6 +243,34 @@ async function listarPastas(ambiente) {
     `/repos/${REPO}/contents/${PASTA_BASE}?ref=${RAMO}`, ambiente.GITHUB_TOKEN);
   const pastas = (Array.isArray(conteudo) ? conteudo : [])
     .filter((x) => x.type === 'dir').map((x) => x.name);
+  return responder({ ok: true, pastas });
+}
+
+/* A lista com o que é preciso para DECIDIR apagar: quantos ficheiros lá estão e
+   que viaturas os usam. Fica numa rota à parte, e não junto ao /pastas, porque
+   isto custa um pedido por anúncio — e o /pastas é chamado sempre que a página
+   abre, só para propor um nome livre. Não se paga o preço quem não vai apagar. */
+async function listarPastasDetalhe(ambiente) {
+  const ref = await github(`/repos/${REPO}/git/ref/heads/${RAMO}`, ambiente.GITHUB_TOKEN);
+  const commitBase = await github(`/repos/${REPO}/git/commits/${ref.object.sha}`, ambiente.GITHUB_TOKEN);
+  const arvore = await github(
+    `/repos/${REPO}/git/trees/${commitBase.tree.sha}?recursive=1`, ambiente.GITHUB_TOKEN);
+
+  const conta = new Map();
+  for (const x of (arvore.tree || [])) {
+    if (x.type !== 'blob' || !x.path.startsWith(PASTA_BASE + '/')) continue;
+    const resto = x.path.slice(PASTA_BASE.length + 1);
+    if (!resto.includes('/')) continue;                    // ficheiro solto na raiz
+    const pasta = resto.split('/')[0];
+    conta.set(pasta, (conta.get(pasta) || 0) + 1);
+  }
+
+  const emUso = await pastasEmUso(ambiente);
+  const pastas = [...conta.entries()]
+    .map(([nome, ficheiros]) => ({
+      nome, ficheiros, viaturas: [...(emUso.get(nome) || [])].sort(),
+    }))
+    .sort((a, b) => a.nome.localeCompare(b.nome, 'pt'));
   return responder({ ok: true, pastas });
 }
 
@@ -401,6 +536,8 @@ export default {
 
     try {
       if (rota === '/pastas') return await listarPastas(ambiente);
+      if (rota === '/pastas-detalhe') return await listarPastasDetalhe(ambiente);
+      if (rota === '/apagar-pasta') return await apagarPasta(dados, ambiente);
       if (rota === '/commit') return await gravarCommit(dados, ambiente);
       return responder({ erro: 'não encontrado' }, 404);
     } catch (e) {
