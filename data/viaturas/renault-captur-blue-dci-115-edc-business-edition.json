@@ -1,5 +1,4 @@
 {
-  "slug": "renault-captur-blue-dci-115-edc-business-edition",
   "marca": "Renault",
   "modelo": "Captur",
   "versao": "BLUE dCi 115 EDC BUSINESS EDITION",
@@ -9,6 +8,35 @@
   "publicado": true,
   "reservado": false,
   "estado": "disponivel",
+  "fotos": [
+    "assets/veiculos/renault-captur-blue-dci-115-edc-business-edition/01-1600.webp",
+    "assets/veiculos/renault-captur-blue-dci-115-edc-business-edition/02-1600.webp",
+    "assets/veiculos/renault-captur-blue-dci-115-edc-business-edition/03-1600.webp",
+    "assets/veiculos/renault-captur-blue-dci-115-edc-business-edition/04-1600.webp",
+    "assets/veiculos/captur-2021/IMG_0481.jpg",
+    "assets/veiculos/captur-2021/IMG_0482.jpg",
+    "assets/veiculos/captur-2021/IMG_0498.jpg",
+    "assets/veiculos/captur-2021/IMG_0499.jpg",
+    "assets/veiculos/captur-2021/IMG_0506.jpeg",
+    "assets/veiculos/captur-2021/IMG_0491.jpg",
+    "assets/veiculos/captur-2021/IMG_0492.jpg",
+    "assets/veiculos/captur-2021/IMG_0493.jpg",
+    "assets/veiculos/captur-2021/IMG_0490.jpg",
+    "assets/veiculos/captur-2021/IMG_0489.jpeg",
+    "assets/veiculos/captur-2021/IMG_0483.jpg",
+    "assets/veiculos/captur-2021/IMG_0485.jpg",
+    "assets/veiculos/captur-2021/IMG_0484.jpg",
+    "assets/veiculos/captur-2021/IMG_0486.jpg",
+    "assets/veiculos/captur-2021/IMG_0487.jpg",
+    "assets/veiculos/captur-2021/IMG_0494.jpeg",
+    "assets/veiculos/captur-2021/IMG_0496.jpg",
+    "assets/veiculos/captur-2021/IMG_0495.jpg",
+    "assets/veiculos/captur-2021/IMG_0501.jpg",
+    "assets/veiculos/captur-2021/IMG_0503.jpg",
+    "assets/veiculos/captur-2021/IMG_0497.jpg",
+    "assets/veiculos/captur-2021/IMG_0502.jpeg",
+    "assets/veiculos/captur-2021/IMG_0505.jpeg"
+  ],
   "ano": 2021,
   "mes": "Maio",
   "km": 132000,
@@ -17,11 +45,9 @@
   "potencia": 115,
   "cilindrada": 1461,
   "cor": "Cinzento",
-  "lugares": null,
   "portas": 5,
   "origem": "Importado",
   "garantia": "18 meses",
-  "descricao": "Renault Captur BLUE dCi 115 EDC BUSINESS EDITION de 05/2021 com 132 000 km. Caixa automática, 115 cv, importado. Garantia de 18 meses.",
   "equipamento": [
     "AC automático",
     "Cruise Control",
@@ -34,13 +60,8 @@
     "Câmara de marcha-atrás",
     "Arranque sem chave"
   ],
-  "fotos": [
-    "assets/veiculos/renault-captur-blue-dci-115-edc-business-edition/01-1600.webp",
-    "assets/veiculos/renault-captur-blue-dci-115-edc-business-edition/02-1600.webp",
-    "assets/veiculos/renault-captur-blue-dci-115-edc-business-edition/03-1600.webp",
-    "assets/veiculos/renault-captur-blue-dci-115-edc-business-edition/04-1600.webp",
-    "assets/veiculos/renault-captur-blue-dci-115-edc-business-edition/05-1600.webp"
-  ],
+  "descricao": "Garantia de 18 meses incluída no preço!\n\nAbsolutamente C/Novo!\nHistórico de revisões, manuais originais, duas chaves, pneus novos, muito económico e versátil, apenas 132.000KM.\n\nPossibilidade de financiamento e Retoma\n\nFull extras:\nCaixa automática\nEcrã touch\nGPS\nCâmara Traseira\nAndroid Auto e Apple Carplay\nFaróis LED\nBancos traseiros ajustáveis em profundidade\nVolante com patilhas F1\nVolante multifunções\nApoio de braço condutor\nKeylessGo (chave no bolso)\nAr condicionado Automático\nSensores chuva e luz\nSensores traseiros\nAviso baixa rodagem\nEspelhos em preto rebatíveis\nChamada de emergência automática\nReconhecimento de sinais de trânsito\nAssistente de faixa\nTravagem de emergência ativa (inclui peões)\nHill Holder\nCruise Control\nModo Eco\n4 Vidros elétricos\nComputador de bordo\nMala dois níveis\nPneu suplente\nStart Stop\nISOFIX\n\nPode ser visto em Braga ou Vila do Conde\n\nEste anúncio foi publicado por rotina informática. Todos os dados carecem de confirmação junto do comercial.\n",
   "destaque": true,
-  "ordem": 5
+  "ordem": 5,
+  "slug": "renault-captur-blue-dci-115-edc-business-edition"
 }
