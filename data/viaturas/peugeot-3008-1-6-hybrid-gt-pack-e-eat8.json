@@ -1,5 +1,4 @@
 {
-  "slug": "peugeot-3008-1-6-hybrid-gt-pack-e-eat8",
   "marca": "Peugeot",
   "modelo": "3008",
   "versao": "1.6 Hybrid GT Pack e-EAT8",
@@ -9,6 +8,22 @@
   "publicado": true,
   "reservado": false,
   "estado": "disponivel",
+  "fotos": [
+    "assets/veiculos/peugeot-3008-1-6-hybrid-gt-pack-e-eat8/01-1600.webp",
+    "assets/veiculos/peugeot-3008-1-6-hybrid-gt-pack-e-eat8/02-1600.webp",
+    "assets/veiculos/peugeot-3008-1-6-hybrid-gt-pack-e-eat8/03-1600.webp",
+    "assets/veiculos/peugeot-3008-1-6-hybrid-gt-pack-e-eat8/04-1600.webp",
+    "assets/veiculos/peugeot-3008-1-6-hybrid-gt-pack-e-eat8/05-1600.webp",
+    "assets/veiculos/peugeot3008hibrido/b511bb6f-d358-4a62-87d4-c7c07eb194d7.jpeg",
+    "assets/veiculos/peugeot3008hibrido/2b063c2d-e39a-411d-81de-36dddcfa4253.jpeg",
+    "assets/veiculos/peugeot3008hibrido/7b82bc78-22fc-4679-989e-480ac83f0b04.jpeg",
+    "assets/veiculos/peugeot3008hibrido/79dab64d-12f1-48f0-ad03-1f2daa871733.jpeg",
+    "assets/veiculos/peugeot3008hibrido/2a83ffda-305c-44c4-be44-0c8c7c30a6dd.jpeg",
+    "assets/veiculos/peugeot3008hibrido/3e9690d4-9d7d-4107-b28d-9d995a6cb8ca.jpeg",
+    "assets/veiculos/peugeot3008hibrido/3cc604d4-222c-4b3f-896b-1b73cf237b38.jpeg",
+    "assets/veiculos/peugeot3008hibrido/8805d8a3-ecf0-4471-8227-64ef3200eb1a.jpeg",
+    "assets/veiculos/peugeot3008hibrido/f06087a4-e763-49de-bfb5-08710215e141.jpeg"
+  ],
   "ano": 2022,
   "mes": "Março",
   "km": 113000,
@@ -17,11 +32,8 @@
   "potencia": 225,
   "cilindrada": 1598,
   "cor": "Cinzento",
-  "lugares": null,
   "portas": 5,
-  "origem": "",
   "garantia": "18 meses",
-  "descricao": "Peugeot 3008 1.6 Hybrid GT Pack e-EAT8 de 03/2022 com 113 000 km. Caixa automática, 225 cv. Garantia de 18 meses.",
   "equipamento": [
     "AC automático",
     "Cruise Control",
@@ -34,13 +46,8 @@
     "Navegação GPS",
     "Sensores de estacionamento traseiros"
   ],
-  "fotos": [
-    "assets/veiculos/peugeot-3008-1-6-hybrid-gt-pack-e-eat8/01-1600.webp",
-    "assets/veiculos/peugeot-3008-1-6-hybrid-gt-pack-e-eat8/02-1600.webp",
-    "assets/veiculos/peugeot-3008-1-6-hybrid-gt-pack-e-eat8/03-1600.webp",
-    "assets/veiculos/peugeot-3008-1-6-hybrid-gt-pack-e-eat8/04-1600.webp",
-    "assets/veiculos/peugeot-3008-1-6-hybrid-gt-pack-e-eat8/05-1600.webp"
-  ],
+  "descricao": "Garantia de 18 meses incluída no preço!\n\nAbsolutamente C/novo!\nHistórico de revisões, 2 chaves, manuais originais; Com, 225cv, ano 2022.\n\nPossibilidade de retoma e financiamento!\n\n3D i-Cockpit Display\nFaróis full Led\nChave Inteligente\nBancos Semi-Pele\nAlcântara tablier\nLuzes Interiores\nCâmara Traseira\nAppleCar e AndroidAuto\nCruise Control\nAviso Colisão\nCorreção de Faixa\nMáximos Automáticos\nVidros Traseiros Escurecidos Origem\nSistema de Navegação\nAr condicionado automático\nRetrovisores rebatíveis electricamente\nTravão de estacionamento eléctrico\nModos condução\nJantes Especiais\nBluetooth//WI-FI//USB//AUX\nSpoiler Cromado\n\nPode ser visto em Braga ou Vila do Conde!\n\nEste anúncio foi publicado por rotina informática. Todos os dados carecem de confirmação junto do comercial.\n",
   "destaque": false,
-  "ordem": 11
+  "ordem": 11,
+  "slug": "peugeot-3008-1-6-hybrid-gt-pack-e-eat8"
 }
