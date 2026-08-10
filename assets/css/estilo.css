@@ -688,7 +688,6 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 .spec dd { margin: 0; font-weight: 700; text-align: right; }
 /* O mês vive debaixo do ano, dentro da mesma célula: mais pequeno, sem peso e
    em tom secundário, para o ano continuar a ser o que se lê primeiro. */
-.spec dd small { display: block; font-size: .8rem; font-weight: 500; color: var(--tinta-2); margin-top: .1rem; }
 @media (max-width: 620px) { .specs { grid-template-columns: 1fr; } }
 
 .bloco { margin-top: clamp(1.8rem, 4vw, 2.6rem); }

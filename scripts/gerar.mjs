@@ -1173,24 +1173,31 @@ function paginaViatura(v) {
     : estaReservada(v) ? 'https://schema.org/LimitedAvailability'
     : 'https://schema.org/InStock';
 
-  /* O ano leva o MÊS por baixo, em vez de haver uma linha «Data da matrícula»
-     à parte. A informação é a mesma — mês e ano da primeira matrícula, que é o
-     que o DL 74/93 obriga a prestar —, só que dita uma vez em vez de duas.
+  /* Mês e ano na mesma linha, como se lê num livrete: 03/2024.
+     ---------------------------------------------------------------------------
+     Esteve o mês por baixo do ano, em letra pequena, e antes disso numa linha
+     «Data da matrícula» à parte. A informação é sempre a mesma — mês e ano da
+     primeira matrícula, que é o que o DL 74/93 obriga a prestar — mas assim
+     lê-se de uma vez e no formato em que estas datas se escrevem.
 
-     Tem de ser dentro da célula e não numa linha própria: a ficha é uma grelha
-     de DUAS colunas, portanto uma linha «Mês» a seguir ao «Ano» aparecia ao
-     lado dele, não por baixo.
+     O mês é guardado por NOME («Março»), porque é escolhido de uma lista no
+     backoffice e é assim que o cliente o reconhece. Aqui passa a número, com o
+     zero à frente: «3/2024» ao lado de «03/2024» noutra viatura ficava
+     desalinhado, e uma ficha técnica lê-se em coluna.
 
-     O mês é um campo do backoffice, escolhido de uma lista. Chegou a ser
-     decifrado de uma data escrita à mão; um campo próprio não tem formatos
-     para adivinhar nem risco de o ano lá dentro contradizer o campo do ano. */
-  const mesDaMatricula = String(v.mes || '').trim();
-  const anoComMes = v.ano
-    ? `${esc(String(v.ano))}${mesDaMatricula ? `<small>${esc(mesDaMatricula)}</small>` : ''}`
+     Se houver mês mas não ano, não se escreve «03/» — mostra-se o que há. */
+  const MESES = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho',
+    'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+  const nMes = MESES.indexOf(String(v.mes || '').trim()) + 1;
+  const matricula = v.ano
+    ? (nMes ? `${String(nMes).padStart(2, '0')}/${v.ano}` : String(v.ano))
     : null;
 
   const specs = [
-    ['Ano', anoComMes, true], ['Quilómetros', v.km != null ? nKm(v.km) : null],
+    /* O rótulo deixa de ser «Ano»: com «03/2024» na célula, chamar-lhe ano era
+       dizer uma coisa e mostrar outra. «1.ª matrícula» é o termo do livrete e é
+       o que o campo é mesmo. */
+    ['1.ª matrícula', matricula], ['Quilómetros', v.km != null ? nKm(v.km) : null],
     ['Combustível', v.combustivel], ['Caixa', v.caixa],
     ['Potência', v.potencia ? v.potencia + ' cv' : null],
     ['Carroçaria', v.carrocaria], ['Cor', v.cor],
@@ -1308,8 +1315,12 @@ function paginaViatura(v) {
         <div class="bloco">
           <h2>Ficha técnica</h2>
           <dl class="specs">
-            ${specs.map(([r, val, jaEmHtml]) =>
-              `<div class="spec"><dt>${esc(r)}</dt><dd>${jaEmHtml ? val : esc(val)}</dd></div>`).join('')}
+            <!-- Todos os valores passam pelo esc(). Havia aqui uma saída para
+                 passar HTML em cru, que existia só para o <small> do mês; com o
+                 mês em «03/2024» deixou de ser preciso, e menos uma saída
+                 dessas é menos uma maneira de injectar marcação numa ficha. -->
+            ${specs.map(([r, val]) =>
+              `<div class="spec"><dt>${esc(r)}</dt><dd>${esc(val)}</dd></div>`).join('')}
           </dl>
         </div>
 
