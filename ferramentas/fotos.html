@@ -158,6 +158,13 @@
   .pasta-ficha:hover { background: #F0F4FB; border-color: var(--azul); }
   .pasta-ficha[aria-pressed="true"] { color: #fff; background: var(--azul); border-color: var(--azul); }
   .pasta-ficha__conta { font-weight: 400; opacity: .75; }
+  /* O «Ver mais» não é uma pasta: fica sem contorno e em cinzento, para não se
+     confundir com um nome na lista ao lado. */
+  .pasta-ficha--mais {
+    color: var(--suave); background: none; border-color: transparent;
+    text-decoration: underline; font-weight: 400;
+  }
+  .pasta-ficha--mais:hover { color: var(--tinta); background: none; border-color: transparent; }
 
   /* Arrumar pastas: deliberadamente discreto. É a única coisa nesta página que
      apaga trabalho, e não tem que competir com o botão de enviar. */
@@ -774,6 +781,9 @@ async function proporPasta() {
 
    As mais recentes primeiro: a pasta a que se quer juntar mais fotografias é,
    quase sempre, a do carro em que se esteve a trabalhar. */
+const PASTAS_A_MOSTRAR = 6;
+let verTodasAsPastas = false;
+
 function desenharEscolhaDePasta() {
   const caixa = document.getElementById('pastaEscolha');
   const lista = document.getElementById('pastaEscolhaLista');
@@ -782,18 +792,55 @@ function desenharEscolhaDePasta() {
 
   caixa.hidden = false;
   lista.textContent = '';
-  for (const nome of [...pastasExistentes].reverse()) {
+
+  const todas = [...pastasExistentes].reverse();      // as mais recentes à frente
+  const escolhida = campoPasta.value.trim();
+
+  /* Mostram-se seis, não vinte e quatro. Com o stock todo lá dentro, as fichas
+     enchiam meio ecrã de telemóvel e empurravam o botão de Enviar para fora.
+     Seis chegam porque a lista vem da mais recente para a mais antiga, e a
+     pasta a que se quer juntar mais fotografias é quase sempre a do carro em
+     que se esteve a trabalhar.
+
+     A que está escolhida entra SEMPRE, mesmo que esteja fora das seis: senão,
+     escolher uma pasta antiga e a lista fechar-se deixava a marca a
+     desaparecer, e ficava a dúvida sobre para onde iam as fotografias. */
+  let visiveis = verTodasAsPastas ? todas : todas.slice(0, PASTAS_A_MOSTRAR);
+  if (escolhida && todas.includes(escolhida) && !visiveis.includes(escolhida)) {
+    visiveis = [escolhida, ...visiveis];
+  }
+
+  for (const nome of visiveis) {
     const b = document.createElement('button');
     b.type = 'button';
     b.className = 'pasta-ficha';
     b.textContent = nome;
-    b.setAttribute('aria-pressed', String(campoPasta.value.trim() === nome));
+    b.setAttribute('aria-pressed', String(escolhida === nome));
     b.addEventListener('click', () => {
       campoPasta.value = nome;
       desenharEscolhaDePasta();
       verificarPasta();
     });
     lista.append(b);
+  }
+
+  const escondidas = todas.length - visiveis.length;
+  if (escondidas > 0 || verTodasAsPastas) {
+    const mais = document.createElement('button');
+    mais.type = 'button';
+    mais.className = 'pasta-ficha pasta-ficha--mais';
+    mais.textContent = verTodasAsPastas ? 'Ver menos' : `Ver mais (${escondidas})`;
+    /* `aria-expanded` diz a quem usa leitor de ecrã que este botão abre e fecha
+       a lista ao lado — sem isso, é só um botão com um número. */
+    mais.setAttribute('aria-expanded', String(verTodasAsPastas));
+    mais.addEventListener('click', () => {
+      verTodasAsPastas = !verTodasAsPastas;
+      desenharEscolhaDePasta();
+      /* O foco volta para o botão, que acabou de ser substituído por outro: sem
+         isto, quem navega por teclado era atirado para o princípio da página. */
+      document.querySelector('.pasta-ficha--mais')?.focus();
+    });
+    lista.append(mais);
   }
 }
 

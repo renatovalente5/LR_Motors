@@ -495,6 +495,8 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 
 /* estados de stock aplicados ao cartão inteiro */
 .cartao--vendido .cartao__foto img { filter: grayscale(1) brightness(.86); }
+/* Nota: o «Ver mais» das pastas vive na página /fotos/, que tem a sua própria
+   folha de estilo embutida — não é aqui. */
 /* O preço de uma vendida sai do azul da marca: em azul e forte continuava a
    pedir a atenção de quem procura um carro para comprar, mesmo riscado. O risco
    é mais grosso do que o do browser, que num número em peso 900 quase não se
