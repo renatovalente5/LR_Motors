@@ -66,6 +66,24 @@ const nEuro = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' €';
    o DL 138/90 exige a quem anuncia preços. */
 const temPreco = (v) => typeof v.preco === 'number' && v.preco > 0;
 const precoTexto = (v) => temPreco(v) ? nEuro(v.preco) : 'Sob consulta';
+
+/* O preço de uma viatura vendida é riscado.
+   ---------------------------------------------------------------------------
+   Uma vendida que fique na página é montra: mostra o que o stand vende e a que
+   preços. Mas o preço não pode continuar a ler-se como uma proposta — quem
+   chega tem de perceber num relance que aquilo já não está para venda.
+
+   `<s>` e não `<del>`: o `<del>` quer dizer «isto foi apagado do documento», e
+   o `<s>` quer dizer «isto já não é verdade», que é exactamente o caso.
+
+   O risco NÃO é a única coisa a dizê-lo — quem usa um leitor de ecrã pode não
+   o ouvir. A etiqueta «Vendido» está no cartão e na ficha, em texto, e é ela
+   que carrega a informação; o risco é para quem vê.
+
+   Sem preço não se risca nada: riscar «Sob consulta» não quer dizer nada. */
+const precoHTML = (v) => temPreco(v) && v.estado === 'vendido'
+  ? `<s>${esc(nEuro(v.preco))}</s>`
+  : esc(precoTexto(v));
 const nKm = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' km';
 
 /* Texto que o cliente escreve num campo de várias linhas do backoffice.
@@ -683,7 +701,7 @@ function cartao(v, { prioridade = false } = {}) {
         ${spec(ic.raio, v.potencia ? v.potencia + ' cv' : '')}
       </div>
       <div class="cartao__pe">
-        <span class="cartao__preco${temPreco(v) ? '' : ' cartao__preco--consulta'}">${precoTexto(v)}</span>
+        <span class="cartao__preco${temPreco(v) ? '' : ' cartao__preco--consulta'}">${precoHTML(v)}</span>
         <span class="cartao__ver">Ver ${ic.seta}</span>
       </div>
     </div>
@@ -1256,10 +1274,16 @@ function paginaViatura(v) {
       <div class="ficha__galeria">${galeria}</div>
 
       <aside class="ficha__lado">
-        <div class="painel">
-          <p class="painel__preco${temPreco(v) ? '' : ' painel__preco--consulta'}">${precoTexto(v)}</p>
-          <p class="painel__iva">${temPreco(v)
-            ? 'Preço final, com todos os impostos incluídos.'
+        <div class="painel${v.estado === 'vendido' ? ' painel--vendido' : ''}">
+          <p class="painel__preco${temPreco(v) ? '' : ' painel__preco--consulta'}">${precoHTML(v)}</p>
+          <!-- «Preço final, com todos os impostos incluídos» num carro já
+               vendido lê-se como uma proposta que não existe. Diz-se o que a
+               linha é: o preço a que aquele carro saiu. -->
+          <p class="painel__iva">${
+            v.estado === 'vendido'
+              ? (temPreco(v) ? 'Preço a que esta viatura foi vendida.'
+                             : 'Esta viatura já foi vendida.')
+            : temPreco(v) ? 'Preço final, com todos os impostos incluídos.'
             : 'Contacte-nos para saber o preço e as condições desta viatura.'}</p>
           ${aviso}
           ${notaVisita('nota-visita--painel')}

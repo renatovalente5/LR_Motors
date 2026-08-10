@@ -54,7 +54,7 @@
     "aviso_visita": "Com marcação, também mostramos a viatura em **Vila do Conde**."
   },
   "opcoes": {
-    "mostrar_vendidos": false
+    "mostrar_vendidos": true
   },
   "tecnico": {
     "worker_fotos": "https://lrmotors-fotos.renato-lima-valente-dcb.workers.dev"
