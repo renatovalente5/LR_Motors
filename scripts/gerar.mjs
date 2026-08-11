@@ -682,14 +682,33 @@ const standLD = {
   },
 };
 
-const migalhasLD = (itens) => ({
-  '@context': 'https://schema.org',
-  '@type': 'BreadcrumbList',
-  itemListElement: itens.map((it, i) => ({
-    '@type': 'ListItem', position: i + 1, name: it.nome,
-    ...(it.href ? { item: abs(it.href) } : {}),
-  })),
-});
+/* Migalhas para o Google.
+   ---------------------------------------------------------------------------
+   O `item` é OBRIGATÓRIO em todas as migalhas menos a última — é o que a
+   Search Console reclamou: «Campo "item" em falta (em "itemListElement")».
+
+   A causa era `it.href ? …`. A página inicial é passada com `href: ''`, que em
+   JavaScript é FALSO, e por isso a primeira migalha — «Início», a que existe em
+   todas as páginas do site — saía sem `item`. Um endereço vazio é um endereço
+   válido: é a raiz. Testa-se a PRESENÇA do campo e não se ele é verdadeiro.
+
+   A última fica sem `item` de propósito: é a página onde já se está, e o Google
+   pede que se omita. */
+const migalhasLD = (itens) => {
+  itens.forEach((it, i) => {
+    if (i < itens.length - 1 && it.href == null) {
+      console.warn(`  !! migalha "${it.nome}" sem href e não é a última — o Google recusa`);
+    }
+  });
+  return {
+    '@context': 'https://schema.org',
+    '@type': 'BreadcrumbList',
+    itemListElement: itens.map((it, i) => ({
+      '@type': 'ListItem', position: i + 1, name: it.nome,
+      ...(it.href != null ? { item: abs(it.href) } : {}),
+    })),
+  };
+};
 
 /* ============================================================== componentes */
 function cartao(v, { prioridade = false } = {}) {
