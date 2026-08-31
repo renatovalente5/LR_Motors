@@ -1,0 +1,29 @@
+{
+  "marca": "Ford ",
+  "modelo": "Puma",
+  "versao": "1.0 EcoBoost Titanium ",
+  "tipo": "carro",
+  "carrocaria": "SUV ",
+  "publicado": true,
+  "reservado": false,
+  "estado": "disponivel",
+  "fotos": [
+    "assets/veiculos/IMG_8403.jpeg"
+  ],
+  "ano": 2020,
+  "mes": "Fevereiro",
+  "km": 84000,
+  "combustivel": "Gasolina",
+  "caixa": "Manual",
+  "potencia": 125,
+  "cilindrada": 998,
+  "cor": "Cinzento ",
+  "lugares": 5,
+  "portas": 5,
+  "origem": "Importado",
+  "garantia": "18 meses - BREVEMENTE ",
+  "descricao": "BREVEMENTE! \nAPROVEITE! ",
+  "destaque": true,
+  "ordem": 2,
+  "slug": "ford-puma-titanium"
+}
