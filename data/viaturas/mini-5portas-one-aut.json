@@ -1,0 +1,27 @@
+{
+  "marca": "MINI ",
+  "modelo": "5 Portas Aut. ",
+  "versao": "One",
+  "tipo": "carro",
+  "publicado": true,
+  "reservado": false,
+  "estado": "disponivel",
+  "fotos": [
+    "assets/veiculos/IMG_8402.jpeg"
+  ],
+  "ano": 2018,
+  "mes": "Dezembro",
+  "km": 112000,
+  "combustivel": "Gasolina",
+  "caixa": "Automática",
+  "potencia": 102,
+  "cilindrada": 1499,
+  "cor": "Cinzento",
+  "lugares": 5,
+  "portas": 5,
+  "origem": "Importado",
+  "garantia": "18 meses - BREVEMENTE ",
+  "destaque": false,
+  "ordem": 50,
+  "slug": "mini-5portas-one-aut"
+}
