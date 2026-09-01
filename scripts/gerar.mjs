@@ -789,16 +789,20 @@ function cartao(v, { prioridade = false } = {}) {
   const spec = (icone, txt) => txt ? `<span class="cartao__spec">${icone}${esc(txt)}</span>` : '';
   const nf = fotos(v).length;
 
-  return `<article class="cartao cartao--${v.estado}"
-    data-tipo="${esc(v.tipo)}" data-marca="${esc(v.marca)}" data-combustivel="${esc(v.combustivel)}"
-    data-caixa="${esc(v.caixa)}" data-preco="${v.preco ?? ''}" data-ano="${v.ano ?? ''}"
-    data-km="${v.km ?? ''}" data-estado="${esc(v.estado)}"
-    data-procura="${esc([tituloLongo(v), v.carrocaria, v.combustivel].filter(Boolean).join(' ').toLowerCase())}">
-  <a href="${u('viaturas/' + v.slug + '/')}" style="display:contents" aria-label="Ver ${esc(tituloLongo(v))}">
-    <div class="cartao__foto">
+  /* Uma vendida não abre nada: não tem página de detalhe (ver a escrita das
+     páginas, lá em baixo) e por isso o cartão não é um link. Fica visível na
+     secção «Já vendidas» — o cliente quer o histórico à vista — mas deixa de
+     prometer um clique que não leva a lado nenhum.
+
+     O `<a>` era `display: contents`, ou seja não desenhava caixa nenhuma; tirá-lo
+     não mexe um pixel no desenho. O que TEM de sair com ele é o resto da
+     promessa: o «Ver →» no rodapé, o cursor de mão e o hover que levanta o
+     cartão (esse sai no CSS, em `.cartao--vendido`). Um cartão que se levanta ao
+     rato e não abre nada é pior do que um cartão parado. */
+  const corpo = `    <div class="cartao__foto">
       ${img}
       ${selos.length ? `<div class="cartao__selos">${selos.join('')}</div>` : ''}
-      ${nf > 1 ? `<span class="cartao__nfotos">${ic.foto}${nf}</span>` : ''}
+      ${nf > 1 && !estaVendida(v) ? `<span class="cartao__nfotos">${ic.foto}${nf}</span>` : ''}
     </div>
     <div class="cartao__corpo">
       <h3 class="cartao__titulo">${esc(titulo(v))}${v.versao ? `<span class="cartao__versao">${esc(v.versao)}</span>` : ''}</h3>
@@ -811,10 +815,28 @@ function cartao(v, { prioridade = false } = {}) {
       </div>
       <div class="cartao__pe">
         <span class="cartao__preco${temPreco(v) ? '' : ' cartao__preco--consulta'}">${precoHTML(v)}</span>
-        <span class="cartao__ver">Ver ${ic.seta}</span>
+        ${estaVendida(v) ? '' : `<span class="cartao__ver">Ver ${ic.seta}</span>`}
       </div>
-    </div>
-  </a>
+    </div>`;
+
+  /* Um `id` só nas vendidas, e serve uma coisa concreta: é para aqui que o
+     reencaminhamento do endereço antigo aponta. Sem ele, quem clicasse num link
+     antigo de um carro caía no cabeçalho «Já vendidas» e tinha de o procurar
+     numa lista que só cresce. Com ele, cai em cima do carro dele.
+
+     O `tabindex="-1"` não põe o cartão na ordem de tabulação (é o que o -1
+     faz): serve para o browser poder pôr o FOCO aqui quando a página abre no
+     fragmento. Sem isso, quem chega por um link antigo com leitor de ecrã ou
+     teclado aterra com o foco no princípio do documento, e a página parece não
+     ter ido a lado nenhum. */
+  return `<article class="cartao cartao--${v.estado}"${estaVendida(v) ? ` id="v-${esc(v.slug)}" tabindex="-1"` : ''}
+    data-tipo="${esc(v.tipo)}" data-marca="${esc(v.marca)}" data-combustivel="${esc(v.combustivel)}"
+    data-caixa="${esc(v.caixa)}" data-preco="${v.preco ?? ''}" data-ano="${v.ano ?? ''}"
+    data-km="${v.km ?? ''}" data-estado="${esc(v.estado)}"
+    data-procura="${esc([tituloLongo(v), v.carrocaria, v.combustivel].filter(Boolean).join(' ').toLowerCase())}">
+${estaVendida(v) ? corpo : `  <a href="${u('viaturas/' + v.slug + '/')}" style="display:contents" aria-label="Ver ${esc(tituloLongo(v))}">
+${corpo}
+  </a>`}
 </article>`;
 }
 
@@ -1251,7 +1273,7 @@ function paginaViaturas() {
     </div>
 
     ${vendidas.length && def.opcoes.mostrar_vendidos ? `
-    <div class="secao__topo" style="margin-top:3rem">
+    <div class="secao__topo" id="vendidas" style="margin-top:3rem">
       <div><p class="sobretitulo">Histórico</p><h2 class="h-secao">Já vendidas</h2></div>
     </div>
     <div class="grelha">${vendidas.map((v) => cartao(v)).join('')}</div>` : ''}
@@ -1279,6 +1301,14 @@ function paginaViaturas() {
 }
 
 function paginaViatura(v) {
+  /* Só as que estão à venda chegam aqui — as vendidas ficaram sem ficha e o seu
+     endereço passou a ser um reencaminhamento. Isto não é uma verificação de
+     segurança, é o contrato escrito: se alguém voltar a passar-lhe uma vendida,
+     a construção pára aqui em vez de publicar uma ficha com preço de um carro
+     que já saiu. */
+  if (estaVendida(v)) {
+    throw new Error(`paginaViatura() recebeu uma viatura vendida (${v.slug}). As vendidas não têm ficha — veja os stubs em main().`);
+  }
   const fs_ = fotos(v);
   const nome = tituloLongo(v);
   const disp = `https://schema.org/${ESTADOS[estadoDe(v)].schema}`;
@@ -1363,8 +1393,11 @@ function paginaViatura(v) {
   const equipamento = (Array.isArray(v.equipamento) ? v.equipamento : [])
     .map((x) => String(x ?? '').trim()).filter(Boolean);
 
+  /* Não há aviso de «vendido» porque não há página de vendido: desde que as
+     vendidas deixaram de ter ficha, esta função só corre para as que estão à
+     venda. Quem chega a um endereço antigo de uma vendida é reencaminhado
+     (ver os stubs, no fim do ficheiro) e o texto do aviso vive lá. */
   const AVISOS = {
-    vendido: `Esta viatura já foi vendida. Veja o <a href="${u('viaturas/')}">stock actual</a> ou diga-nos o que procura.`,
     reservado: 'Viatura reservada. Fale connosco para saber se volta a ficar disponível.',
     brevemente: 'Esta viatura chega em breve. Fale connosco para a reservar antes de entrar no stand.',
   };
@@ -1405,20 +1438,13 @@ function paginaViatura(v) {
       <div class="ficha__galeria">${galeria}</div>
 
       <aside class="ficha__lado">
-        <!-- Numa viatura VENDIDA não vai preço nenhum, por decisão do cliente:
-             a página fica como montra do que o stand vendeu, não como proposta.
-             O lugar do preço passa a dizer o estado, senão ficava um vazio no
-             topo do painel com os botões pendurados por baixo. -->
-        <div class="painel${estaVendida(v) ? ' painel--vendido' : ''}">
-          ${estaVendida(v)
-            ? `<p class="painel__preco painel__preco--vendido">Vendida</p>
-          <p class="painel__iva">Esta viatura já não está à venda.</p>`
-            : `<p class="painel__preco${temPreco(v) ? '' : ' painel__preco--consulta'}">${esc(precoTexto(v))}</p>
+        <div class="painel">
+          <p class="painel__preco${temPreco(v) ? '' : ' painel__preco--consulta'}">${esc(precoTexto(v))}</p>
           <p class="painel__iva">${temPreco(v)
             ? (eBrevemente(v)
                 ? 'Preço final, com todos os impostos incluídos. Ainda não chegou ao stand.'
                 : 'Preço final, com todos os impostos incluídos.')
-            : 'Contacte-nos para saber o preço e as condições desta viatura.'}</p>`}
+            : 'Contacte-nos para saber o preço e as condições desta viatura.'}</p>
           ${aviso}
           ${notaVisita('nota-visita--painel')}
           <div class="painel__acoes">
@@ -1478,10 +1504,7 @@ function paginaViatura(v) {
           </ul>
         </div>` : ''}
 
-        <!-- A descrição também sai das vendidas: é texto de venda de uma
-             viatura que já saiu. Fica a ficha técnica e o equipamento, que são
-             o registo do que o carro era — e é isso que faz a montra valer. -->
-        ${!estaVendida(v) && textoRico(v.descricao) ? `<div class="bloco">
+        ${textoRico(v.descricao) ? `<div class="bloco">
           <h2>Descrição</h2>
           ${textoRico(v.descricao)}
         </div>` : ''}
@@ -1525,19 +1548,8 @@ function paginaViatura(v) {
 
   return pagina({
     pag: 'viaturas/' + v.slug + '/',
-    /* O título e a descrição de uma vendida não levam preço nem «à venda».
-       Não é só coerência com o painel: isto é o que o Google mostra na lista
-       de resultados, e uma pessoa que procura «BMW i4 usado» clicava num
-       anúncio com preço para chegar a uma viatura que já não existe. Fica a
-       dizer o que é — parte do histórico do stand — para quem clicar saber ao
-       que vai. O ano e os quilómetros ficam: são o que dá jeito a quem anda a
-       comparar preços praticados. */
-    titulo: estaVendida(v)
-      ? `${nome}${v.ano ? ' de ' + v.ano : ''} — vendido | LR Motors Vila Verde`
-      : `${nome}${v.ano ? ' de ' + v.ano : ''} — ${precoTexto(v)} | LR Motors Vila Verde`,
-    descricao: estaVendida(v)
-      ? `${nome} vendido pela LR Motors, em Vila Verde (Braga). ${[v.ano, v.km != null ? nKm(v.km) : null, v.combustivel, v.caixa].filter(Boolean).join(' · ')}. Veja as viaturas que temos agora em stock.`
-      : `${nome} usado à venda na LR Motors, Vila Verde (Braga). ${[v.ano, v.km != null ? nKm(v.km) : null, v.combustivel, v.caixa].filter(Boolean).join(' · ')}. ${precoTexto(v)}, com garantia.`,
+    titulo: `${nome}${v.ano ? ' de ' + v.ano : ''} — ${precoTexto(v)} | LR Motors Vila Verde`,
+    descricao: `${nome} usado à venda na LR Motors, Vila Verde (Braga). ${[v.ano, v.km != null ? nKm(v.km) : null, v.combustivel, v.caixa].filter(Boolean).join(' · ')}. ${precoTexto(v)}, com garantia.`,
     /* O cartão de partilha é o `og.jpg` que o script das imagens deixa na pasta
        da viatura, e não a fotografia em WebP que o site mostra: o WhatsApp não
        mostra WebP nas pré-visualizações de link, e este stand partilha os
@@ -1830,7 +1842,95 @@ function main() {
   escrever('contactos/index.html', paginaContactos());
   escrever('servicos/index.html', paginaServicos());
   escrever('sobre/index.html', paginaSobre());
-  for (const v of publicadas) escrever(`viaturas/${v.slug}/index.html`, paginaViatura(v));
+  /* Página de detalhe só para as que estão à venda. Uma vendida não tem para
+     onde levar: sem preço e sem descrição, a página ficava a repetir o que o
+     cartão já diz. O endereço antigo não fica a dar 404 — ver o stub logo a
+     seguir. */
+  for (const v of aVenda) escrever(`viaturas/${v.slug}/index.html`, paginaViatura(v));
+
+  /* Os endereços das vendidas não desaparecem, reencaminham.
+     -------------------------------------------------------------------------
+     Estas páginas estiveram no ar e no sitemap, e o stand PARTILHA links de
+     viaturas por WhatsApp — há links destes guardados em conversas e talvez
+     indexados. Um 404 seco castigava quem guardou o link por uma coisa que não
+     fez. Como o carro continua visível na listagem, mandá-lo para lá não é
+     enganar ninguém: é levá-lo ao sítio onde a viatura ainda está, agora como
+     histórico.
+
+     Num alojamento estático não há 301, por isso é `<meta refresh>` a zero
+     segundos com `rel=canonical` — que é o que o Google lê como mudança
+     permanente — mais uma ligação visível para quem tenha o refresh desligado.
+     Fora do sitemap, claro.
+
+     SEM `noindex`, e é deliberado: `noindex` junto com um `canonical` é um sinal
+     contraditório («não indexes isto» + «indexa aquilo em vez disto»), e o
+     Google pode aplicar o noindex ao DESTINO do canonical. O destino aqui é
+     /viaturas/, a página mais importante do site a seguir à inicial. O refresh
+     imediato já basta para o stub não ficar nos resultados. */
+  /* A âncora só existe se a secção existir. `mostrar_vendidos` é um interruptor
+     do backoffice: o cliente desliga-o e a secção «Já vendidas» deixa de ser
+     desenhada, e com ela desaparecem os `id` dos cartões. O `#v-<slug>` ficava a
+     apontar para um id que não está na página, e quem viesse de um link antigo
+     caía no topo da listagem sem perceber porquê. Com o interruptor desligado o
+     reencaminhamento é para a listagem e pronto — o texto do stub já diz que a
+     viatura foi vendida. */
+  const haSeccaoVendidas = vendidas.length > 0 && !!def.opcoes.mostrar_vendidos;
+
+  for (const v of vendidas) {
+    /* SEM `rel=canonical`, e é escolha e não esquecimento. Um canonical declara
+       que duas páginas são substancialmente o mesmo conteúdo, e quarenta
+       palavras a dizer «este carro foi vendido» não são a listagem do stock.
+       O `<meta refresh>` a zero segundos já é lido pelo Google como
+       reencaminhamento permanente, que é o sinal de canonicalização mais forte
+       que existe — o canonical por cima só acrescentava uma declaração falsa.
+
+       O endereço absoluto fica só no `og:url`, para as pré-visualizações. O
+       reencaminhamento e a ligação visível vão em caminho do site, para o stub
+       funcionar onde quer que o site esteja (domínio, github.io de recurso,
+       servidor local). Dei por isto a testar em local — o stub atirava o
+       browser para fora do servidor de testes e eu ia a acreditar que a âncora
+       estava partida. */
+    const destino = abs('viaturas/');
+    const comAncora = u('viaturas/') + (haSeccaoVendidas ? `#v-${v.slug}` : '');
+
+    /* O cartão de partilha vem com o stub, e não é um extra: a razão de existir
+       deste stub são os links partilhados por WhatsApp. Sem `og:image`, voltar
+       a partilhar um link antigo dava uma pré-visualização vazia — pior do que
+       antes de haver stub. É o mesmo `og.jpg` que a página tinha, com o mesmo
+       recuo para o logótipo quando ainda não foi gerado. */
+    const f0 = fotos(v)[0];
+    const pastaFoto = f0 ? f0.src.replace(BASE + '/', '').split('/').slice(0, -1).join('/') : null;
+    const cartao = pastaFoto && existsSync(join(RAIZ, pastaFoto, 'og.jpg'))
+      ? abs(pastaFoto + '/og.jpg') : abs('assets/img/og.jpg');  // o mesmo recuo do resto do site (linha 621)
+    /* «Esta viatura já foi vendida» e não «O X foi vendido»: o género do artigo
+       e do particípio teria de acompanhar o modelo — «O BMW», mas «A Smart» —
+       e escrevê-lo à mão dava frases erradas mal entrasse a marca seguinte.
+       Concordar com «viatura» é sempre certo, e é o que o cartão já diz. */
+    const legenda = 'Esta viatura já foi vendida. Veja as viaturas em stock na LR Motors, em Vila Verde.';
+
+    escrever(`viaturas/${v.slug}/index.html`, `<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>${esc(tituloLongo(v))} — vendido | LR Motors</title>
+<meta name="description" content="${esc(legenda)}">
+<meta http-equiv="refresh" content="0; url=${comAncora}">
+<meta property="og:type" content="website">
+<meta property="og:title" content="${esc(tituloLongo(v))} — vendido">
+<meta property="og:description" content="${esc(legenda)}">
+<meta property="og:image" content="${cartao}">
+<meta property="og:url" content="${destino}">
+<meta name="twitter:card" content="summary_large_image">
+</head>
+<body style="font-family:system-ui,sans-serif;padding:2rem;text-align:center;color:#0E1726">
+<p><strong>${esc(tituloLongo(v))}</strong></p>
+<p>Esta viatura já foi vendida.</p>
+<p><a href="${comAncora}">Ver as viaturas em stock</a></p>
+</body>
+</html>
+`);
+  }
 
   /* páginas legais: markdown simples convertido no build */
   for (const [ficheiro, destino] of Object.entries({
@@ -1856,7 +1956,10 @@ function main() {
   /* sitemap + robots */
   const urls = ['', 'viaturas/', 'servicos/', 'sobre/', 'contactos/',
     'privacidade/', 'termos/', 'garantia/', 'resolucao-de-litigios/',
-    ...publicadas.map((v) => `viaturas/${v.slug}/`)];
+    /* Só as que têm página a sério. No lugar das vendidas ficaram stubs de
+       reencaminhamento: pô-los no sitemap era pedir ao Google que fosse buscar
+       páginas cujo único conteúdo é «vai antes ali». */
+    ...aVenda.map((v) => `viaturas/${v.slug}/`)];
   const hoje = new Date().toISOString().slice(0, 10);
   escrever('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">

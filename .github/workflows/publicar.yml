@@ -112,13 +112,27 @@ jobs:
           fi
           echo "caminhos e CNAME conferidos"
 
+      # Contar pastas deixou de provar alguma coisa: as viaturas vendidas também
+      # deixam uma pasta lá, com um stub de reencaminhamento em vez de uma
+      # página. Sem separar as duas coisas, esta guarda passava com o stand todo
+      # vendido e ZERO páginas a sério — a dizer "16 páginas de viatura geradas".
       - name: Verificar o resultado
         run: |
           test -f _site/index.html || { echo "falta o index.html"; exit 1; }
           test -f _site/sitemap.xml || { echo "falta o sitemap"; exit 1; }
-          n=$(find _site/viaturas -mindepth 1 -maxdepth 1 -type d | wc -l)
-          echo "páginas de viatura geradas: $n"
-          test "$n" -gt 0 || { echo "nenhuma viatura gerada"; exit 1; }
+          total=$(find _site/viaturas -mindepth 1 -maxdepth 1 -type d | wc -l | tr -d ' ')
+          stubs=$(grep -rl 'http-equiv="refresh"' _site/viaturas --include='index.html' | wc -l | tr -d ' ')
+          reais=$((total - stubs))
+          echo "páginas de viatura: $reais a sério, $stubs reencaminhamentos de vendidas"
+          test "$reais" -gt 0 || { echo "nenhuma viatura à venda tem página"; exit 1; }
+          # Um stub tem noindex implícito pelo refresh; pedir ao Google que o
+          # rastreie pelo sitemap era mandá-lo a uma página que o manda embora.
+          for s in $(grep -rl 'http-equiv="refresh"' _site/viaturas --include='index.html' | awk -F/ '{print $3}'); do
+            if grep -q "/viaturas/$s/" _site/sitemap.xml; then
+              echo "a vendida $s está no sitemap e não devia"; exit 1
+            fi
+          done
+          echo "sitemap sem vendidas conferido"
 
       - uses: actions/upload-pages-artifact@v3
         with:

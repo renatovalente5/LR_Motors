@@ -508,6 +508,23 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 
 /* estados de stock aplicados ao cartão inteiro */
 .cartao--vendido .cartao__foto img { filter: grayscale(1) brightness(.86); }
+/* Uma vendida não é um link — não tem página de detalhe para onde ir. Por isso
+   perde também tudo o que PROMETE um clique: o cartão deixa de se levantar ao
+   passar o rato e a fotografia deixa de crescer. Sem isto ficava um cartão que
+   reage e não abre nada, que é a pior das combinações: quem lá passa clica,
+   não acontece nada, e conclui que o site está avariado. O cursor volta ao
+   normal sozinho, por já não haver `<a>`. */
+/* Sem `scroll-margin-top` aqui: o `html` já tem `scroll-padding-top` para a
+   navbar pegajosa (ver o topo do ficheiro) e os dois SOMAM-SE — o cartão para
+   onde o reencaminhamento aterra ficava cem pixels abaixo do que devia, com um
+   vão branco por cima. Quem trata da navbar é a regra global, e uma só. */
+.cartao--vendido:hover {
+  /* `none` e não uma sombra qualquer: em repouso o `.cartao` não declara
+     `box-shadow` nenhuma, por isso repor uma aqui ACRESCENTAVA sombra ao passar
+     o rato — o contrário do que se quer. */
+  transform: none; box-shadow: none; border-color: var(--borda);
+}
+.cartao--vendido:hover .cartao__foto img { transform: none; }
 /* Nota: o «Ver mais» das pastas vive na página /fotos/, que tem a sua própria
    folha de estilo embutida — não é aqui. */
 /* O preço de uma vendida sai do azul da marca: em azul e forte continuava a
@@ -550,6 +567,14 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
   .filtros-movel { display: block; }
   .filtros__fechar { position: sticky; bottom: 0; margin: 0 calc(var(--gutter) * -1) 0;
     padding: .8rem var(--gutter); background: var(--carta); border-top: 1px solid var(--borda); }
+  /* O `scroll-padding-top` do `html` conta a navbar e mais nada — mas AQUI há um
+     segundo elemento pegajoso por baixo dela, esta barra de filtros, com 76 px
+     medidos. Quem chega de um link antigo de uma vendida (e chega quase sempre
+     pelo WhatsApp, ou seja, de telemóvel) aterrava com a etiqueta VENDIDO do
+     seu carro escondida por trás da barra — justamente a informação por que
+     ali veio parar. A compensação vive dentro desta media query porque a barra
+     também: em ecrã largo os 76 px eram um vão branco sem razão. */
+  .cartao--vendido[id] { scroll-margin-top: 5.5rem; }
 }
 
 .vazio {
@@ -670,10 +695,8 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 }
 @media (max-width: 980px) { .painel { position: static; } }
 .painel__preco { font-size: 2.2rem; font-weight: 900; letter-spacing: -.035em; color: var(--azul); line-height: 1; }
-/* Na ficha de uma vendida, no lugar do preço vai a palavra «Vendida» — menor
-   do que um preço, porque não é um número a comparar, e fora do azul da marca. */
-.painel__preco--vendido { font-size: 1.5rem; color: var(--tinta-2); letter-spacing: -.02em; }
-/* No cartão da listagem, o mesmo: onde estaria o preço fica a palavra, em tom
+/* Nenhuma regra de «vendida» no painel: a ficha de uma vendida deixou de
+   existir. No cartão da listagem, onde estaria o preço fica a palavra, em tom
    secundário, para não competir com os preços a sério dos carros à venda. */
 .cartao__preco--saiu { font-size: 1rem; font-weight: 800; color: var(--tinta-2); }
 .painel__preco--consulta { font-size: 1.35rem; color: var(--tinta); }
@@ -687,8 +710,8 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
   margin-top: .9rem; padding: .7rem .85rem; border-radius: 10px;
   font-size: .88rem; font-weight: 700; line-height: 1.5;
 }
-.painel__aviso--vendido { background: var(--fundo); color: var(--tinta); }
-.painel__aviso--vendido a { color: var(--azul); text-decoration: underline; }
+/* Não há `--vendido` aqui: os avisos vivem no painel da ficha, e as vendidas
+   não têm ficha. O que uma vendida diz, di-lo o cartão e o reencaminhamento. */
 .painel__aviso--reservado { background: var(--ambar-tenue); color: var(--ambar); }
 .painel__aviso--brevemente { background: var(--azul-tenue); color: var(--azul); }
 
@@ -1165,7 +1188,8 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
    mesmo azul-lavado que o «Brevemente» usava, e as duas apareciam encostadas. */
 .vit-selo--brevemente { background: var(--azul); color: #fff; }
 .vit-selo--reservado { background: var(--ambar); color: #fff; }
-.vit-selo--vendido { background: var(--tinta-2); color: #fff; }
+/* Sem `--vendido`: o carrossel de destaques só mostra viaturas à venda, por isso
+   esta etiqueta nunca chegava a ser desenhada aqui — era só a sugerir que sim. */
 .vit-selo--eletrico { background: var(--verde-tenue); color: var(--verde); }
 .vit-selo--garantia { background: var(--azul-tenue); color: var(--azul); }
 
