@@ -27,7 +27,9 @@ on:
         default: ''
 
 permissions:
-  contents: read
+  # `write` e não `read` por causa do passo que arruma as vendidas: ele grava no
+  # repositório. É o mínimo — não dá acesso a mais nada do que ao conteúdo deste.
+  contents: write
   pages: write
   id-token: write
 
@@ -46,6 +48,34 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      # As viaturas marcadas como vendidas mudam-se para data/viaturas/vendidas/,
+      # e as que deixarem de estar vendidas voltam para trás. Corre ANTES de
+      # gerar, para o site já sair com os ficheiros do lado certo.
+      #
+      # O `[skip ci]` na mensagem é obrigatório: sem ele, esta gravação disparava
+      # outra publicação, que arrumaria nada e gravaria nada — mas só se descobre
+      # isso depois de a correr. Com muitas vendas seguidas dava uma publicação a
+      # mais por cada uma.
+      #
+      # E se a gravação falhar, AVISA e segue. Falha quando o cliente grava outra
+      # viatura enquanto isto corre: o `main` mexeu-se e o push é recusado. Nesse
+      # caso o site publicado já está certo — os ficheiros foram movidos aqui — e
+      # o que fica por fazer é a arrumação no repositório, que a próxima
+      # publicação repete. Deitar a publicação abaixo por causa disso seria
+      # trocar um site no ar por uma pasta arrumada.
+      - name: Arrumar as viaturas vendidas
+        run: |
+          node scripts/arrumar-vendidas.mjs
+          if [ -z "$(git status --porcelain data/viaturas)" ]; then
+            echo "nada mudou de pasta"; exit 0
+          fi
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A data/viaturas
+          git commit -m 'Arrumar as viaturas vendidas na pasta das Vendidas [skip ci]'
+          git pull --rebase --quiet origin main || true
+          git push origin HEAD:main || echo "AVISO: não deu para gravar a arrumação; o site vai na mesma e a próxima publicação repete"
 
       - uses: actions/setup-python@v5
         with:

@@ -489,7 +489,20 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
   padding: .3rem .6rem; border-radius: 999px; background: var(--carta); color: var(--tinta);
   box-shadow: 0 1px 3px rgba(14,23,38,.16);
 }
-.selo--reservado { background: var(--ambar-tenue); color: var(--ambar); }
+/* DISPONIBILIDADE em cor cheia, CARACTERÍSTICA em cor lavada.
+   ---------------------------------------------------------------------------
+   Antes disto, «Reservado» e «100% elétrico» eram a mesma pastilha pálida no
+   mesmo canto, e dizem coisas de natureza diferente: uma é «este carro pode
+   não ser seu», a outra é uma qualidade do carro. Lado a lado, a primeira
+   perdia-se — que é exactamente a que o comprador precisa de ver primeiro.
+   Agora a disponibilidade é fundo cheio e texto branco, e as características
+   ficam lavadas. Não é decoração: é a hierarquia a fazer-se ver sem se ler.
+
+   As três cores contam a história sozinhas — azul «está para chegar», âmbar
+   «espera», cinzento «acabou» — e mantêm ≥5,9:1 sobre branco (medido, não
+   estimado), por isso passam em AA mesmo neste tamanho pequeno. */
+.selo--brevemente { background: var(--azul); color: #fff; }
+.selo--reservado { background: var(--ambar); color: #fff; }
 .selo--vendido { background: var(--tinta-2); color: #fff; }
 .selo--eletrico { background: var(--verde-tenue); color: var(--verde); }
 
@@ -657,9 +670,12 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 }
 @media (max-width: 980px) { .painel { position: static; } }
 .painel__preco { font-size: 2.2rem; font-weight: 900; letter-spacing: -.035em; color: var(--azul); line-height: 1; }
-/* Na ficha de uma vendida o mesmo: fora do azul da marca. Aqui é ainda mais
-   importante, porque o número tem 2,2rem e é a primeira coisa que se lê. */
-.painel--vendido .painel__preco { color: var(--tinta-3); }
+/* Na ficha de uma vendida, no lugar do preço vai a palavra «Vendida» — menor
+   do que um preço, porque não é um número a comparar, e fora do azul da marca. */
+.painel__preco--vendido { font-size: 1.5rem; color: var(--tinta-2); letter-spacing: -.02em; }
+/* No cartão da listagem, o mesmo: onde estaria o preço fica a palavra, em tom
+   secundário, para não competir com os preços a sério dos carros à venda. */
+.cartao__preco--saiu { font-size: 1rem; font-weight: 800; color: var(--tinta-2); }
 .painel__preco--consulta { font-size: 1.35rem; color: var(--tinta); }
 .painel__iva { font-size: .82rem; color: var(--tinta-3); margin-top: .35rem; }
 .painel__acoes { display: grid; gap: .55rem; margin-top: 1.1rem; }
@@ -674,6 +690,7 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 .painel__aviso--vendido { background: var(--fundo); color: var(--tinta); }
 .painel__aviso--vendido a { color: var(--azul); text-decoration: underline; }
 .painel__aviso--reservado { background: var(--ambar-tenue); color: var(--ambar); }
+.painel__aviso--brevemente { background: var(--azul-tenue); color: var(--azul); }
 
 /* folha de especificações */
 /* Duas colunas de linhas, e não uma grelha de cartões: quinze caixas com
@@ -1143,7 +1160,12 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
   padding: .25rem .55rem; border-radius: 999px;
   background: var(--fundo); color: var(--tinta-2);
 }
-.vit-selo--reservado { background: var(--ambar-tenue); color: var(--ambar); }
+/* A mesma regra do `.selo`: disponibilidade cheia, característica lavada. Aqui
+   é ainda mais preciso, porque a garantia — que é uma característica — usa o
+   mesmo azul-lavado que o «Brevemente» usava, e as duas apareciam encostadas. */
+.vit-selo--brevemente { background: var(--azul); color: #fff; }
+.vit-selo--reservado { background: var(--ambar); color: #fff; }
+.vit-selo--vendido { background: var(--tinta-2); color: #fff; }
 .vit-selo--eletrico { background: var(--verde-tenue); color: var(--verde); }
 .vit-selo--garantia { background: var(--azul-tenue); color: var(--azul); }
 

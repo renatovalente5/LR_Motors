@@ -5,8 +5,7 @@
   "tipo": "carro",
   "carrocaria": "SUV ",
   "publicado": true,
-  "reservado": false,
-  "estado": "disponivel",
+  "estado": "brevemente",
   "fotos": [
     "assets/veiculos/IMG_8403.jpeg"
   ],
@@ -21,7 +20,7 @@
   "lugares": 5,
   "portas": 5,
   "origem": "Importado",
-  "garantia": "18 meses - BREVEMENTE ",
+  "garantia": "18 meses",
   "descricao": "BREVEMENTE! \nAPROVEITE! ",
   "destaque": true,
   "ordem": 2,

@@ -43,6 +43,11 @@ content:
     path: data/viaturas
     filename: '{fields.slug}.json'
     format: json
+    # As vendidas vivem em data/viaturas/vendidas/, que é uma subpasta desta.
+    # Sem isto apareciam aqui dentro também, e a pasta separada não servia de
+    # nada. É SUBPASTA e não pasta irmã porque o Pages CMS só deixa renomear um
+    # ficheiro para dentro do caminho da própria colecção.
+    subfolders: false
     view:
       # O `slug` na tabela é a referência da viatura: é o que está no endereço
       # da página e o nome do próprio ficheiro, portanto é por ele que se
@@ -52,10 +57,16 @@ content:
       # Captur e dois Peugeot em stock, e sem a versão são indistinguíveis.
       # O título de cada linha é o MODELO, que é o que distingue de relance —
       # com a marca a repetir-se, «Renault» três vezes não orienta ninguém.
-      fields: [modelo, marca, versao, preco, reservado, estado, publicado, slug]
+      fields: [modelo, marca, versao, preco, estado, publicado, slug]
       primary: modelo
       sort: [ordem, preco, ano]
-    fields:
+    # `&campos` / `*campos` é uma âncora de YAML: a lista é escrita UMA vez e a
+    # pasta das Vendidas, mais abaixo, reutiliza-a. Não é para poupar linhas — é
+    # porque o Pages CMS APAGA do ficheiro qualquer campo que a colecção não
+    # declare. Duas listas escritas à mão divergiriam ao primeiro campo novo, e
+    # gravar uma vendida deitava fora o que a outra lista tivesse a mais.
+    # (Confirmado que o parser deles, o pacote `yaml`, resolve âncoras.)
+    fields: &campos
       # ORDEM DOS CAMPOS. O Pages CMS mostra-os por esta ordem, e é a ordem por
       # que se pensa num carro: o que é, quanto custa, as fotos, a ficha, o que
       # a lei obriga, os textos, e só no fim as opções de publicação. O `slug`
@@ -115,35 +126,31 @@ content:
           Desligue para tirar a viatura do site sem perder o anúncio — fica aqui
           guardada e volta a aparecer quando ligar outra vez. Diferente de
           "Vendido": essa continua a aparecer na secção das já vendidas.
-      # A RESERVA É UM INTERRUPTOR, não uma opção da lista do estado. É a
-      # alteração mais frequente do dia-a-dia do stand — um carro reserva-se e
-      # desreserva-se várias vezes até se vender — e estava a dar quatro passos:
-      # abrir a lista, procurar, escolher, gravar. Agora é um toque.
+      # UMA LISTA SÓ, e não um interruptor mais uma lista. A reserva já foi um
+      # interruptor à parte do estado, o que permitia dizer que um carro estava
+      # reservado E vendido ao mesmo tempo — havia uma regra escrita no gerador
+      # a decidir qual mandava. Com quatro valores numa lista, a contradição
+      # deixou de se poder exprimir.
       #
-      # O modelo aguenta: «vendido» é um fim de linha, «reservado» é uma marca
-      # num carro que ainda está à venda. Se por acaso ficarem os dois ligados,
-      # vendido manda — está escrito no gerador.
-      - name: reservado
-        label: Reservada
-        type: boolean
-        default: false
-        description: >-
-          Continua no site e ganha a etiqueta "Reservado". Use enquanto o
-          negócio não fecha; quando fechar, ponha o estado em "Vendido".
-      # Atenção às etiquetas com vírgulas: na forma `{ name: x, label: y }` uma
-      # vírgula dentro da etiqueta termina o texto e o cliente passa a ler a
-      # etiqueta cortada a meio, sem erro nenhum. Daí as aspas.
+      # Custa um toque a mais para reservar do que custava o interruptor. Vale:
+      # são estados que se excluem, e é assim que o cliente pensa neles.
       - name: estado
         label: Estado
         type: select
         default: disponivel
         description: >-
-          "Vendido" tira a viatura da listagem — não a apague, que o histórico
-          serve de montra. Para reservar use o interruptor acima.
+          À venda é o normal. Reservado e Brevemente ficam na lista, com uma
+          etiqueta por cima da fotografia. Vendido tira a viatura da lista de
+          quem anda à procura e passa-a para "Já vendidas", no fundo da página,
+          sem preço e sem a descrição. O ficheiro muda-se sozinho para a pasta
+          "Vendidas" aqui do lado na publicação a seguir — não o apague, que o
+          histórico serve de montra.
         options:
           values:
             - { name: disponivel, label: 'À venda' }
-            - { name: vendido, label: 'Vendido (sai da listagem)' }
+            - { name: reservado, label: 'Reservado (fica no site, com etiqueta)' }
+            - { name: brevemente, label: 'Brevemente (ainda não chegou ao stand)' }
+            - { name: vendido, label: 'Vendido (passa para a pasta Vendidas)' }
       # ─────────── fotografias
       - name: fotos
         label: Fotografias
@@ -322,6 +329,29 @@ content:
           Exemplo: bmw-serie-3-320d. DEPOIS DE PUBLICADO, NÃO MUDE — quem tiver
           o link guardado ou partilhado deixa de o conseguir abrir.
         pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
+
+  # --------------------------------------------------------------- vendidas
+  # As viaturas vendidas, fora do caminho de quem trata do stock do dia-a-dia.
+  # NÃO se põe aqui uma viatura à mão: põe-se o Estado em "Vendido" na pasta das
+  # Viaturas, e a publicação move o ficheiro para cá. Mover é feito pela Action
+  # porque o Pages CMS não deixa arrastar ficheiros entre pastas.
+  #
+  # Os campos são os MESMOS da outra pasta, pela âncora acima. O preço e a
+  # descrição continuam declarados e continuam no formulário, mesmo já não
+  # aparecendo no site: se fossem retirados daqui, a primeira gravação de uma
+  # vendida apagava-os do ficheiro, e desfazer uma venda por engano deixava a
+  # viatura sem preço para sempre.
+  - name: vendidas
+    label: Vendidas
+    type: collection
+    path: data/viaturas/vendidas
+    filename: '{fields.slug}.json'
+    format: json
+    view:
+      fields: [modelo, marca, versao, ano, slug]
+      primary: modelo
+      sort: [ordem, ano]
+    fields: *campos
 
   # ------------------------------------------------------------- definições
   - name: definicoes

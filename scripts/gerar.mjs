@@ -29,6 +29,12 @@ const def = JSON.parse(readFileSync(join(RAIZ, 'data/definicoes.json'), 'utf8'))
    trata — cada anúncio é uma entrada própria, cria-se e apaga-se sozinha, e dois
    anúncios editados ao mesmo tempo não colidem no mesmo ficheiro. */
 const PASTA_VIATURAS = join(RAIZ, 'data/viaturas');
+/* E as vendidas numa subpasta, para não estarem no caminho de quem trata do
+   stock. Quem as move para lá é a publicação (.github/workflows/publicar.yml),
+   a olhar para o campo `estado` — o backoffice não deixa arrastar ficheiros
+   entre pastas. Aqui lêem-se as duas na mesma, porque para o site uma vendida
+   continua a ser uma viatura: aparece na página, na lista e no mapa do site. */
+const PASTA_VENDIDAS = join(PASTA_VIATURAS, 'vendidas');
 /* Espaços a mais fora, à entrada e num sítio só.
    ---------------------------------------------------------------------------
    O cliente escreve estes campos à mão, ou cola-os do Standvirtual, e vêm com
@@ -60,9 +66,33 @@ function limparCampos(v) {
   return limpo;
 }
 
-const todas = (existsSync(PASTA_VIATURAS) ? readdirSync(PASTA_VIATURAS) : [])
-  .filter((f) => f.endsWith('.json'))
-  .map((f) => limparCampos(JSON.parse(readFileSync(join(PASTA_VIATURAS, f), 'utf8'))))
+const lerPasta = (pasta) =>
+  (existsSync(pasta) ? readdirSync(pasta) : [])
+    .filter((f) => f.endsWith('.json'))
+    .map((f) => ({ ficheiro: join(pasta, f), v: limparCampos(JSON.parse(readFileSync(join(pasta, f), 'utf8'))) }));
+
+const ficheiros = [...lerPasta(PASTA_VIATURAS), ...lerPasta(PASTA_VENDIDAS)];
+
+/* Duas pastas, um só site: dois ficheiros com o mesmo `slug` escreviam a mesma
+   página um por cima do outro e ganhava o último a ser gerado, em silêncio. É
+   o que aconteceria se a mudança de pasta falhasse a meio — o ficheiro copiado
+   e o original ainda lá — ou se alguém criasse a viatura à mão nas Vendidas.
+   Mata-se a construção: publicar meia venda é pior do que não publicar. */
+const porSlug = new Map();
+for (const { ficheiro, v } of ficheiros) {
+  const anterior = porSlug.get(v.slug);
+  if (anterior) {
+    console.error(`\nERRO: duas viaturas com o mesmo endereço "${v.slug}":`);
+    console.error(`  ${relative(RAIZ, anterior)}`);
+    console.error(`  ${relative(RAIZ, ficheiro)}`);
+    console.error('Apague uma delas — provavelmente a que está fora da pasta certa.\n');
+    process.exit(1);
+  }
+  porSlug.set(v.slug, ficheiro);
+}
+
+const todas = ficheiros
+  .map(({ v }) => v)
   .sort((a, b) => (a.ordem ?? 999) - (b.ordem ?? 999));
 
 /* O site vive em renatovalente5.github.io/LR_Motors/ enquanto não houver
@@ -98,22 +128,15 @@ const nEuro = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' €';
 const temPreco = (v) => typeof v.preco === 'number' && v.preco > 0;
 const precoTexto = (v) => temPreco(v) ? nEuro(v.preco) : 'Sob consulta';
 
-/* O preço de uma viatura vendida é riscado.
+/* No lugar do preço, numa viatura vendida, vai a palavra «Vendida».
    ---------------------------------------------------------------------------
-   Uma vendida que fique na página é montra: mostra o que o stand vende e a que
-   preços. Mas o preço não pode continuar a ler-se como uma proposta — quem
-   chega tem de perceber num relance que aquilo já não está para venda.
-
-   `<s>` e não `<del>`: o `<del>` quer dizer «isto foi apagado do documento», e
-   o `<s>` quer dizer «isto já não é verdade», que é exactamente o caso.
-
-   O risco NÃO é a única coisa a dizê-lo — quem usa um leitor de ecrã pode não
-   o ouvir. A etiqueta «Vendido» está no cartão e na ficha, em texto, e é ela
-   que carrega a informação; o risco é para quem vê.
-
-   Sem preço não se risca nada: riscar «Sob consulta» não quer dizer nada. */
-const precoHTML = (v) => temPreco(v) && v.estado === 'vendido'
-  ? `<s>${esc(nEuro(v.preco))}</s>`
+   O preço esteve riscado — foi o que o cliente pediu primeiro — e agora sai por
+   completo: uma vendida deixa de anunciar valor nenhum. O lugar não pode ficar
+   vazio, que num cartão de listagem abria um buraco entre a ficha e o «Ver».
+   Vai a palavra, em tom secundário, para não competir com os preços a sério
+   dos carros que ainda estão à venda. */
+const precoHTML = (v) => estaVendida(v)
+  ? '<span class="cartao__preco--saiu">Vendida</span>'
   : esc(precoTexto(v));
 const nKm = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' km';
 
@@ -142,8 +165,42 @@ function textoRico(bruto) {
   }</p>`).join('');
 }
 
+/* OS QUATRO ESTADOS DE UMA VIATURA, num sítio só.
+   ---------------------------------------------------------------------------
+   A reserva já foi um interruptor à parte do estado, e isso permitia estados
+   impossíveis: um carro reservado E vendido ao mesmo tempo. Havia uma regra
+   escrita a dizer qual mandava. Agora são quatro valores de UMA lista, e a
+   contradição deixou de se poder exprimir.
+
+   `brevemente` é uma viatura que ainda não chegou: aparece na listagem, com
+   etiqueta, mas não se anuncia como disponível — ao Google vai `PreOrder`, que
+   é o que schema.org tem para isto. */
+const ESTADOS = {
+  disponivel: { rotulo: 'À venda', schema: 'InStock' },
+  reservado: { rotulo: 'Reservado', schema: 'LimitedAvailability' },
+  brevemente: { rotulo: 'Brevemente', schema: 'PreOrder' },
+  vendido: { rotulo: 'Vendido', schema: 'SoldOut' },
+};
+/* Um estado que não esteja na lista conta como à venda: é o que menos estraga
+   se alguém escrever à mão no ficheiro uma palavra que o backoffice não oferece. */
+/* Um estado que o site não conhece vale «à venda» — é o que menos estraga: a
+   viatura aparece na listagem como qualquer outra em vez de desaparecer. Mas
+   passa a avisar. O backoffice só deixa escolher da lista, por isso isto só
+   acontece se alguém editar o JSON à mão ou se um estado for renomeado aqui e
+   os dados ficarem para trás; nesse caso o site continuaria a publicar como
+   disponível uma viatura vendida, e ninguém dava por ela. */
+const estadoDe = (v) => (ESTADOS[v.estado] ? v.estado : 'disponivel');
+for (const v of todas) {
+  if (v.estado != null && v.estado !== '' && !ESTADOS[v.estado]) {
+    console.warn(`  !! "${v.marca} ${v.modelo}" tem estado "${v.estado}", que não existe — fica à venda`);
+  }
+}
+const estaVendida = (v) => estadoDe(v) === 'vendido';
+const estaReservada = (v) => estadoDe(v) === 'reservado';
+const eBrevemente = (v) => estadoDe(v) === 'brevemente';
+
 const publicadas = todas.filter((v) => v.publicado !== false);
-const aVenda = publicadas.filter((v) => v.estado !== 'vendido');
+const aVenda = publicadas.filter((v) => !estaVendida(v));
 
 /* Os tipos que existem mesmo em stock, para o rodapé não oferecer categorias
    vazias. O rótulo é o plural por que se lhes chama na navegação. */
@@ -151,11 +208,6 @@ const aVenda = publicadas.filter((v) => v.estado !== 'vendido');
    marcação. Sai das definições e aparece nos três sítios onde alguém pensa
    «isso é longe»: a secção de visitar, a página de contactos e a ficha da
    viatura, ao pé dos botões. Vazio, não aparece em lado nenhum. */
-/* A reserva é um interruptor no backoffice e o «vendido» é um estado. Se por
-   acaso ficarem os dois ligados, vendido manda: um carro vendido não é um carro
-   reservado, e mostrar «Reservado» num carro que já saiu seria mentira. Uma só
-   função para todo o site, senão a regra divergia entre a listagem e a ficha. */
-const estaReservada = (v) => Boolean(v.reservado) && v.estado !== 'vendido';
 
 const avisoVisita = (def.textos.aviso_visita || '').trim();
 /* O texto aceita **negrito**, e é a única forma honesta de o cliente realçar o
@@ -171,7 +223,7 @@ const ROTULO_TIPO = { carro: 'Carros', mota: 'Motos', 'off-road': 'Off-road' };
 const tiposEmStock = [...new Set(aVenda.map((v) => v.tipo).filter(Boolean))]
   .map((t) => ({ valor: t, rotulo: ROTULO_TIPO[t] || t }))
   .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt'));
-const vendidas = publicadas.filter((v) => v.estado === 'vendido');
+const vendidas = publicadas.filter((v) => estaVendida(v));
 
 const titulo = (v) => [v.marca, v.modelo].filter(Boolean).join(' ');
 const tituloLongo = (v) => [v.marca, v.modelo, v.versao].filter(Boolean).join(' ');
@@ -721,8 +773,13 @@ function cartao(v, { prioridade = false } = {}) {
     : '<div style="display:grid;place-items:center;height:100%;color:var(--tinta-3)">Sem foto</div>';
 
   const selos = [];
-  if (estaReservada(v)) selos.push('<span class="selo selo--reservado">Reservado</span>');
-  if (v.estado === 'vendido') selos.push('<span class="selo selo--vendido">Vendido</span>');
+  /* Uma etiqueta de estado, nunca duas: os quatro estados excluem-se. «À venda»
+     não leva etiqueta nenhuma — é o normal, e uma etiqueta em todos os cartões
+     não distingue nada. */
+  const est = estadoDe(v);
+  if (est !== 'disponivel') {
+    selos.push(`<span class="selo selo--${est}">${ESTADOS[est].rotulo}</span>`);
+  }
   /* Sem etiqueta «Destaque». O campo continua a existir e é ele que escolhe as
      viaturas do carrossel lá em cima — mas dizer no cartão que a viatura é um
      destaque não informa quem compra de nada, e ficava a competir com as
@@ -819,7 +876,10 @@ function vitrine(lista) {
       : (/garantia/i.test(g) ? g : `Garantia ${g}`);
 
     const selos = [];
-    if (estaReservada(v)) selos.push('<span class="vit-selo vit-selo--reservado">Reservado</span>');
+    const est = estadoDe(v);
+    if (est !== 'disponivel') {
+      selos.push(`<span class="vit-selo vit-selo--${est}">${ESTADOS[est].rotulo}</span>`);
+    }
     if (/el[éeê]ctric|el[éeê]tric/i.test(v.combustivel || '')) selos.push('<span class="vit-selo vit-selo--eletrico">100% elétrico</span>');
     if (garantia) selos.push(`<span class="vit-selo vit-selo--garantia">${esc(garantia)}</span>`);
 
@@ -1221,9 +1281,7 @@ function paginaViaturas() {
 function paginaViatura(v) {
   const fs_ = fotos(v);
   const nome = tituloLongo(v);
-  const disp = v.estado === 'vendido' ? 'https://schema.org/SoldOut'
-    : estaReservada(v) ? 'https://schema.org/LimitedAvailability'
-    : 'https://schema.org/InStock';
+  const disp = `https://schema.org/${ESTADOS[estadoDe(v)].schema}`;
 
   /* Mês e ano na mesma linha, como se lê num livrete: 03 / 2025.
      ---------------------------------------------------------------------------
@@ -1305,10 +1363,13 @@ function paginaViatura(v) {
   const equipamento = (Array.isArray(v.equipamento) ? v.equipamento : [])
     .map((x) => String(x ?? '').trim()).filter(Boolean);
 
-  const aviso = v.estado === 'vendido'
-    ? `<p class="painel__aviso painel__aviso--vendido">Esta viatura já foi vendida. Veja o <a href="${u('viaturas/')}">stock actual</a> ou diga-nos o que procura.</p>`
-    : estaReservada(v)
-    ? `<p class="painel__aviso painel__aviso--reservado">Viatura reservada. Fale connosco para saber se volta a ficar disponível.</p>` : '';
+  const AVISOS = {
+    vendido: `Esta viatura já foi vendida. Veja o <a href="${u('viaturas/')}">stock actual</a> ou diga-nos o que procura.`,
+    reservado: 'Viatura reservada. Fale connosco para saber se volta a ficar disponível.',
+    brevemente: 'Esta viatura chega em breve. Fale connosco para a reservar antes de entrar no stand.',
+  };
+  const aviso = AVISOS[estadoDe(v)]
+    ? `<p class="painel__aviso painel__aviso--${estadoDe(v)}">${AVISOS[estadoDe(v)]}</p>` : '';
 
   /* Etiquetas do cabeçalho — as mesmas do carrossel da inicial, para a viatura
      se ler igual onde quer que apareça. */
@@ -1316,8 +1377,9 @@ function paginaViatura(v) {
   const garantiaTxt = !g ? '' : /^\d+$/.test(g) ? `Garantia ${g} meses`
     : (/garantia/i.test(g) ? g : `Garantia ${g}`);
   const selosFicha = [];
-  if (estaReservada(v)) selosFicha.push('<span class="vit-selo vit-selo--reservado">Reservado</span>');
-  if (v.estado === 'vendido') selosFicha.push('<span class="vit-selo vit-selo--reservado">Vendido</span>');
+  if (estadoDe(v) !== 'disponivel') {
+    selosFicha.push(`<span class="vit-selo vit-selo--${estadoDe(v)}">${ESTADOS[estadoDe(v)].rotulo}</span>`);
+  }
   if (/el[\u00e9e\u00ea]ctric|el[\u00e9e\u00ea]tric/i.test(v.combustivel || '')) selosFicha.push('<span class="vit-selo vit-selo--eletrico">100% elétrico</span>');
   if (garantiaTxt) selosFicha.push(`<span class="vit-selo vit-selo--garantia">${esc(garantiaTxt)}</span>`);
 
@@ -1343,17 +1405,20 @@ function paginaViatura(v) {
       <div class="ficha__galeria">${galeria}</div>
 
       <aside class="ficha__lado">
-        <div class="painel${v.estado === 'vendido' ? ' painel--vendido' : ''}">
-          <p class="painel__preco${temPreco(v) ? '' : ' painel__preco--consulta'}">${precoHTML(v)}</p>
-          <!-- «Preço final, com todos os impostos incluídos» num carro já
-               vendido lê-se como uma proposta que não existe. Diz-se o que a
-               linha é: o preço a que aquele carro saiu. -->
-          <p class="painel__iva">${
-            v.estado === 'vendido'
-              ? (temPreco(v) ? 'Preço a que esta viatura foi vendida.'
-                             : 'Esta viatura já foi vendida.')
-            : temPreco(v) ? 'Preço final, com todos os impostos incluídos.'
-            : 'Contacte-nos para saber o preço e as condições desta viatura.'}</p>
+        <!-- Numa viatura VENDIDA não vai preço nenhum, por decisão do cliente:
+             a página fica como montra do que o stand vendeu, não como proposta.
+             O lugar do preço passa a dizer o estado, senão ficava um vazio no
+             topo do painel com os botões pendurados por baixo. -->
+        <div class="painel${estaVendida(v) ? ' painel--vendido' : ''}">
+          ${estaVendida(v)
+            ? `<p class="painel__preco painel__preco--vendido">Vendida</p>
+          <p class="painel__iva">Esta viatura já não está à venda.</p>`
+            : `<p class="painel__preco${temPreco(v) ? '' : ' painel__preco--consulta'}">${esc(precoTexto(v))}</p>
+          <p class="painel__iva">${temPreco(v)
+            ? (eBrevemente(v)
+                ? 'Preço final, com todos os impostos incluídos. Ainda não chegou ao stand.'
+                : 'Preço final, com todos os impostos incluídos.')
+            : 'Contacte-nos para saber o preço e as condições desta viatura.'}</p>`}
           ${aviso}
           ${notaVisita('nota-visita--painel')}
           <div class="painel__acoes">
@@ -1413,7 +1478,10 @@ function paginaViatura(v) {
           </ul>
         </div>` : ''}
 
-        ${textoRico(v.descricao) ? `<div class="bloco">
+        <!-- A descrição também sai das vendidas: é texto de venda de uma
+             viatura que já saiu. Fica a ficha técnica e o equipamento, que são
+             o registo do que o carro era — e é isso que faz a montra valer. -->
+        ${!estaVendida(v) && textoRico(v.descricao) ? `<div class="bloco">
           <h2>Descrição</h2>
           ${textoRico(v.descricao)}
         </div>` : ''}
@@ -1457,8 +1525,19 @@ function paginaViatura(v) {
 
   return pagina({
     pag: 'viaturas/' + v.slug + '/',
-    titulo: `${nome}${v.ano ? ' de ' + v.ano : ''} — ${precoTexto(v)} | LR Motors Vila Verde`,
-    descricao: `${nome} usado à venda na LR Motors, Vila Verde (Braga). ${[v.ano, v.km != null ? nKm(v.km) : null, v.combustivel, v.caixa].filter(Boolean).join(' · ')}. ${precoTexto(v)}, com garantia.`,
+    /* O título e a descrição de uma vendida não levam preço nem «à venda».
+       Não é só coerência com o painel: isto é o que o Google mostra na lista
+       de resultados, e uma pessoa que procura «BMW i4 usado» clicava num
+       anúncio com preço para chegar a uma viatura que já não existe. Fica a
+       dizer o que é — parte do histórico do stand — para quem clicar saber ao
+       que vai. O ano e os quilómetros ficam: são o que dá jeito a quem anda a
+       comparar preços praticados. */
+    titulo: estaVendida(v)
+      ? `${nome}${v.ano ? ' de ' + v.ano : ''} — vendido | LR Motors Vila Verde`
+      : `${nome}${v.ano ? ' de ' + v.ano : ''} — ${precoTexto(v)} | LR Motors Vila Verde`,
+    descricao: estaVendida(v)
+      ? `${nome} vendido pela LR Motors, em Vila Verde (Braga). ${[v.ano, v.km != null ? nKm(v.km) : null, v.combustivel, v.caixa].filter(Boolean).join(' · ')}. Veja as viaturas que temos agora em stock.`
+      : `${nome} usado à venda na LR Motors, Vila Verde (Braga). ${[v.ano, v.km != null ? nKm(v.km) : null, v.combustivel, v.caixa].filter(Boolean).join(' · ')}. ${precoTexto(v)}, com garantia.`,
     /* O cartão de partilha é o `og.jpg` que o script das imagens deixa na pasta
        da viatura, e não a fotografia em WebP que o site mostra: o WhatsApp não
        mostra WebP nas pré-visualizações de link, e este stand partilha os

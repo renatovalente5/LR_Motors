@@ -6,7 +6,6 @@
   "carrocaria": "Sedan",
   "preco": 42000,
   "publicado": true,
-  "reservado": false,
   "estado": "vendido",
   "fotos": [
     "assets/veiculos/bmw-i4-edrive40-pack-desportivo-m-pro/01-1600.webp",

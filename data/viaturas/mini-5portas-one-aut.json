@@ -4,8 +4,7 @@
   "versao": "One",
   "tipo": "carro",
   "publicado": true,
-  "reservado": false,
-  "estado": "disponivel",
+  "estado": "brevemente",
   "fotos": [
     "assets/veiculos/IMG_8402.jpeg"
   ],
@@ -20,7 +19,7 @@
   "lugares": 5,
   "portas": 5,
   "origem": "Importado",
-  "garantia": "18 meses - BREVEMENTE ",
+  "garantia": "18 meses",
   "descricao": "Brevemente! Aproveite! \n\n",
   "destaque": true,
   "ordem": 1,

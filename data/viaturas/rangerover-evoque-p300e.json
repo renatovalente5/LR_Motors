@@ -6,7 +6,6 @@
   "carrocaria": "SUV ",
   "preco": 37500,
   "publicado": true,
-  "reservado": false,
   "estado": "disponivel",
   "fotos": [
     "assets/veiculos/evoque/IMG_7959.jpg",

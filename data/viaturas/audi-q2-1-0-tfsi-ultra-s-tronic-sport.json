@@ -6,7 +6,6 @@
   "carrocaria": "SUV",
   "preco": 20499,
   "publicado": true,
-  "reservado": false,
   "estado": "disponivel",
   "fotos": [
     "assets/veiculos/audi-q2-1-0-tfsi-ultra-s-tronic-sport/01-1600.webp",

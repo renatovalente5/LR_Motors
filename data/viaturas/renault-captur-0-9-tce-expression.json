@@ -6,8 +6,7 @@
   "carrocaria": "SUV",
   "preco": 11750,
   "publicado": true,
-  "reservado": false,
-  "estado": "disponivel",
+  "estado": "reservado",
   "fotos": [
     "assets/veiculos/renault-captur-0-9-tce-expression/01-1600.webp",
     "assets/veiculos/renault-captur-0-9-tce-expression/02-1600.webp",
@@ -44,7 +43,7 @@
   "portas": 5,
   "origem": "Nacional",
   "registos_anteriores": 1,
-  "garantia": "18 meses - RESERVADO",
+  "garantia": "18 meses",
   "equipamento": [
     "AC automático",
     "Cruise Control",

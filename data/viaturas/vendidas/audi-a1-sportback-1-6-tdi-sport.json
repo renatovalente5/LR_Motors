@@ -6,7 +6,6 @@
   "carrocaria": "Citadino",
   "preco": 11750,
   "publicado": true,
-  "reservado": false,
   "estado": "vendido",
   "fotos": [
     "assets/veiculos/audi-a1-sportback-1-6-tdi-sport/01-1600.webp",
@@ -37,7 +36,7 @@
   "cilindrada": 1598,
   "cor": "Branco",
   "portas": 5,
-  "garantia": "RESERVADO",
+  "garantia": "",
   "equipamento": [
     "AC manual",
     "Cruise Control",

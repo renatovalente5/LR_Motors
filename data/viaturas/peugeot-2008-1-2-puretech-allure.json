@@ -6,7 +6,6 @@
   "carrocaria": "SUV",
   "preco": 18990,
   "publicado": true,
-  "reservado": false,
   "estado": "disponivel",
   "fotos": [
     "assets/veiculos/2008/IMG_5368.jpg",

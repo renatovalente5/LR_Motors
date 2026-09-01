@@ -6,7 +6,6 @@
   "carrocaria": "Carrinha",
   "preco": 43499,
   "publicado": true,
-  "reservado": false,
   "estado": "disponivel",
   "fotos": [
     "assets/veiculos/mercedes300defrisos/IMG_8008.jpg",

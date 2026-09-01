@@ -6,7 +6,6 @@
   "carrocaria": "Citadino",
   "preco": 13500,
   "publicado": true,
-  "reservado": false,
   "estado": "disponivel",
   "fotos": [
     "assets/veiculos/opel-corsa-1-2-edition/01-1600.webp",

@@ -6,7 +6,6 @@
   "carrocaria": "SUV",
   "preco": 18749,
   "publicado": true,
-  "reservado": false,
   "estado": "disponivel",
   "fotos": [
     "assets/veiculos/renault-captur-blue-dci-115-edc-business-edition/01-1600.webp",
