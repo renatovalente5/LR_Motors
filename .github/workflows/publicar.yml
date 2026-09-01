@@ -51,31 +51,11 @@ jobs:
 
       # As viaturas marcadas como vendidas mudam-se para data/viaturas/vendidas/,
       # e as que deixarem de estar vendidas voltam para trás. Corre ANTES de
-      # gerar, para o site já sair com os ficheiros do lado certo.
-      #
-      # O `[skip ci]` na mensagem é obrigatório: sem ele, esta gravação disparava
-      # outra publicação, que arrumaria nada e gravaria nada — mas só se descobre
-      # isso depois de a correr. Com muitas vendas seguidas dava uma publicação a
-      # mais por cada uma.
-      #
-      # E se a gravação falhar, AVISA e segue. Falha quando o cliente grava outra
-      # viatura enquanto isto corre: o `main` mexeu-se e o push é recusado. Nesse
-      # caso o site publicado já está certo — os ficheiros foram movidos aqui — e
-      # o que fica por fazer é a arrumação no repositório, que a próxima
-      # publicação repete. Deitar a publicação abaixo por causa disso seria
-      # trocar um site no ar por uma pasta arrumada.
+      # gerar, para o site já sair com os ficheiros do lado certo. Aqui só se
+      # movem: quem grava é o passo «Guardar…», mais abaixo, para ir tudo num
+      # commit só com as fotografias preparadas.
       - name: Arrumar as viaturas vendidas
-        run: |
-          node scripts/arrumar-vendidas.mjs
-          if [ -z "$(git status --porcelain data/viaturas)" ]; then
-            echo "nada mudou de pasta"; exit 0
-          fi
-          git config user.name  'github-actions[bot]'
-          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
-          git add -A data/viaturas
-          git commit -m 'Arrumar as viaturas vendidas na pasta das Vendidas [skip ci]'
-          git pull --rebase --quiet origin main || true
-          git push origin HEAD:main || echo "AVISO: não deu para gravar a arrumação; o site vai na mesma e a próxima publicação repete"
+        run: node scripts/arrumar-vendidas.mjs
 
       - uses: actions/setup-python@v5
         with:
@@ -89,6 +69,42 @@ jobs:
       # site serve. Os originais nunca chegam ao visitante.
       - name: Preparar as fotografias
         run: python3 scripts/otimizar-imagens.py --varrer
+
+      # GRAVA O QUE ESTA PUBLICAÇÃO PRODUZIU: as viaturas que mudaram de pasta e
+      # as variantes das fotografias.
+      #
+      # As variantes eram o problema maior e não se via: o script é incremental,
+      # mas o que ele gerava ficava só na máquina da Action e ia fora no fim. Na
+      # publicação de 1/9/2026 isso deu «variantes novas: 241 · já existentes:
+      # 25» e 197 dos 240 segundos da publicação inteira — a repetir-se em cada
+      # gravação do cliente, e a piorar a cada fotografia que ele carregasse.
+      # Guardadas, cada fotografia é preparada UMA vez e a publicação volta a
+      # demorar menos de um minuto. Isso não é só gastar menos: o cliente gravou,
+      # foi ver o site, ainda lá estava o antigo, e concluiu que o site estava
+      # avariado — o que aconteceu mesmo, a 1/9.
+      #
+      # `[skip ci]` porque um push com o GITHUB_TOKEN não dispara workflows de
+      # qualquer maneira; fica escrito para quem ler o histórico perceber que a
+      # gravação não é para publicar nada.
+      #
+      # Se a gravação falhar, AVISA e segue. Falha quando o cliente grava outra
+      # viatura enquanto isto corre: o `main` mexeu-se e o push é recusado. Nesse
+      # caso o site que vai para o ar já está certo — os ficheiros foram movidos
+      # e as fotografias preparadas aqui — e o que fica por gravar repete-se na
+      # publicação seguinte. Deitar a publicação abaixo por causa disso seria
+      # trocar um site no ar por um repositório arrumado.
+      - name: Guardar as mudanças de pasta e as fotografias preparadas
+        run: |
+          if [ -z "$(git status --porcelain data/viaturas assets/veiculos)" ]; then
+            echo "nada de novo para guardar"; exit 0
+          fi
+          git config user.name  'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -A data/viaturas assets/veiculos
+          n=$(git diff --cached --numstat | wc -l | tr -d ' ')
+          git commit -m "Arrumar vendidas e guardar fotografias preparadas ($n ficheiros) [skip ci]"
+          git pull --rebase --quiet origin main || true
+          git push origin HEAD:main || echo "AVISO: não deu para gravar; o site vai na mesma e a próxima publicação repete"
 
       # O site tem domínio próprio, lrmotorsautomoveis.pt, e um domínio próprio
       # serve na RAIZ. Enquanto isto esteve em `/LR_Motors`, tudo o que o HTML

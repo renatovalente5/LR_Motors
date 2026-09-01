@@ -319,7 +319,22 @@ content:
   - name: vendidas
     label: Vendidas
     type: collection
+    description: >-
+      Histórico. As viaturas chegam aqui sozinhas quando lhes põe o Estado em
+      "Vendido" na pasta Viaturas — incluindo as que nunca chegou a anunciar:
+      crie-as em Viaturas, ponha logo o Estado em "Vendido" e elas passam para
+      cá na publicação a seguir. Para desfazer uma venda, mude aqui o Estado
+      para "À venda" e a viatura volta ao stock.
     path: data/viaturas/vendidas
+    # NÃO se criam viaturas aqui, e o botão de criar está desligado de propósito.
+    # O cliente tentou-o — «coloquei direto para a pasta vendido» — e o carro
+    # apareceu no site como disponível: uma entrada criada aqui nasce com o
+    # Estado por omissão, «À venda», e a arrumação da publicação faz o que lhe
+    # compete e manda-a para o stock. É um estado impossível de adivinhar por
+    # quem não conhece o mecanismo, por isso tira-se o caminho em vez de o
+    # explicar. Apagar continua a poder fazer-se, que os enganos acontecem.
+    operations:
+      create: false
     filename:
       template: '{fields.marca}-{fields.modelo}-{fields.versao}.json'
       field: false
