@@ -13,6 +13,15 @@ grandes nunca chegam ao site.
 
 Correr:  python3 scripts/otimizar-imagens.py
          python3 scripts/otimizar-imagens.py --so-novas    (salta o que já existe)
+
+   CORRER ISTO EM LOCAL, NUM MAC, É MÁ IDEIA. As variantes ficam com o nome que
+   o sistema de ficheiros dá ao original, e o macOS guarda os acentos em forma
+   decomposta («Co» + acento) enquanto o git desta máquina os grava precompostos
+   («Ó»). Uma fotografia chamada «Cópia de Stock.jpeg» acabou comitada DUAS
+   vezes, com as três variantes de cada — iguais no ecrã, diferentes em bytes,
+   e o CI a regenerar tudo na mesma porque não reconhecia as que lá estavam.
+   Desde 1/9/2026 a publicação guarda as variantes que gera, e corre em Linux,
+   que não normaliza nada: deixe-a fazer o trabalho.
 """
 import json
 import os

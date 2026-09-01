@@ -62,10 +62,6 @@ content:
     # ficheiro para dentro do caminho da própria colecção.
     subfolders: false
     view:
-      # O `slug` na tabela é a referência da viatura: é o que está no endereço
-      # da página e o nome do próprio ficheiro, portanto é por ele que se
-      # identifica uma viatura sem ambiguidade — há dois Renault e dois Peugeot
-      # em stock, e «marca + modelo» não chega para os distinguir de relance.
       # `versao` na lista porque «marca + modelo» não chega: há duas Renault
       # Captur e dois Peugeot em stock, e sem a versão são indistinguíveis.
       # O título de cada linha é o MODELO, que é o que distingue de relance —
@@ -91,8 +87,8 @@ content:
     fields: &campos
       # ORDEM DOS CAMPOS. O Pages CMS mostra-os por esta ordem, e é a ordem por
       # que se pensa num carro: o que é, quanto custa, as fotos, a ficha, o que
-      # a lei obriga, os textos, e só no fim as opções de publicação. O `slug`
-      # ficou para último por ser o único campo técnico do formulário.
+      # a lei obriga, os textos, e só no fim as opções de publicação. Não há
+      # aqui campo nenhum técnico: o endereço da página sai do nome do ficheiro.
 
       # ─────────── que carro é
       - name: marca
