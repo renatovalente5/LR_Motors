@@ -8,6 +8,9 @@
   "fotos": [
     "assets/veiculos/Cópia de Cópia de Stock.jpeg"
   ],
+  "ano": 2000,
+  "combustivel": "Diesel",
+  "origem": "Nacional",
   "destaque": false,
   "ordem": 50
 }
