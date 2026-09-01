@@ -347,6 +347,11 @@ content:
     path: data/viaturas/vendidas
     filename: '{fields.slug}.json'
     format: json
+    # Sem isto, o backoffice mostra aqui o botão de criar subpastas. Uma viatura
+    # arrastada para uma subpasta desaparecia do site em silêncio: o gerador e a
+    # arrumação só lêem o primeiro nível desta pasta, e ninguém dava pela falta
+    # até alguém reparar que o carro sumiu do histórico.
+    subfolders: false
     view:
       fields: [modelo, marca, versao, ano, slug]
       primary: modelo
