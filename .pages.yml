@@ -73,6 +73,15 @@ content:
       fields: [modelo, marca, versao, preco, estado, publicado, ordem]
       primary: modelo
       sort: [ordem, preco, ano]
+      # A lista abre na MESMA ordem em que as viaturas saem no site. Antes abria
+      # por modelo, em ordem alfabética, e o campo «Ordem» — que é quem manda na
+      # listagem — nem sequer se via: o cliente escolhia-a às cegas e os dados
+      # mostram o resultado, três viaturas com ordem 1 e três com ordem 2. Com a
+      # coluna à vista e a lista ordenada por ela, o backoffice passa a ser um
+      # espelho da página, e um número repetido salta aos olhos.
+      default:
+        sort: ordem
+        order: asc
     # `&campos` / `*campos` é uma âncora de YAML: a lista é escrita UMA vez e a
     # pasta das Vendidas, mais abaixo, reutiliza-a. Não é para poupar linhas — é
     # porque o Pages CMS APAGA do ficheiro qualquer campo que a colecção não
