@@ -66,10 +66,33 @@ function limparCampos(v) {
   return limpo;
 }
 
+/* O ENDEREÇO DA PÁGINA VEM DO NOME DO FICHEIRO, e não de um campo.
+   ---------------------------------------------------------------------------
+   Havia um campo `slug` que o cliente tinha de preencher à mão — «Endereço da
+   página (referência)», com um parágrafo a explicar que só podia levar
+   minúsculas e hífens e que NUNCA mais podia ser mudado. Era o campo mais
+   técnico do backoffice inteiro, num formulário para o dono de um stand, e um
+   erro nele partia o endereço de uma página já partilhada.
+
+   Agora não existe. O Pages CMS já dá nome ao ficheiro a partir da marca, do
+   modelo e da versão (passa-os pelo slugify dele), e é esse nome que manda —
+   é a identidade do ficheiro de qualquer maneira, não há duas fontes de
+   verdade que possam divergir. Os 16 ficheiros que já existiam tinham nome
+   igual ao slug, por isso nenhum endereço mexeu.
+
+   Normaliza-se, porque o nome gerado pode trazer hífens a mais: se a versão
+   estiver vazia sai «renault-captur-.json», e o endereço não tem que herdar o
+   traço solto. */
+const slugDoFicheiro = (nomeDoFicheiro) =>
+  nomeDoFicheiro.replace(/\.json$/, '').replace(/-{2,}/g, '-').replace(/^-+|-+$/g, '');
+
 const lerPasta = (pasta) =>
   (existsSync(pasta) ? readdirSync(pasta) : [])
     .filter((f) => f.endsWith('.json'))
-    .map((f) => ({ ficheiro: join(pasta, f), v: limparCampos(JSON.parse(readFileSync(join(pasta, f), 'utf8'))) }));
+    .map((f) => ({
+      ficheiro: join(pasta, f),
+      v: { ...limparCampos(JSON.parse(readFileSync(join(pasta, f), 'utf8'))), slug: slugDoFicheiro(f) },
+    }));
 
 const ficheiros = [...lerPasta(PASTA_VIATURAS), ...lerPasta(PASTA_VENDIDAS)];
 

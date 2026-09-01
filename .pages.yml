@@ -41,7 +41,20 @@ content:
     label: Viaturas
     type: collection
     path: data/viaturas
-    filename: '{fields.slug}.json'
+    # O NOME DO FICHEIRO É O ENDEREÇO DA PÁGINA, e sai sozinho do que o cliente
+    # escreve. Havia aqui um campo «Endereço da página (referência)» que ele
+    # tinha de preencher à mão, com um parágrafo a avisar que só levava
+    # minúsculas e hífens e que nunca mais podia ser mudado — o campo mais
+    # técnico do backoffice todo, num formulário para o dono de um stand.
+    #
+    # `field: false` esconde-o por completo: ele nunca vê nem decide o nome.
+    # Isto é seguro porque o Pages CMS NÃO renomeia ficheiros já criados (só
+    # gera o nome ao criar), por isso corrigir uma gralha na marca não muda o
+    # endereço de uma página já partilhada; e porque se dois carros derem o
+    # mesmo nome ele acrescenta -1, -2 em vez de escrever por cima.
+    filename:
+      template: '{fields.marca}-{fields.modelo}-{fields.versao}.json'
+      field: false
     format: json
     # As vendidas vivem em data/viaturas/vendidas/, que é uma subpasta desta.
     # Sem isto apareciam aqui dentro também, e a pasta separada não servia de
@@ -57,7 +70,7 @@ content:
       # Captur e dois Peugeot em stock, e sem a versão são indistinguíveis.
       # O título de cada linha é o MODELO, que é o que distingue de relance —
       # com a marca a repetir-se, «Renault» três vezes não orienta ninguém.
-      fields: [modelo, marca, versao, preco, estado, publicado, slug]
+      fields: [modelo, marca, versao, preco, estado, publicado]
       primary: modelo
       sort: [ordem, preco, ano]
     # `&campos` / `*campos` é uma âncora de YAML: a lista é escrita UMA vez e a
@@ -82,18 +95,15 @@ content:
         label: Modelo
         type: string
         required: true
-        description: 'Só o modelo, sem a versão. Exemplo: Captur, i4, Classe E.'
+        description: 'Só o modelo, sem a versão: Captur, i4, Classe E.'
       - name: versao
         label: Versão
         type: string
-        description: >-
-          O resto do nome, como vem no anúncio do Standvirtual.
-          Exemplo: 0.9 TCE Expression. Aparece por baixo do modelo, em cinzento.
+        description: 'O resto do nome: 0.9 TCE Expression.'
       - name: tipo
         label: Tipo de veículo
         type: select
         default: carro
-        description: Só aparecem no menu do rodapé os tipos que existirem em stock.
         # A chave de cada opção é `name`, não `value` — está assim documentado.
         # Estava `value`, o que arrisca gravar o estado errado quando o cliente
         # escolhe da lista. Nunca chegou a acontecer porque os valores dos dados
@@ -110,22 +120,16 @@ content:
 
       # ─────────── preço
       - name: preco
-        label: Preço em euros
+        label: Preço
         type: number
-        description: >-
-          Só o número, sem o símbolo do euro nem pontos. Exemplo: 18990.
-          Tem de ser o preço FINAL, com impostos — é o que a lei exige a quem
-          anuncia preços. Deixe vazio para o site mostrar "Sob consulta".
+        description: 'Só o número, sem € nem pontos: 18990. Tem de ser o preço final, com impostos. Vazio mostra "Sob consulta".'
 
       # ─────────── disponibilidade (o que mais se mexe no dia-a-dia)
       - name: publicado
         label: Publicado no site
         type: boolean
         default: true
-        description: >-
-          Desligue para tirar a viatura do site sem perder o anúncio — fica aqui
-          guardada e volta a aparecer quando ligar outra vez. Diferente de
-          "Vendido": essa continua a aparecer na secção das já vendidas.
+        description: 'Desligue para esconder a viatura sem perder o anúncio.'
       # UMA LISTA SÓ, e não um interruptor mais uma lista. A reserva já foi um
       # interruptor à parte do estado, o que permitia dizer que um carro estava
       # reservado E vendido ao mesmo tempo — havia uma regra escrita no gerador
@@ -138,13 +142,7 @@ content:
         label: Estado
         type: select
         default: disponivel
-        description: >-
-          À venda é o normal. Reservado e Brevemente ficam na lista, com uma
-          etiqueta por cima da fotografia. Vendido tira a viatura da lista de
-          quem anda à procura e passa-a para "Já vendidas", no fundo da página,
-          sem preço e sem a descrição. O ficheiro muda-se sozinho para a pasta
-          "Vendidas" aqui do lado na publicação a seguir — não o apague, que o
-          histórico serve de montra.
+        description: 'Reservado e Brevemente ficam na lista, com etiqueta na fotografia. Vendido passa a viatura para "Já vendidas" e move o ficheiro para a pasta Vendidas.'
         options:
           values:
             - { name: disponivel, label: 'À venda' }
@@ -162,30 +160,13 @@ content:
           # mais fotos que este stand teve tinha doze.
           multiple:
             max: 50
-        description: >-
-          Até 50 fotografias, e cada uma tem de ter MENOS DE 3 MB — acima disso
-          o carregamento falha com "Failed to upload file". Se isso acontecer,
-          abra lrmotorsautomoveis.pt/fotos/ no telemóvel, deixe lá as
-          fotografias e volte com as que essa página lhe der: ficam do tamanho
-          certo e sobem todas à primeira.
-          Para carregar VÁRIAS de uma vez, no ecrã de escolha carregue em
-          "Upload" e seleccione todas de uma assentada (Ctrl/Cmd no computador,
-          ou "Seleccionar" no telemóvel).
-          A PRIMEIRA é a mais importante: é a que aparece na listagem, nos
-          destaques e na pré-visualização quando o link é partilhado no WhatsApp
-          ou no Facebook. Use o carro inteiro, de três quartos à frente, sem
-          pessoas. Depois exterior, interior e mala. Arraste para reordenar.
-          IMPORTANTE: não apague fotografias na biblioteca — se estiverem numa
-          viatura, essa viatura fica com uma imagem partida no site. Para tirar
-          uma foto de um anúncio, remova-a aqui neste campo.
+        description: 'A primeira é a que aparece na listagem e nas partilhas: o carro inteiro, de três quartos, sem pessoas. Arraste para reordenar. Se alguma falhar a carregar é grande de mais — reduza-a em lrmotorsautomoveis.pt/fotos/. Não apague fotografias na biblioteca; para tirar uma do anúncio, remova-a aqui.'
 
       # ─────────── ficha técnica
       - name: ano
         label: Ano
         type: number
-        description: >-
-          O ano da primeira matrícula, como vem no livrete. Obrigatório por lei
-          na venda de usados. Na ficha aparece com o mês à frente: 03/2024.
+        description: 'Ano da primeira matrícula, como vem no livrete.'
       # O mês é campo próprio e não parte de uma data escrita à mão: escolhido
       # de uma lista não há enganos de formato. Substituiu o antigo campo «Data
       # da primeira matrícula», que guardava a mesma coisa que este mais o ano e
@@ -198,10 +179,7 @@ content:
       - name: mes
         label: Mês
         type: select
-        description: >-
-          O mês da primeira matrícula. Aparece à frente do ano na ficha técnica,
-          em letra mais pequena: 03/2024. Deixe vazio se não souber — fica só o
-          ano.
+        description: 'Mês da primeira matrícula. Vazio mostra só o ano.'
         options:
           values:
             - { name: Janeiro, label: Janeiro }
@@ -219,11 +197,10 @@ content:
       - name: km
         label: Quilómetros
         type: number
-        description: 'Só o número. Exemplo: 94000.'
+        description: 'Só o número: 94000.'
       - name: combustivel
         label: Combustível
         type: select
-        description: Escolha da lista — escrito à mão não é reconhecido pelos filtros.
         options:
           values: [Gasolina, Diesel, Elétrico, Híbrido, Híbrido Plug-in, GPL]
       - name: caixa
@@ -237,7 +214,7 @@ content:
       - name: cilindrada
         label: Cilindrada (cm³)
         type: number
-        description: Deixe vazio nos eléctricos.
+        description: 'Vazio nos eléctricos.'
       - name: cor
         label: Cor
         type: string
@@ -257,78 +234,43 @@ content:
       - name: matricula
         label: Matrícula
         type: string
-        description: >-
-          OBRIGATÓRIO POR LEI na venda de usados (Decreto-Lei 74/93).
-          Exemplo: AA-00-BB. Enquanto estiver vazio, o site não a mostra —
-          mas a informação continua a ser devida ao comprador.
+        description: 'Obrigatória por lei na venda de usados. Exemplo: AA-00-BB.'
       - name: ano_construcao
         label: Ano de construção
         type: number
-        description: >-
-          Obrigatório por lei quando é diferente do ano da matrícula — acontece
-          em carros matriculados no ano seguinte ao de fabrico.
+        description: 'Obrigatório por lei, e só quando é diferente do ano da matrícula.'
       - name: registos_anteriores
-        label: Número de proprietários anteriores
+        label: Donos anteriores
         type: number
-        description: Obrigatório por lei. Conte os donos anteriores, sem contar o stand.
+        description: 'Obrigatório por lei. Sem contar o stand.'
       - name: garantia
         label: Garantia
         type: string
-        description: >-
-          Escreva como quer que apareça no site. Exemplo: "18 meses" ou
-          "Garantia incluída". Aparece como etiqueta no cartão e na ficha.
-          Vazio mostra só a referência à garantia legal.
+        description: 'Como quer que apareça: "18 meses". Vazio mostra só a garantia legal.'
 
       # ─────────── o que traz, e o que se diz dele
       - name: equipamento
         label: Equipamento
         type: string
         list: true
-        description: >-
-          Um item por linha, curto. Exemplo: Câmara de marcha-atrás.
-          Aparece na página da viatura entre a ficha técnica e a descrição,
-          em lista de duas ou três colunas com um visto em cada item.
-          Não repita o que já está na ficha técnica (ano, quilómetros,
-          combustível, caixa, potência, cor, portas) nem o que escrever na
-          descrição — é o mesmo carro contado três vezes.
+        description: 'Um por linha, curto: Câmara de marcha-atrás. Não repita a ficha técnica.'
       - name: descricao
         label: Descrição
         type: text
-        description: >-
-          Duas ou três frases. Diga o que a ficha técnica não diz: estado,
-          histórico, o que faz esta viatura valer a pena. Se houver algum
-          defeito conhecido, é aqui que deve ficar escrito — é o que protege o
-          stand. Não precisa de repetir os extras: esses vão no campo
-          Equipamento, que aparece logo acima desta secção na página.
-          Os parágrafos e as mudanças de linha que escrever aqui aparecem no
-          site tal como os deixar. Para pôr uma frase a negrito, escreva-a
-          entre dois asteriscos de cada lado, assim: **Garantia incluída**.
+        description: 'Duas ou três frases sobre o que a ficha não diz: estado, histórico. Defeitos conhecidos escrevem-se aqui — é o que protege o stand. Para negrito, escreva **assim**.'
 
       # ─────────── onde aparece na página inicial
       - name: destaque
-        label: Mostrar em destaque na página inicial
+        label: Destaque na página inicial
         type: boolean
         default: false
-        description: >-
-          As viaturas em destaque aparecem no carrossel do topo da página
-          inicial. Quatro a seis é o número que fica bem.
+        description: 'Aparecem no carrossel do topo. Quatro a seis fica bem.'
       - name: ordem
-        label: Ordem na listagem
+        label: Ordem
         type: number
         default: 50
-        description: Número mais baixo aparece primeiro. Deixe 50 se for indiferente.
+        description: 'Número mais baixo aparece primeiro. 50 se for indiferente.'
 
-      # ─────────── técnico
-      - name: slug
-        label: Endereço da página (referência)
-        type: string
-        required: true
-        description: >-
-          É o fim do link da viatura e a referência que aparece na lista aqui do
-          backoffice. Só letras minúsculas, números e hífens.
-          Exemplo: bmw-serie-3-320d. DEPOIS DE PUBLICADO, NÃO MUDE — quem tiver
-          o link guardado ou partilhado deixa de o conseguir abrir.
-        pattern: '^[a-z0-9]+(?:-[a-z0-9]+)*$'
 
   # --------------------------------------------------------------- vendidas
   # As viaturas vendidas, fora do caminho de quem trata do stock do dia-a-dia.
@@ -345,7 +287,9 @@ content:
     label: Vendidas
     type: collection
     path: data/viaturas/vendidas
-    filename: '{fields.slug}.json'
+    filename:
+      template: '{fields.marca}-{fields.modelo}-{fields.versao}.json'
+      field: false
     format: json
     # Sem isto, o backoffice mostra aqui o botão de criar subpastas. Uma viatura
     # arrastada para uma subpasta desaparecia do site em silêncio: o gerador e a
@@ -353,7 +297,7 @@ content:
     # até alguém reparar que o carro sumiu do histórico.
     subfolders: false
     view:
-      fields: [modelo, marca, versao, ano, slug]
+      fields: [modelo, marca, versao, ano]
       primary: modelo
       sort: [ordem, ano]
     fields: *campos
