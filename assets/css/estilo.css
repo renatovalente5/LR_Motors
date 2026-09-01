@@ -1340,6 +1340,10 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 /* --------------------------------------------------------- rodapé legal -- */
 .rodape__legal { justify-content: space-between; }
 .rodape__copy { order: -1; margin: 0; }
+/* A hora da última publicação, a seguir ao copyright. Discreta de propósito: é
+   informação de confiança, não é um anúncio. Numa linha própria em telemóvel. */
+.rodape__stock { display: block; margin-top: .25rem; opacity: .75; }
+@media (min-width: 700px) { .rodape__stock { display: inline; margin-left: .6rem; } }
 .rodape__links { margin-left: auto; }
 @media (max-width: 720px) {
   .rodape__legal { flex-direction: column; align-items: flex-start; }
