@@ -3,7 +3,7 @@
   "modelo": "Range Rover ",
   "versao": "Evoque P300e SE R-Dynamic ",
   "tipo": "carro",
-  "carrocaria": "SUV ",
+  "carrocaria": "SUV",
   "preco": 37500,
   "publicado": true,
   "estado": "disponivel",
@@ -50,11 +50,11 @@
   "caixa": "Automática",
   "potencia": 309,
   "cilindrada": 1500,
-  "cor": "Preto ",
+  "cor": "Preto",
   "lugares": 5,
   "portas": 5,
   "origem": "Importado",
-  "garantia": "18 meses - Iva dedutível ",
+  "garantia": "18 meses",
   "equipamento": [
     "Teto de abrir panorâmico ",
     "Câmaras 360°",
@@ -66,5 +66,6 @@
   ],
   "descricao": "Garantia de 18 meses incluída no preço! \n\nAbsolutamente com “cheirinho a novo“!\nApenas 32000km com as revisões todas na Land Rover ( histórico online pelo chassi: SALZA2BT9LH114908 ); Carregamento rápido!   \n\nPossibilidade de financiamento e retoma!\n\nEquipamento de topo:\nTeto panorâmico de abrir \nCâmaras 360°\nCâmara no retrovisor interior \nCockpit virtual profissional\nMala automática \nKeylessGo (chave no bolso)\nEstacionamento Auto (sozinho)\nVolante desportivo C/ patilhas F1\nSistema de som \nAppleCar e Android Auto\nEcrã touch \nGPS Profissional\nBancos aquecidos\nBancos em pele + memória \nVolante C/multifunções Touch\nAssistência a travagem\nAssistência anticolisão\nÂngulo Morto\nComandos por voz\nFaróis FullLed\nEspelhos rebatíveis (auto)\nAnti encadeamento\nAr condicionado Auto_independente\nAr condicionado traseiro c/regulação\nCruise control adaptativo\nApoio de braço\nEntradas USB (frente e trás)\nVidros elétricos\nVidros escurecidos\nSensores luz\nSensores chuva\nSensores Pressão Pneus\nComputador de bordo\nTranc/portas Auto\nDifusor traseiro\nCabo de carregamento\nISOFIX\nE muito mais…\n\nPode ser visto em Braga ou Vila do Conde!\n\nEste anúncio foi publicado por rotina informática. Todos os dados carecem de confirmação junto do comercial.\n",
   "destaque": true,
-  "ordem": 1
+  "ordem": 1,
+  "iva_dedutivel": true
 }

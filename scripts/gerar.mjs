@@ -923,6 +923,7 @@ function vitrine(lista) {
     }
     if (/el[éeê]ctric|el[éeê]tric/i.test(v.combustivel || '')) selos.push('<span class="vit-selo vit-selo--eletrico">100% elétrico</span>');
     if (garantia) selos.push(`<span class="vit-selo vit-selo--garantia">${esc(garantia)}</span>`);
+    if (v.iva_dedutivel) selos.push('<span class="vit-selo vit-selo--iva">IVA dedutível</span>');
 
     const specs = [
       ['Ano', v.ano],
@@ -1434,6 +1435,14 @@ function paginaViatura(v) {
   }
   if (/el[\u00e9e\u00ea]ctric|el[\u00e9e\u00ea]tric/i.test(v.combustivel || '')) selosFicha.push('<span class="vit-selo vit-selo--eletrico">100% elétrico</span>');
   if (garantiaTxt) selosFicha.push(`<span class="vit-selo vit-selo--garantia">${esc(garantiaTxt)}</span>`);
+  /* IVA DEDUTÍVEL é um campo próprio desde que se percebeu que o cliente o
+     andava a escrever à mão no campo da GARANTIA — «18 meses - Iva dedutível»,
+     em duas viaturas. É a segunda vez que ele usa um campo de texto como
+     depósito do que falta (a primeira foi o «BREVEMENTE», no mesmo sítio), e
+     das duas vezes o que estava escrito era um pedido de funcionalidade.
+     Interessa a quem compra em nome de uma empresa, e é dos primeiros filtros
+     de quem o faz — por isso é etiqueta, e não uma linha perdida no texto. */
+  if (v.iva_dedutivel) selosFicha.push('<span class="vit-selo vit-selo--iva">IVA dedutível</span>');
 
   const corpo = `
 <section class="ficha">
@@ -1463,7 +1472,7 @@ function paginaViatura(v) {
             ? (eBrevemente(v)
                 ? 'Preço final, com todos os impostos incluídos. Ainda não chegou ao stand.'
                 : 'Preço final, com todos os impostos incluídos.')
-            : 'Contacte-nos para saber o preço e as condições desta viatura.'}</p>
+            : 'Contacte-nos para saber o preço e as condições desta viatura.'}${v.iva_dedutivel ? ' IVA dedutível para empresas.' : ''}</p>
           ${aviso}
           ${notaVisita('nota-visita--painel')}
           <div class="painel__acoes">

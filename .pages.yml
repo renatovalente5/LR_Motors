@@ -70,7 +70,7 @@ content:
       # Captur e dois Peugeot em stock, e sem a versão são indistinguíveis.
       # O título de cada linha é o MODELO, que é o que distingue de relance —
       # com a marca a repetir-se, «Renault» três vezes não orienta ninguém.
-      fields: [modelo, marca, versao, preco, estado, publicado]
+      fields: [modelo, marca, versao, preco, estado, publicado, ordem]
       primary: modelo
       sort: [ordem, preco, ano]
     # `&campos` / `*campos` é uma âncora de YAML: a lista é escrita UMA vez e a
@@ -95,11 +95,11 @@ content:
         label: Modelo
         type: string
         required: true
-        description: 'Só o modelo, sem a versão: Captur, i4, Classe E.'
+        description: 'Só o nome do modelo, sem mais nada: Captur, Corsa, i4, Classe E.'
       - name: versao
         label: Versão
         type: string
-        description: 'O resto do nome: 0.9 TCE Expression.'
+        description: 'O resto do nome — motor, acabamento, portas: 1.2 PureTech Allure.'
       - name: tipo
         label: Tipo de veículo
         type: select
@@ -113,16 +113,39 @@ content:
             - { name: carro, label: Carro }
             - { name: mota, label: Mota }
             - { name: off-road, label: 'Off-road / todo-o-terreno' }
+      # Lista e não texto livre: escrito à mão já tinha derivado — havia «SUV» e
+      # «SUV » a conviver, e um «Sedan» inglês ao lado de carroçarias em
+      # português. Ninguém via a diferença no ecrã e o filtro tratava-as como
+      # duas coisas. Os valores da lista cobrem os cinco que já existiam.
       - name: carrocaria
         label: Carroçaria
-        type: string
-        description: 'Citadino, SUV, Berlina, Carrinha, Cabrio, Coupé…'
+        type: select
+        options:
+          values:
+            - Citadino
+            - Berlina
+            - Carrinha
+            - SUV
+            - Coupé
+            - Cabrio
+            - Monovolume
+            - Comercial
 
       # ─────────── preço
       - name: preco
         label: Preço
         type: number
         description: 'Só o número, sem € nem pontos: 18990. Tem de ser o preço final, com impostos. Vazio mostra "Sob consulta".'
+
+      # Este campo nasceu dos dados: o cliente escrevia «Iva dedutível» à mão no
+      # campo da Garantia, em duas viaturas. Era a segunda vez que usava um campo
+      # de texto como depósito do que faltava — a primeira foi o «BREVEMENTE», no
+      # mesmo sítio — e das duas vezes o que lá estava era um pedido.
+      - name: iva_dedutivel
+        label: IVA dedutível
+        type: boolean
+        default: false
+        description: Ligue nas viaturas em que a empresa compradora pode deduzir o IVA. Aparece como etiqueta e ao lado do preço.
 
       # ─────────── disponibilidade (o que mais se mexe no dia-a-dia)
       - name: publicado
@@ -221,6 +244,7 @@ content:
       - name: lugares
         label: Lugares
         type: number
+        default: 5
       - name: portas
         label: Portas
         type: number

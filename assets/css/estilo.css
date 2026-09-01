@@ -1190,6 +1190,10 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
    esta etiqueta nunca chegava a ser desenhada aqui — era só a sugerir que sim. */
 .vit-selo--eletrico { background: var(--verde-tenue); color: var(--verde); }
 .vit-selo--garantia { background: var(--azul-tenue); color: var(--azul); }
+/* IVA dedutível fica em verde-lavado, o mesmo tom das características (ver a
+   regra dos selos cheios/lavados mais acima): é uma qualidade da viatura, não
+   um estado de disponibilidade, e não pode competir com o «Reservado». */
+.vit-selo--iva { background: var(--verde-tenue); color: var(--verde); }
 
 /* ---- grelha de especificações, abaixo da foto */
 /* Três colunas por duas linhas, valor em cima e etiqueta pequena por baixo. É a
