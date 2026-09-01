@@ -695,10 +695,8 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 }
 @media (max-width: 980px) { .painel { position: static; } }
 .painel__preco { font-size: 2.2rem; font-weight: 900; letter-spacing: -.035em; color: var(--azul); line-height: 1; }
-/* Nenhuma regra de «vendida» no painel: a ficha de uma vendida deixou de
-   existir. No cartão da listagem, onde estaria o preço fica a palavra, em tom
-   secundário, para não competir com os preços a sério dos carros à venda. */
-.cartao__preco--saiu { font-size: 1rem; font-weight: 800; color: var(--tinta-2); }
+/* Nada de «vendida» aqui: a ficha de uma vendida deixou de existir, e no cartão
+   o rodapé inteiro sai — quem diz que o carro saiu é a etiqueta na fotografia. */
 .painel__preco--consulta { font-size: 1.35rem; color: var(--tinta); }
 .painel__iva { font-size: .82rem; color: var(--tinta-3); margin-top: .35rem; }
 .painel__acoes { display: grid; gap: .55rem; margin-top: 1.1rem; }

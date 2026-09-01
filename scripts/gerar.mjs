@@ -128,16 +128,6 @@ const nEuro = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' €';
 const temPreco = (v) => typeof v.preco === 'number' && v.preco > 0;
 const precoTexto = (v) => temPreco(v) ? nEuro(v.preco) : 'Sob consulta';
 
-/* No lugar do preço, numa viatura vendida, vai a palavra «Vendida».
-   ---------------------------------------------------------------------------
-   O preço esteve riscado — foi o que o cliente pediu primeiro — e agora sai por
-   completo: uma vendida deixa de anunciar valor nenhum. O lugar não pode ficar
-   vazio, que num cartão de listagem abria um buraco entre a ficha e o «Ver».
-   Vai a palavra, em tom secundário, para não competir com os preços a sério
-   dos carros que ainda estão à venda. */
-const precoHTML = (v) => estaVendida(v)
-  ? '<span class="cartao__preco--saiu">Vendida</span>'
-  : esc(precoTexto(v));
 const nKm = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' km';
 
 /* Texto que o cliente escreve num campo de várias linhas do backoffice.
@@ -796,9 +786,15 @@ function cartao(v, { prioridade = false } = {}) {
 
      O `<a>` era `display: contents`, ou seja não desenhava caixa nenhuma; tirá-lo
      não mexe um pixel no desenho. O que TEM de sair com ele é o resto da
-     promessa: o «Ver →» no rodapé, o cursor de mão e o hover que levanta o
-     cartão (esse sai no CSS, em `.cartao--vendido`). Um cartão que se levanta ao
-     rato e não abre nada é pior do que um cartão parado. */
+     promessa: o cursor de mão e o hover que levanta o cartão (esse sai no CSS,
+     em `.cartao--vendido`). Um cartão que se levanta ao rato e não abre nada é
+     pior do que um cartão parado.
+
+     E sai o RODAPÉ inteiro — preço e «Ver →». Chegou a dizer «Vendida» no lugar
+     do preço, mas a etiqueta VENDIDO já está por cima da fotografia: era a mesma
+     informação duas vezes no mesmo cartão, uma delas debaixo de uma risca de
+     separação que não separava nada. Sem rodapé, o cartão acaba na ficha
+     técnica, que é o que resta de útil num carro que já saiu. */
   const corpo = `    <div class="cartao__foto">
       ${img}
       ${selos.length ? `<div class="cartao__selos">${selos.join('')}</div>` : ''}
@@ -813,10 +809,10 @@ function cartao(v, { prioridade = false } = {}) {
         ${spec(ic.caixa, v.caixa)}
         ${spec(ic.raio, v.potencia ? v.potencia + ' cv' : '')}
       </div>
-      <div class="cartao__pe">
-        <span class="cartao__preco${temPreco(v) ? '' : ' cartao__preco--consulta'}">${precoHTML(v)}</span>
-        ${estaVendida(v) ? '' : `<span class="cartao__ver">Ver ${ic.seta}</span>`}
-      </div>
+      ${estaVendida(v) ? '' : `<div class="cartao__pe">
+        <span class="cartao__preco${temPreco(v) ? '' : ' cartao__preco--consulta'}">${esc(precoTexto(v))}</span>
+        <span class="cartao__ver">Ver ${ic.seta}</span>
+      </div>`}
     </div>`;
 
   /* Um `id` só nas vendidas, e serve uma coisa concreta: é para aqui que o
