@@ -1,0 +1,13 @@
+{
+  "marca": "Nissan",
+  "modelo": "Patrol ",
+  "versao": "GR 61",
+  "tipo": "off-road",
+  "publicado": true,
+  "estado": "vendido",
+  "fotos": [
+    "assets/veiculos/Cópia de Cópia de Stock.jpeg"
+  ],
+  "destaque": false,
+  "ordem": 50
+}
