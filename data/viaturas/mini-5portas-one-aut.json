@@ -3,9 +3,10 @@
   "modelo": "5 Portas Aut. ",
   "versao": "One",
   "tipo": "carro",
+  "preco": 17.49,
   "iva_dedutivel": false,
   "publicado": true,
-  "estado": "brevemente",
+  "estado": "disponivel",
   "fotos": [
     "assets/veiculos/mini5portasone/IMG_8464-1600.webp",
     "assets/veiculos/mini5portasone/IMG_8469-1600.webp",
