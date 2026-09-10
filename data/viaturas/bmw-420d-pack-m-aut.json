@@ -1,0 +1,30 @@
+{
+  "marca": "BMW ",
+  "modelo": "420d",
+  "versao": "Pack M Aut. ",
+  "tipo": "carro",
+  "carrocaria": "Berlina",
+  "preco": 26500,
+  "iva_dedutivel": false,
+  "publicado": true,
+  "estado": "disponivel",
+  "ano": 2019,
+  "mes": "Junho",
+  "km": 143000,
+  "combustivel": "Diesel",
+  "caixa": "Automática",
+  "potencia": 190,
+  "cilindrada": 1995,
+  "cor": "Azul ",
+  "lugares": 5,
+  "origem": "Nacional",
+  "garantia": "18 meses ",
+  "equipamento": [
+    "Quadrante Digital ",
+    "Volante M ",
+    "GPS Profissional ",
+    "Modos de condução "
+  ],
+  "destaque": false,
+  "ordem": 50
+}
