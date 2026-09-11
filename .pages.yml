@@ -177,6 +177,28 @@ content:
             - { name: reservado, label: 'Reservado (fica no site, com etiqueta)' }
             - { name: brevemente, label: 'Brevemente (ainda não chegou ao stand)' }
             - { name: vendido, label: 'Vendido (passa para a pasta Vendidas)' }
+
+      # ─────────── onde aparece na página inicial
+      #
+      # Estes dois estavam NO FIM do formulário, a seguir à Descrição. A
+      # Descrição é uma caixa de texto que cresce com o que lá está, e as deste
+      # cliente têm quarenta linhas — num telemóvel são dois ou três ecrãs de
+      # nada a separar o resto do formulário destes dois campos. A 11/9/2026 ele
+      # escreveu que «a parte das viaturas de destaque deixou de estar
+      # disponível»; o campo estava lá e a gravar, o que lhe faltava era
+      # encontrá-lo. Sobem para junto do «Publicado no site» e do «Estado», que
+      # é o que respondem: onde é que esta viatura aparece.
+      - name: destaque
+        label: Destaque na página inicial
+        type: boolean
+        default: false
+        description: 'Aparecem no carrossel do topo. Quatro a seis fica bem.'
+      - name: ordem
+        label: Ordem
+        type: number
+        default: 50
+        description: 'Número mais baixo aparece primeiro. 50 se for indiferente.'
+
       # ─────────── fotografias
       - name: fotos
         label: Fotografias
@@ -287,18 +309,6 @@ content:
         label: Descrição
         type: text
         description: 'Duas ou três frases sobre o que a ficha não diz: estado, histórico. Defeitos conhecidos escrevem-se aqui — é o que protege o stand. Para negrito, escreva **assim**.'
-
-      # ─────────── onde aparece na página inicial
-      - name: destaque
-        label: Destaque na página inicial
-        type: boolean
-        default: false
-        description: 'Aparecem no carrossel do topo. Quatro a seis fica bem.'
-      - name: ordem
-        label: Ordem
-        type: number
-        default: 50
-        description: 'Número mais baixo aparece primeiro. 50 se for indiferente.'
 
 
   # --------------------------------------------------------------- vendidas
