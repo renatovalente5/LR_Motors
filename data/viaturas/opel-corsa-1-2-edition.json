@@ -5,6 +5,7 @@
   "tipo": "carro",
   "carrocaria": "Citadino",
   "preco": 13500,
+  "iva_dedutivel": false,
   "publicado": true,
   "estado": "disponivel",
   "fotos": [
@@ -38,9 +39,10 @@
   "potencia": 75,
   "cilindrada": 1199,
   "cor": "Prateado",
+  "lugares": 5,
   "portas": 5,
   "origem": "Nacional",
-  "garantia": "18 meses",
+  "garantia": "36 meses",
   "equipamento": [
     "AC manual",
     "Cruise Control",
