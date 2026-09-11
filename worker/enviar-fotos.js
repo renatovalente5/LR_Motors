@@ -256,11 +256,12 @@ async function listarPastasDetalhe(ambiente) {
   const arvore = await github(
     `/repos/${REPO}/git/trees/${commitBase.tree.sha}?recursive=1`, ambiente.GITHUB_TOKEN);
 
-  /* Contar FOTOGRAFIAS, não ficheiros. Ao lado de cada fotografia vivem as
+  /* Contar FOTOGRAFIAS, não ficheiros. Desde 11/9/2026 são a mesma coisa — as
      versões que o site serve (-480, -960, -1600 em WebP) e o cartão de partilha
-     og.jpg, e isso multiplica a conta por quatro ou cinco: a pasta do Peugeot
-     tem 20 fotografias e 89 ficheiros. Dizer «89» a quem está a decidir se
-     apaga é dizer-lhe um número que não corresponde a nada que ele reconheça. */
+     og.jpg passaram para assets/fotos/, fora desta pasta —, mas o teste fica:
+     enquanto viveram aqui ao lado, a pasta do Peugeot tinha 20 fotografias e 89
+     ficheiros, e dizer «89» a quem está a decidir se apaga era dizer-lhe um
+     número que não corresponde a nada que ele reconheça. */
   const VARIANTE = /-(?:480|960|1600)\.webp$/;
   const conta = new Map();
   for (const x of (arvore.tree || [])) {

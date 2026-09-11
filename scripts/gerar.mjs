@@ -123,7 +123,18 @@ const todas = ficheiros
    à mão parte o site publicado e funciona em local, que é a pior combinação. */
 const BASE = (process.env.BASE ?? '/LR_Motors').replace(/\/$/, '');
 const SITE = process.env.SITE ?? `https://renatovalente5.github.io${BASE}`;
-const u = (p = '') => (BASE + '/' + String(p).replace(/^\//, '')).replace(/\/{2,}/g, '/');
+/* ESPAÇOS E VÍRGULAS NO NOME DE UM FICHEIRO PARTEM O `srcset`.
+   ---------------------------------------------------------------------------
+   O `srcset` separa os candidatos por vírgula e o endereço da largura por
+   espaço. Uma fotografia chamada «Cópia de Cópia de Stock-480.webp» faz o
+   browser ler «/assets/fotos/Cópia» como endereço e «de», «Cópia», «de» como
+   descritores de largura; o candidato é deitado fora inteiro, sem erro nenhum à
+   vista — fica só a servir o `src`, que é a versão grande. Há uma no stand (o
+   Nissan Patrol) e nomes assim chegam do telemóvel a toda a hora: «WhatsApp
+   Image 2026-09-11 at 10.22.33.jpeg». Codifica-se à saída, num sítio só, para
+   não haver endereço nenhum do site que dependa do nome que a foto trouxe. */
+const codificar = (p) => String(p).replace(/ /g, '%20').replace(/,/g, '%2C');
+const u = (p = '') => codificar((BASE + '/' + String(p).replace(/^\//, '')).replace(/\/{2,}/g, '/'));
 
 /* A HORA DA ÚLTIMA PUBLICAÇÃO, no rodapé de todas as páginas.
    ---------------------------------------------------------------------------
@@ -141,7 +152,7 @@ const ACTUALIZADO = new Intl.DateTimeFormat('pt-PT', {
   day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
   timeZone: 'Europe/Lisbon',
 }).format(new Date());
-const abs = (p = '') => SITE.replace(/\/$/, '') + '/' + String(p).replace(/^\//, '');
+const abs = (p = '') => codificar(SITE.replace(/\/$/, '') + '/' + String(p).replace(/^\//, ''));
 
 /* O backoffice (Pages CMS) vive fora do site, e o endereço leva o nome do
    repositório em minúsculas — é assim que o Pages CMS o escreve. */
@@ -258,10 +269,33 @@ const vendidas = publicadas.filter((v) => estaVendida(v));
 const titulo = (v) => [v.marca, v.modelo].filter(Boolean).join(' ');
 const tituloLongo = (v) => [v.marca, v.modelo, v.versao].filter(Boolean).join(' ');
 
+/* DUAS PASTAS, e a razão é o backoffice.
+   ---------------------------------------------------------------------------
+   assets/veiculos/ é a BIBLIOTECA: só o que o cliente carrega, um ficheiro por
+   fotografia, e é a única que o Pages CMS mostra. assets/fotos/ é o que o
+   scripts/otimizar-imagens.py gera — as três larguras e o cartão de partilha —
+   no mesmo caminho relativo, e é de lá que o site serve.
+
+   Estiveram juntas até 11/9/2026, e o cliente queixou-se de ver «até 4
+   repetições da mesma foto» ao escolher: via o original mais as três variantes,
+   iguais na miniatura, e escolhia à sorte. Um anúncio ficou com metade das
+   fotos em «-480» e uma fotografia escolhida duas vezes, que saía repetida na
+   galeria.
+
+   Os caminhos gravados pelo backoffice apontam para a BIBLIOTECA; quem os
+   traduz para as variantes é isto. Os que ficaram gravados na forma antiga
+   (`...-1600.webp`) continuam a funcionar: tira-se o sufixo de largura e o
+   resultado é o mesmo. */
+const BIBLIOTECA = 'assets/veiculos';
+const DERIVADAS = 'assets/fotos';
+const pastaDerivada = (rel) =>
+  rel === BIBLIOTECA || rel.startsWith(BIBLIOTECA + '/') ? DERIVADAS + rel.slice(BIBLIOTECA.length) : rel;
+const ficheirosDe = (rel) => (existsSync(join(RAIZ, rel)) ? readdirSync(join(RAIZ, rel)) : []);
+
 /* Constrói o srcset a partir das variantes que EXISTEM em disco. O pipeline de
    imagens gera -480/-960/-1600; se um dia faltar uma, o site não parte. */
 function fotos(v) {
-  const dir = `assets/veiculos/${v.slug}`;
+  const dir = `${BIBLIOTECA}/${v.slug}`;
   const pasta = join(RAIZ, dir);
   const existentes = existsSync(pasta) ? readdirSync(pasta) : [];
 
@@ -284,35 +318,43 @@ function fotos(v) {
      Salta-se em vez de falhar a construção de propósito. Falhar deixaria o
      cliente sem publicar nada por causa de uma fotografia; assim o site fica
      certo, com menos uma foto, e o aviso fica no registo da Action. */
-  caminhos = caminhos.filter((c) => {
+  /* Cada caminho da lista, resolvido nas duas pastas de uma vez: a fotografia
+     na biblioteca e as variantes em assets/fotos/. É a mesma conta para o teste
+     de existência e para as URLs, por isso faz-se uma vez só. */
+  const resolver = (c) => {
     const limpo = String(c).replace(/^\/+/, '');
     const nome = limpo.split('/').pop();
+    /* A pasta é a do ficheiro, seja qual for aquela em que o backoffice o tenha
+       gravado — não se assume a pasta da viatura. */
     const pastaRel = limpo.includes('/') ? limpo.slice(0, limpo.lastIndexOf('/')) : dir;
+    /* Tira a extensão e um eventual sufixo de largura: tanto serve
+       "IMG_4821.jpg" acabado de carregar como "01-1600.webp", que é a forma
+       antiga, de quando as variantes viviam ao lado do original. */
     const base = nome.replace(/\.[a-z0-9]+$/i, '').replace(/-(?:480|960|1600)$/, '');
-    const vizinhos = existsSync(join(RAIZ, pastaRel)) ? readdirSync(join(RAIZ, pastaRel)) : [];
-    const ha = vizinhos.some((f) => f === nome || f.startsWith(base + '-'));
+    const geradas = ficheirosDe(pastaDerivada(pastaRel));
+    const larguras = [480, 960, 1600].filter((w) => geradas.includes(`${base}-${w}.webp`));
+    /* O original só interessa enquanto não houver variantes — ver abaixo. */
+    const naBiblioteca = ficheirosDe(pastaRel).find((f) => f === nome || f.replace(/\.[a-z0-9]+$/i, '') === base);
+    return { limpo, pastaRel, base, larguras, naBiblioteca };
+  };
+
+  caminhos = caminhos.filter((c) => {
+    const { limpo, larguras, naBiblioteca } = resolver(c);
+    const ha = larguras.length > 0 || Boolean(naBiblioteca);
     if (!ha) console.warn(`  !! ${v.slug}: a foto ${limpo} está na lista mas não existe — ignorada`);
     return ha;
   });
 
   return caminhos.map((c) => {
-    const limpo = String(c).replace(/^\/+/, '');
-    const nome = limpo.split('/').pop();
-    /* As variantes vivem ao lado do ficheiro, seja qual for a pasta em que o
-       backoffice o tenha gravado — não se assume a pasta da viatura. */
-    const pastaRel = limpo.includes('/') ? limpo.slice(0, limpo.lastIndexOf('/')) : dir;
-    const vizinhos = existsSync(join(RAIZ, pastaRel)) ? readdirSync(join(RAIZ, pastaRel)) : [];
-    /* Tira a extensão e um eventual sufixo de largura: tanto serve
-       "01-1600.webp" como "IMG_4821.jpg" acabado de carregar pelo cliente. */
-    const base = nome.replace(/\.[a-z0-9]+$/i, '').replace(/-(?:480|960|1600)$/, '');
-    const larguras = [480, 960, 1600].filter((w) => vizinhos.includes(`${base}-${w}.webp`));
+    const { pastaRel, base, larguras, naBiblioteca } = resolver(c);
     if (!larguras.length) {
-      /* Sem variantes geradas ainda: serve-se o ficheiro tal como está, para a
-         foto aparecer à mesma enquanto a Action não corre. */
-      const url = u(limpo.startsWith('assets/') ? limpo : `${dir}/${nome}`);
+      /* Sem variantes geradas ainda: serve-se o ficheiro da biblioteca tal como
+         está, para a foto aparecer à mesma enquanto a Action não corre. É o
+         único caso em que um original chega ao visitante. */
+      const url = u(`${pastaRel}/${naBiblioteca}`);
       return { src: url, srcset: '', srcCartao: url, srcsetCartao: '' };
     }
-    const url = (w) => u(`${pastaRel}/${base}-${w}.webp`);
+    const url = (w) => u(`${pastaDerivada(pastaRel)}/${base}-${w}.webp`);
     return {
       src: url(larguras.at(-1)),
       srcset: larguras.map((w) => `${url(w)} ${w}w`).join(', '),
@@ -1770,42 +1812,45 @@ function paginaSobre() {
 }
 
 /* ------------------------------------------------------------------ escrita */
-/* Que ficheiros de assets/veiculos/ vão mesmo para o ar.
+/* Que ficheiros das pastas de fotografias vão mesmo para o ar.
    ---------------------------------------------------------------------------
-   Duas coisas passaram a estar publicadas sem ninguém decidir isso:
+   assets/fotos/ é o que o site serve e vai quase inteiro. A BIBLIOTECA
+   (assets/veiculos/) fica no repositório para o backoffice a mostrar, mas
+   praticamente nada dela é publicado — são duas coisas que estiveram no ar sem
+   ninguém decidir isso:
 
    1. O que o cliente carrega no backoffice sem abrir primeiro a pasta de uma
-      viatura fica solto na raiz de assets/veiculos/. Não pertence a anúncio
-      nenhum, mas o site copiava a pasta inteira e servia-o à mesma —
-      aconteceu com uma fotografia do conta-quilómetros de um Peugeot, que
-      esteve no ar em lrmotorsautomoveis.pt sem estar em anúncio nenhum.
+      viatura fica solto na raiz. Não pertence a anúncio nenhum, mas o site
+      copiava a pasta inteira e servia-o à mesma — aconteceu com uma fotografia
+      do conta-quilómetros de um Peugeot, que esteve no ar em
+      lrmotorsautomoveis.pt sem estar em anúncio nenhum. A regra vale agora para
+      os dois lados: uma foto solta que não esteja em uso não vai, nem ela nem
+      as variantes que o script lhe gerou.
 
    2. O ficheiro ORIGINAL, tal como saiu do telemóvel. O site nunca o usa —
       serve sempre as variantes -480/-960/-1600 — mas ele seguia na mesma:
       vários MB por fotografia, e com os metadados do telemóvel, coordenadas
-      de GPS incluídas, que o Pillow deixa cair ao gerar as variantes.
-
-   Fica tudo no repositório (a biblioteca do backoffice continua a mostrá-lo);
-   o que muda é que deixa de ser copiado para o site. O original só vai quando
-   ainda não tiver variantes, para uma foto acabada de carregar aparecer à
-   mesma enquanto a Action não corre — é o mesmo caso que fotos() já trata. */
-const LARGURA_VARIANTE = /-(?:480|960|1600)\.webp$/;
+      de GPS incluídas, que o Pillow deixa cair ao gerar as variantes. Só vai
+      quando ainda não tiver variantes, para uma foto acabada de carregar
+      aparecer à mesma enquanto a Action não corre — é o mesmo caso que fotos()
+      já trata. */
 const semSufixo = (nome) => nome.replace(/\.[a-z0-9]+$/i, '').replace(/-(?:480|960|1600)$/, '');
 
-/* Fotos que alguma viatura aponta para a RAIZ de assets/veiculos/. Normalmente
-   nenhuma, mas o backoffice deixa lá gravar e fotos() aceita-o, portanto não se
-   deita fora o que está mesmo a ser usado. */
+/* Fotos que alguma viatura aponta para a RAIZ das pastas de fotografias.
+   Normalmente nenhuma, mas o backoffice deixa lá gravar e fotos() aceita-o,
+   portanto não se deita fora o que está mesmo a ser usado. */
 const soltasEmUso = new Set(todas
   .flatMap((v) => (Array.isArray(v.fotos) ? v.fotos : []))
   .map((c) => String(c).replace(/^\/+/, ''))
-  .filter((c) => /^assets\/veiculos\/[^/]+$/.test(c))
+  .filter((c) => new RegExp(`^(?:${BIBLIOTECA}|${DERIVADAS})/[^/]+$`).test(c))
   .map((c) => semSufixo(c.split('/').pop())));
 
 const naoPublicados = [];
 
 function publicavel(origem) {
   const rel = relative(RAIZ, origem).split(sep).join('/');
-  if (!rel.startsWith('assets/veiculos/')) return true;
+  const daBiblioteca = rel.startsWith(BIBLIOTECA + '/');
+  if (!daBiblioteca && !rel.startsWith(DERIVADAS + '/')) return true;
 
   /* As PASTAS passam sempre. Dizer que não a uma pasta faz o cpSync não descer
      lá dentro, e perde-se o anúncio inteiro de uma vez — fotografias e cartão
@@ -1816,15 +1861,15 @@ function publicavel(origem) {
      cliente cria as pastas à mão na biblioteca. */
   if (statSync(origem).isDirectory()) return true;
 
-  const resto = rel.slice('assets/veiculos/'.length);
+  const resto = rel.slice((daBiblioteca ? BIBLIOTECA : DERIVADAS).length + 1);
   const nome = resto.split('/').pop();
   const base = semSufixo(nome);
   const cartao = nome === 'og.jpg';
 
-  /* Caso 1: solto na raiz de assets/veiculos/, que é onde o backoffice grava
-     quando não se abre primeiro a pasta de uma viatura. O cartão de partilha
-     da raiz segue a sorte das fotos que lhe deram origem: o
-     otimizar-imagens.py faz um por cada pasta com variantes, raiz incluída. */
+  /* Caso 1: solto na raiz, que é onde o backoffice grava quando não se abre
+     primeiro a pasta de uma viatura. O cartão de partilha da raiz segue a sorte
+     das fotos que lhe deram origem: o otimizar-imagens.py faz um por cada pasta
+     com variantes, raiz incluída. */
   if (!resto.includes('/')) {
     const emUso = cartao ? soltasEmUso.size > 0 : soltasEmUso.has(base);
     if (!emUso) {
@@ -1838,8 +1883,8 @@ function publicavel(origem) {
      carregar aparecer enquanto a Action não corre. Vale na raiz e dentro das
      pastas: uma foto em uso na raiz também não tem que levar para o ar os
      vários MB e os metadados do telemóvel. */
-  if (cartao || LARGURA_VARIANTE.test(nome)) return true;
-  const temVariantes = readdirSync(dirname(origem)).includes(`${base}-1600.webp`);
+  if (!daBiblioteca) return true;
+  const temVariantes = ficheirosDe(pastaDerivada(dirname(rel))).includes(`${base}-1600.webp`);
   if (temVariantes) naoPublicados.push(`${rel} (original; o site usa as variantes)`);
   return !temVariantes;
 }

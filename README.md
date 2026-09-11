@@ -53,7 +53,8 @@ Não apague o anúncio. Mude o **Estado**:
 |---|---|
 | Alojamento | GitHub Pages, publicado por GitHub Actions |
 | Conteúdo | `data/viaturas/*.json` (um ficheiro por viatura) e `data/definicoes.json` |
-| Fotos | `assets/veiculos/<slug>/` em WebP, três larguras |
+| Fotos | `assets/veiculos/<slug>/` é a **biblioteca** — o que o cliente carrega, um ficheiro por fotografia, e a única pasta que o backoffice mostra |
+| Fotos que vão para o ar | `assets/fotos/<slug>/` — as três larguras em WebP e o cartão de partilha, gerados na publicação |
 | Gerador | `scripts/gerar.mjs` — Node puro, **zero dependências** |
 | Imagens | `scripts/otimizar-imagens.py` — Pillow |
 | Backoffice | [Pages CMS](https://pagescms.org), configurado em `.pages.yml` |
