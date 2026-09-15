@@ -45,9 +45,11 @@ globalThis.fetch = async (url, opcoes = {}) => {
     return r({ tree: [
       { type: 'blob', path: 'assets/veiculos/livre/01.jpg' },
       { type: 'blob', path: 'assets/veiculos/livre/02.jpg' },
-      /* As versões que o site serve, e o cartão de partilha. Existem ao lado de
-         cada fotografia e multiplicam a contagem por quatro — o cliente tem de
-         ver fotografias, não ficheiros. */
+      /* As versões que o site serve, e o cartão de partilha. Desde 11/9/2026 já
+         não vivem aqui — foram para assets/fotos/, e o cartão passou a ser um
+         por viatura —, mas a contagem tem de continuar a aguentá-los: um
+         repositório de antes dessa mudança, ou uma variante lá deixada à mão,
+         não podem fazer o cliente ver ficheiros onde devia ver fotografias. */
       { type: 'blob', path: 'assets/veiculos/livre/01-480.webp' },
       { type: 'blob', path: 'assets/veiculos/livre/01-960.webp' },
       { type: 'blob', path: 'assets/veiculos/livre/01-1600.webp' },

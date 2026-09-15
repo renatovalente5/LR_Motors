@@ -76,18 +76,32 @@ jobs:
       - name: Preparar as fotografias
         run: python3 scripts/otimizar-imagens.py --varrer
 
-      # A biblioteca só pode ter fotografias. Se um ficheiro gerado lá voltar a
-      # aparecer — por engano num script, ou carregado à mão —, o backoffice
+      # O cartão de partilha tem de mostrar a MESMA fotografia que a ficha
+      # mostra como capa. A regra é simples de dizer e partiu-se duas vezes no
+      # dia em que foi escrita, sempre em silêncio — nada falha, o WhatsApp é
+      # que passa a mostrar outro carro. A bateria monta uma árvore de teste com
+      # fotografias de cores sólidas e compara as duas. Corre em cinco segundos.
+      - name: Bateria do cartão de partilha
+        run: python3 scripts/testar-cartoes.py
+
+      # A biblioteca só pode ter fotografias. Se uma variante lá voltar a
+      # aparecer — por engano num script, ou carregada à mão —, o backoffice
       # volta a mostrar a mesma fotografia várias vezes, que foi a queixa de
       # 11/9/2026. Falha aqui, antes de o cliente dar com isso.
+      #
+      # Só os sufixos de largura. O `og.jpg` esteve nesta lista durante umas
+      # horas e saiu: o cartão de partilha mudou-se para assets/fotos/partilha/,
+      # portanto já nada o escreve aqui, e uma fotografia que o cliente calhasse
+      # a ter com esse nome deixava de poder ser publicada — uma publicação
+      # bloqueada por um nome de ficheiro, sem nada de mal a acontecer.
       - name: Confirmar que a biblioteca não tem ficheiros gerados
         run: |
           intrusos=$(find assets/veiculos -type f \( -name '*-480.webp' -o -name '*-960.webp' \
-                      -o -name '*-1600.webp' -o -name 'og.jpg' \) | head -20)
+                      -o -name '*-1600.webp' \) | head -20)
           if [ -n "$intrusos" ]; then
-            echo "há ficheiros gerados dentro de assets/veiculos (a biblioteca do backoffice):"
+            echo "há variantes geradas dentro de assets/veiculos (a biblioteca do backoffice):"
             echo "$intrusos"
-            echo "o sítio deles é assets/fotos/ — ver scripts/otimizar-imagens.py"
+            echo "o sítio delas é assets/fotos/ — ver scripts/otimizar-imagens.py"
             exit 1
           fi
           echo "biblioteca só com fotografias: $(find assets/veiculos -type f | wc -l | tr -d ' ') ficheiros"
@@ -171,6 +185,35 @@ jobs:
             fi
           done
           echo "sitemap sem vendidas conferido"
+
+      # O `og:image` é a fotografia que o WhatsApp mostra quando o stand
+      # partilha um anúncio, e é assim que este negócio vende. Sai de um
+      # ficheiro que OUTRO script escreve (o cartão de partilha, em
+      # assets/fotos/partilha/), portanto é fácil de partir sem ninguém dar por
+      # isso: basta um cartão apagado pela limpeza das órfãs, ou um retoque na
+      # regra que decide o que é copiado para _site. Sem imagem, a partilha sai
+      # sem pré-visualização nenhuma — e não há erro em lado nenhum a dizê-lo.
+      - name: Confirmar que as imagens de partilha existem
+        run: |
+          python3 - <<'PY'
+          import os, re, sys, urllib.parse
+          faltam = []
+          for raiz, _, ficheiros in os.walk('_site'):
+              for nome in ficheiros:
+                  if not nome.endswith('.html'):
+                      continue
+                  caminho = os.path.join(raiz, nome)
+                  html = open(caminho, encoding='utf-8').read()
+                  for m in re.finditer(r'property="og:image" content="([^"]+)"', html):
+                      rel = urllib.parse.unquote(urllib.parse.urlparse(m.group(1)).path).lstrip('/')
+                      if not os.path.isfile(os.path.join('_site', rel)):
+                          faltam.append(f'{caminho}: {m.group(1)}')
+          if faltam:
+              print('há páginas a apontar para uma imagem de partilha que não existe:')
+              print('\n'.join(faltam[:20]))
+              sys.exit(1)
+          print('imagens de partilha conferidas')
+          PY
 
       - uses: actions/upload-pages-artifact@v3
         with:

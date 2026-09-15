@@ -273,8 +273,10 @@ const tituloLongo = (v) => [v.marca, v.modelo, v.versao].filter(Boolean).join(' 
    ---------------------------------------------------------------------------
    assets/veiculos/ é a BIBLIOTECA: só o que o cliente carrega, um ficheiro por
    fotografia, e é a única que o Pages CMS mostra. assets/fotos/ é o que o
-   scripts/otimizar-imagens.py gera — as três larguras e o cartão de partilha —
-   no mesmo caminho relativo, e é de lá que o site serve.
+   scripts/otimizar-imagens.py gera — as três larguras de cada fotografia, no
+   mesmo caminho relativo —, e é de lá que o site serve. (O cartão de partilha
+   é a excepção: está num sítio fixo, assets/fotos/partilha/<slug>.jpg, um por
+   viatura e não um por fotografia — ver cartaoDe(), mais abaixo.)
 
    Estiveram juntas até 11/9/2026, e o cliente queixou-se de ver «até 4
    repetições da mesma foto» ao escolher: via o original mais as três variantes,
@@ -292,6 +294,31 @@ const pastaDerivada = (rel) =>
   rel === BIBLIOTECA || rel.startsWith(BIBLIOTECA + '/') ? DERIVADAS + rel.slice(BIBLIOTECA.length) : rel;
 const ficheirosDe = (rel) => (existsSync(join(RAIZ, rel)) ? readdirSync(join(RAIZ, rel)) : []);
 
+/* O CARTÃO DE PARTILHA É DE UMA VIATURA, NÃO DE UMA PASTA.
+   ---------------------------------------------------------------------------
+   É o `og:image`: a imagem que o WhatsApp, o Facebook e o Instagram mostram
+   quando alguém partilha o link do anúncio, e é assim que este stand vende.
+   Vem em JPEG e não em WebP porque as pré-visualizações do WhatsApp não
+   mostram WebP — é a única imagem do site em JPEG.
+
+   Esteve um por PASTA, feito da fotografia primeira por ordem alfabética, e
+   isso não é a capa: é só o nome do ficheiro. Duas consequências, as duas
+   reais em 11/9/2026. O Polaris tinha a capa trocada porque o cliente
+   reordenou as fotografias e o nome ficou para trás. E os dois carros cujas
+   fotografias estão soltas na raiz da biblioteca — o Ford Puma e o Nissan
+   Patrol — partilhavam o MESMO cartão, feito de uma fotografia que não é de
+   nenhum dos dois: partilhar o Puma no WhatsApp mostrava outro carro.
+
+   Agora é um por viatura, feito da PRIMEIRA fotografia da lista, que é a capa
+   que o cliente escolhe arrastando no backoffice. Quem o escreve é o
+   scripts/otimizar-imagens.py, em assets/fotos/partilha/<slug>.jpg. Enquanto
+   não existir — viatura acabada de carregar antes de a publicação correr —
+   cai-se no cartão do logótipo, que é melhor do que uma partilha sem imagem. */
+const cartaoDe = (v) => {
+  const rel = `${DERIVADAS}/partilha/${v.slug}.jpg`;
+  return existsSync(join(RAIZ, rel)) ? abs(rel) : undefined;
+};
+
 /* Constrói o srcset a partir das variantes que EXISTEM em disco. O pipeline de
    imagens gera -480/-960/-1600; se um dia faltar uma, o site não parte. */
 function fotos(v) {
@@ -300,14 +327,12 @@ function fotos(v) {
   const existentes = existsSync(pasta) ? readdirSync(pasta) : [];
 
   /* A lista vem do JSON (é a ordem que o cliente definiu no backoffice). Se
-     ainda não houver lista, cai para o que estiver na pasta, por nome. */
-  /* Sem lista, o og.jpg tem de ser excluído à mão: é o cartão de partilha,
-     1200x630 cortado ao centro, e entrava na galeria como se fosse mais uma
-     fotografia do carro — sem variantes, servido em tamanho grande. */
+     ainda não houver lista, cai para o que estiver na pasta, por nome.
+     Aqui lê-se a BIBLIOTECA, onde só há fotografias: o cartão de partilha vive
+     em assets/fotos/partilha/ e não tem como entrar na galeria. */
   let caminhos = Array.isArray(v.fotos) && v.fotos.length
     ? v.fotos
-    : [...new Set(existentes.filter((f) => f !== 'og.jpg')
-        .map((f) => f.replace(/-(?:480|960|1600)\.webp$/, '')))]
+    : [...new Set(existentes.map((f) => f.replace(/-(?:480|960|1600)\.webp$/, '')))]
         .sort().map((b) => `${dir}/${b}`);
 
   /* Uma foto apagada na biblioteca do backoffice deixa a lista do JSON a
@@ -694,8 +719,9 @@ function pagina({ pag = '', titulo: t, descricao, corpo, jsonld = [], og, classe
   const imagem = og ?? abs('assets/img/og.jpg');
   /* Largura e altura declaradas porque o WhatsApp precisa delas para decidir
      mostrar a pré-visualização GRANDE. Sem elas arrisca-se a miniatura pequena
-     ao lado do texto, que é onde o logótipo se perde. São as do og.jpg; quando
-     a imagem é a de uma viatura, as fotografias são todas 1600×1200. */
+     ao lado do texto, que é onde o logótipo se perde. Valem para os dois
+     cartões: o do logótipo e o de cada viatura saem ambos a 1200×630 — é o
+     tamanho que o otimizar-imagens.py corta (OG_TAM), e não o da fotografia. */
   const [larguraOg, alturaOg] = [1200, 630];
   return `<!doctype html>
 <html lang="pt-PT">
@@ -1638,17 +1664,7 @@ function paginaViatura(v) {
     pag: 'viaturas/' + v.slug + '/',
     titulo: `${nome}${v.ano ? ' de ' + v.ano : ''} — ${precoTexto(v)} | LR Motors Vila Verde`,
     descricao: `${nome} usado à venda na LR Motors, Vila Verde (Braga). ${[v.ano, v.km != null ? nKm(v.km) : null, v.combustivel, v.caixa].filter(Boolean).join(' · ')}. ${precoTexto(v)}, com garantia.`,
-    /* O cartão de partilha é o `og.jpg` que o script das imagens deixa na pasta
-       da viatura, e não a fotografia em WebP que o site mostra: o WhatsApp não
-       mostra WebP nas pré-visualizações de link, e este stand partilha os
-       anúncios por WhatsApp. Se a pasta ainda não tiver o cartão — viatura
-       acabada de carregar antes de o script correr — cai no do logótipo, que é
-       melhor do que uma partilha sem imagem. */
-    og: (() => {
-      if (!fs_[0]) return undefined;
-      const pasta = fs_[0].src.replace(BASE + '/', '').split('/').slice(0, -1).join('/');
-      return existsSync(join(RAIZ, pasta, 'og.jpg')) ? abs(pasta + '/og.jpg') : undefined;
-    })(),
+    og: cartaoDe(v),   // a capa da viatura em JPEG — ver cartaoDe()
     corpo,
     jsonld: [
       produtoLD,
@@ -1864,15 +1880,14 @@ function publicavel(origem) {
   const resto = rel.slice((daBiblioteca ? BIBLIOTECA : DERIVADAS).length + 1);
   const nome = resto.split('/').pop();
   const base = semSufixo(nome);
-  const cartao = nome === 'og.jpg';
 
   /* Caso 1: solto na raiz, que é onde o backoffice grava quando não se abre
-     primeiro a pasta de uma viatura. O cartão de partilha da raiz segue a sorte
-     das fotos que lhe deram origem: o otimizar-imagens.py faz um por cada pasta
-     com variantes, raiz incluída. */
+     primeiro a pasta de uma viatura. Vale para a fotografia e para as variantes
+     que ela deu — a regra é a mesma nas duas pastas, e é por isso que `base`
+     leva o sufixo de largura fora. Os cartões de partilha não passam por aqui:
+     vivem em assets/fotos/partilha/, que é uma subpasta. */
   if (!resto.includes('/')) {
-    const emUso = cartao ? soltasEmUso.size > 0 : soltasEmUso.has(base);
-    if (!emUso) {
+    if (!soltasEmUso.has(base)) {
       naoPublicados.push(`${rel} (não pertence a nenhuma viatura)`);
       return false;
     }
@@ -1987,12 +2002,9 @@ function main() {
     /* O cartão de partilha vem com o stub, e não é um extra: a razão de existir
        deste stub são os links partilhados por WhatsApp. Sem `og:image`, voltar
        a partilhar um link antigo dava uma pré-visualização vazia — pior do que
-       antes de haver stub. É o mesmo `og.jpg` que a página tinha, com o mesmo
+       antes de haver stub. É o mesmo cartão que a página tinha, com o mesmo
        recuo para o logótipo quando ainda não foi gerado. */
-    const f0 = fotos(v)[0];
-    const pastaFoto = f0 ? f0.src.replace(BASE + '/', '').split('/').slice(0, -1).join('/') : null;
-    const cartao = pastaFoto && existsSync(join(RAIZ, pastaFoto, 'og.jpg'))
-      ? abs(pastaFoto + '/og.jpg') : abs('assets/img/og.jpg');  // o mesmo recuo do resto do site (linha 621)
+    const cartao = cartaoDe(v) ?? abs('assets/img/og.jpg');
     /* «Esta viatura já foi vendida» e não «O X foi vendido»: o género do artigo
        e do particípio teria de acompanhar o modelo — «O BMW», mas «A Smart» —
        e escrevê-lo à mão dava frases erradas mal entrasse a marca seguinte.
