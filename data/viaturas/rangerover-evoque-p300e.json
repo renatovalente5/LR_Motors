@@ -8,7 +8,7 @@
   "iva_dedutivel": true,
   "publicado": true,
   "estado": "reservado",
-  "destaque": true,
+  "destaque": false,
   "ordem": 1,
   "fotos": [
     "assets/veiculos/evoque/IMG_7959.jpg",
