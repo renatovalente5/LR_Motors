@@ -4,8 +4,11 @@
   "versao": "XP 1000 TURBO ",
   "tipo": "off-road",
   "preco": 17900,
+  "iva_dedutivel": false,
   "publicado": true,
-  "estado": "disponivel",
+  "estado": "vendido",
+  "destaque": true,
+  "ordem": 5,
   "fotos": [
     "assets/veiculos/polaris-rzr/IMG_8028.jpg",
     "assets/veiculos/polaris-rzr/IMG_8041.jpg",
@@ -36,7 +39,5 @@
   "lugares": 2,
   "origem": "Nacional",
   "garantia": "Garantia mútuo acordo",
-  "descricao": "Polaris RZR XP 1000 TURBO - 2016\n\nEm rigoroso estado, nacional com muitos extras e apenas 9800km. \n\nPossibilidade de financiamento e retoma! \n\n180cv \nPortas \nTeto \nBarra led \nSuspensão Fox \nCintos e pontos sparco \nEscape em inox, com ponteira original \nKit autocolantes novo \nRevisão incluída \n\nPronto para entrega imediata!",
-  "destaque": true,
-  "ordem": 5
+  "descricao": "Polaris RZR XP 1000 TURBO - 2016\n\nEm rigoroso estado, nacional com muitos extras e apenas 9800km. \n\nPossibilidade de financiamento e retoma! \n\n180cv \nPortas \nTeto \nBarra led \nSuspensão Fox \nCintos e pontos sparco \nEscape em inox, com ponteira original \nKit autocolantes novo \nRevisão incluída \n\nPronto para entrega imediata!"
 }
