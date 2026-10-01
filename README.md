@@ -1,47 +1,56 @@
-# LR Motors — site e backoffice
+# LR Motors — o site
 
 Stand online da **Luís & Ricardo Motors, Lda** (LR Motors), Vila Verde, Braga.
-Site estático em GitHub Pages, sem custos de alojamento, com backoffice para o
-cliente gerir o stock sozinho.
+Site estático em GitHub Pages, sem custos de alojamento. O stand gere o stock
+sozinho, num painel próprio.
 
-**Site:** https://renatovalente5.github.io/LR_Motors/
+**Site:** https://lrmotorsautomoveis.pt
+**Painel (backoffice):** https://backoffice.lrmotorsautomoveis.pt
 
 ---
 
-## Para o cliente — como gerir o stock
+## Para o stand — como gerir o stock
 
-Não é preciso perceber nada de programação, nem ter conta no GitHub.
+Tudo se faz no **painel**, no telemóvel ou no computador. Não é preciso conta no
+GitHub nem perceber nada de programação. O painel tem um ecrã de **Ajuda**.
 
 ### Entrar
 
-1. Abra o link que recebeu por email.
-2. Escreva o seu email e carregue em entrar — recebe um link de acesso.
+1. Abra https://backoffice.lrmotorsautomoveis.pt.
+2. Escreva o seu email e carregue em entrar: recebe um código por email.
+   Escreva-o no painel.
+
+Só entram os emails autorizados.
 
 ### Pôr um carro à venda
 
-1. **Viaturas** → **Add an entry**.
-2. Preencha. Os campos obrigatórios estão marcados.
-   - **Endereço da página**: minúsculas e hífens, por exemplo `bmw-serie-3-320d`.
-     É o que fica no link. Depois de publicado, não convém mudar.
-   - **Preço**: em euros, valor final com impostos. É o que a lei exige a quem
+1. **Viaturas** → **Nova viatura**.
+2. Preencha. O endereço da página sai sozinho da marca, do modelo e da versão, e
+   não muda depois — é o link que se partilha.
+   - **Preço**: em euros, o valor final com impostos. É o que a lei exige a quem
      anuncia preços.
-   - **Fotografias**: carregue à vontade, mesmo grandes — o site trata de as
-     encolher. **A primeira foto é a mais importante**: é a que aparece na
-     listagem e nas partilhas do WhatsApp e do Facebook. Use o carro inteiro,
-     de três quartos à frente. Depois exterior, interior e mala.
-3. **Save**. Em 1 a 3 minutos está no site.
+   - **Fotografias**: escolha-as no telemóvel, mesmo grandes — o painel reduz-as
+     antes de as enviar, e tira-lhes os metadados (as coordenadas do GPS
+     incluídas). **A primeira é a capa**: aparece na listagem e nas partilhas do
+     WhatsApp e do Facebook. Use o carro inteiro, de três quartos à frente.
+3. **Gravar**. Em 1 a 3 minutos está no site; o ecrã **Publicação** mostra
+   quando ficou.
 
 ### Vender ou reservar
 
 Não apague o anúncio. Mude o **Estado**:
 
-- **Reservado** — continua visível, com etiqueta amarela.
-- **Vendido** — sai da listagem, mas a página continua a existir para quem tenha
-  o link guardado. Apagar criaria erros em partilhas antigas.
+- **Reservado** ou **Brevemente** — continua visível, com etiqueta.
+- **Vendido** — passa para as **Vendidas** e sai do stock à venda. O endereço
+  antigo leva à lista das viaturas, para quem tenha o link guardado. Uma venda
+  que se desfaça volta a pôr-se à venda a partir das Vendidas.
 
 ### Mudar contactos, horário ou textos
 
-**Dados do stand** → altere → **Save**.
+**Dados do stand** → altere → **Gravar**.
+
+O que o painel assinala por baixo de um campo é o que o site precisa para
+publicar, ou o que a lei pede ao anúncio — está explicado ali mesmo.
 
 ---
 
@@ -51,22 +60,47 @@ Não apague o anúncio. Mude o **Estado**:
 
 | | |
 |---|---|
-| Alojamento | GitHub Pages, publicado por GitHub Actions |
-| Conteúdo | `data/viaturas/*.json` (um ficheiro por viatura) e `data/definicoes.json` |
-| Fotos | `assets/veiculos/<slug>/` é a **biblioteca** — o que o cliente carrega, um ficheiro por fotografia, e a única pasta que o backoffice mostra |
+| Alojamento | GitHub Pages, publicado por GitHub Actions (`.github/workflows/publicar.yml`) |
+| Domínio | `lrmotorsautomoveis.pt` (o ficheiro `CNAME`, copiado para o `_site`); o site serve na raiz |
+| Conteúdo | `data/viaturas/<slug>.json` (um ficheiro por viatura; as vendidas em `data/viaturas/vendidas/`) e `data/definicoes.json` |
+| Fotos | `assets/veiculos/` é a **biblioteca** — o que o painel carrega, um ficheiro por fotografia. Para o site só saem jpg, jpeg, png e webp |
 | Fotos que vão para o ar | `assets/fotos/<pasta>/` — as três larguras em WebP, geradas na publicação |
 | Cartão de partilha | `assets/fotos/partilha/<slug>.jpg` — um por viatura, cortado da **capa** (a primeira fotografia da lista) para o `og:image` do WhatsApp |
 | Gerador | `scripts/gerar.mjs` — Node puro, **zero dependências** |
-| Imagens | `scripts/otimizar-imagens.py` — Pillow |
-| Backoffice | [Pages CMS](https://pagescms.org), configurado em `.pages.yml` |
+| Imagens | `scripts/otimizar-imagens.py` — Pillow, numa versão fixa no `publicar.yml` |
+| Backoffice | **o painel**, https://backoffice.lrmotorsautomoveis.pt: um Worker da Cloudflare, num repositório próprio (privado, `renatovalente5/lr-motors-painel`), que grava neste por uma GitHub App |
+| Regras dos dados | `.github/regras.mjs` — as mesmas no painel (que guarda uma cópia byte a byte) e na guarda da publicação (`.github/guardas.mjs`) |
+
+**O que o painel grava aqui**, e mais nada: `data/viaturas/<slug>.json`,
+`data/viaturas/vendidas/<slug>.json`, `data/definicoes.json` e as fotografias
+em `assets/veiculos/<slug>/`. Nunca o código (`.github/`, `scripts/`), os
+conteúdos legais (`conteudo/`), as fotografias geradas (`assets/fotos/`) nem o
+`CNAME`. Uma viatura vendida muda de pasta no mesmo commit em que se grava.
 
 **Porquê um gerador próprio e não Astro ou Jekyll:** as páginas que valem
 dinheiro num stand são as de cada viatura. Precisam de existir em HTML no
 código-fonte — não só depois de o JavaScript correr — porque os robôs de
 pré-visualização de links do **WhatsApp, Facebook e Instagram não executam
-JavaScript**, e é por aí que este negócio partilha carros. Um gerador de ~900
-linhas sem dependências resolve isso e não apodrece: não há `npm install`,
-não há versões a partir o build daqui a dois anos.
+JavaScript**, e é por aí que este negócio partilha carros. Um gerador sem
+dependências resolve isso e não apodrece: não há `npm install`, não há versões
+a partir o build daqui a dois anos.
+
+### A publicação
+
+Cada commit em `main` — os do painel incluídos — corre o `publicar.yml`: a
+guarda do conteúdo (as regras), a arrumação das vendidas, as fotografias
+preparadas, o commit de volta do CI (`[skip ci]`), a cópia dos dados que o
+gerador lê, o gerador, as verificações e o `deploy-pages`. A guarda só **pára**
+a publicação no que partiria o site ou a lei (a estrutura, os dados legais); uma
+viatura com problemas fica escondida ou sem a fotografia em falta, e o resto
+publica. Quando pára, ou quando uma viatura muda no site por causa dos dados,
+abre-se a issue «Publicação parada».
+
+No painel, o ecrã **Publicação** mostra as corridas e tem o «Publicar outra
+vez». À mão: Actions → Publicar site → Run workflow.
+
+> Em **Settings → Pages**, a origem tem de estar em **GitHub Actions**. Na opção
+> antiga o GitHub tenta processar o repositório com Jekyll e publica a fonte.
 
 ### Correr localmente
 
@@ -75,10 +109,22 @@ BASE= SITE=http://localhost:4200 node scripts/gerar.mjs
 python3 -m http.server 4200 --directory _site
 ```
 
-O `BASE` vazio serve para o site funcionar na raiz em local. Em produção o
-`BASE` é `/LR_Motors`, porque é uma *project page*. **Nunca escrever caminhos
-absolutos à mão** — usar sempre o `u()` do gerador, ou o site parte quando
-publicado e funciona em local, que é a pior combinação possível.
+Em produção o `BASE` também é vazio (o domínio próprio serve na raiz) e o `SITE`
+é `https://lrmotorsautomoveis.pt` — ver o passo «Gerar o site» do
+`publicar.yml`. **Nunca escrever caminhos absolutos à mão** — usar sempre o
+`u()` do gerador.
+
+### Testes
+
+```bash
+PYTHON=<python com Pillow> node .github/test-guardas.mjs   # as regras, a guarda e o CI de ponta a ponta
+node .github/test-gerador.mjs                               # o gerador, também com dados hostis
+.github/comparar-site.sh main HEAD                          # a prova de que uma mudança não mexe no _site
+python3 scripts/testar-cartoes.py                           # o cartão de partilha (corre também na publicação)
+```
+
+As baterias têm de passar duas vezes seguidas. Mudar as regras
+(`.github/regras.mjs`) obriga a copiá-las para o painel.
 
 ### Fotografias
 
@@ -89,14 +135,6 @@ python3 scripts/otimizar-imagens.py --varrer      # gera o que falta
 Os originais ficam em `_fonte/originais/`, **fora do repositório** (ver
 `.gitignore`). Foi de propósito: uma vez comitados, os ficheiros ficam na
 história do Git para sempre e o repositório nunca mais encolhe.
-
-### Publicar
-
-`git push` para `main`. A Action gera e publica. Também há botão manual em
-Actions → Publicar site → Run workflow.
-
-> Em **Settings → Pages**, a origem tem de estar em **GitHub Actions**. Na opção
-> antiga o GitHub tenta processar o repositório com Jekyll e publica a fonte.
 
 ---
 
@@ -138,14 +176,10 @@ Verificado para um stand de usados (Lda) em Vila Verde:
 
 ---
 
-## O que falta preencher
+## O que a lei pede a cada anúncio
 
-Três viaturas estão publicadas **sem preço** («Sob consulta»), porque não havia
-essa informação nas fotos de origem: **BMW i4**, **Kia EV6** e
-**Mercedes Classe E Station**. Recomendo pôr preço — é o primeiro filtro mental
-de quem compra.
-
-Faltam também, em todas as viaturas, os campos que o **DL 74/93** exige na venda
-de usados e que só o stand tem: **matrícula**, **data da matrícula**, **ano de
-construção** e **número de proprietários anteriores**. Os campos já existem no
-backoffice e aparecem na ficha assim que forem preenchidos.
+O painel lembra, em cada viatura à venda, o que falta do que a lei dos usados
+pede ao anúncio (**DL 74/93**: matrícula, donos anteriores, ano de construção
+quando difere do da matrícula), o **preço** (DL 138/90 — sem ele o site mostra
+«Sob consulta») e a **garantia** (num usado, abaixo de 18 meses não é legal —
+DL 84/2021). Lembra, não impede de gravar.
