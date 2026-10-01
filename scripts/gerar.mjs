@@ -22,9 +22,9 @@ import { join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 /* As regras dos dados (as mesmas da guarda do CI e do painel): daqui sai o que
    o site diz ao Google do horário, a nota do custo da chamada de cada telefone,
-   e o que é um endereço que se possa pôr num link. Um sítio só — o que as
-   regras dizem que não se percebe é exactamente o que aqui fica de fora. */
-import { lerHorario, notaDaChamada, urlHttps } from '../.github/regras.mjs';
+   e o que é um email ou um endereço que se possa pôr num link. Um sítio só —
+   o que as regras dizem que não se percebe é exactamente o que aqui fica de fora. */
+import { lerHorario, notaDaChamada, emailValido, urlHttps } from '../.github/regras.mjs';
 
 const RAIZ = dirname(dirname(fileURLToPath(import.meta.url)));
 const SAIDA = join(RAIZ, '_site');
@@ -222,10 +222,20 @@ const GRUPOS_DE_TELEFONES = TELEFONES.reduce((grupos, t) => {
   else grupos.push({ nota: t.nota, telefones: [t] });
   return grupos;
 }, []);
+/* «Telefones: 961 053 363 e 916 228 513 (Chamada para a rede móvel nacional)»,
+   em texto corrido (os Termos). */
+const TELEFONES_EM_TEXTO = `${TELEFONES.length > 1 ? 'Telefones' : 'Telefone'}: ${GRUPOS_DE_TELEFONES
+  .map((g) => `${g.telefones.map((t) => t.texto).join(' e ')} (${g.nota})`).join(' e ')}`;
+
 /* O WhatsApp vai num endereço (wa.me/…), codificado: um valor estranho num
    commit à mão não sai do atributo. */
 const WHATSAPP = String(def.contactos.whatsapp ?? '').trim();
 const waMe = (mensagem) => `https://wa.me/${encodeURIComponent(WHATSAPP)}${mensagem ? `?text=${encodeURIComponent(mensagem)}` : ''}`;
+
+/* O email esteve sempre no backoffice e nunca chegou ao site. Aparece quando é
+   um email (emailValido, nas regras): nos Contactos, no rodapé, nos Termos e no
+   JSON-LD. Vazio ou mal escrito, não aparece em lado nenhum. */
+const EMAIL = emailValido(def.contactos.email) ? def.contactos.email.trim() : '';
 
 /* A morada numa linha: o mapa embutido, e o «Como chegar» sem coordenadas. */
 const MORADA_NUMA_LINHA = `${def.stand.morada}, ${def.stand.codigo_postal} ${def.stand.localidade}`;
@@ -247,6 +257,12 @@ const LINK_DO_MAPA = urlHttps(def.stand.mapa) ? def.stand.mapa.trim() : `https:/
 const redeSocial = (x) => (urlHttps(x) ? x.trim() : '');
 const REDES = { instagram: redeSocial(def.redes.instagram), facebook: redeSocial(def.redes.facebook), tiktok: redeSocial(def.redes.tiktok) };
 
+/* «Onde estamos (texto livre)», dos Textos do site, é o sítio da frase do
+   rodapé de todas as páginas («Stand em …, com oficina própria.»). Estava
+   escrito à mão e o campo não chegava a lado nenhum. Vazio, diz-se a
+   localidade e o distrito do stand. */
+const ONDE_ESTAMOS = temTexto(def.textos.locais) ? def.textos.locais.trim()
+  : [def.stand.localidade, def.stand.distrito].filter(temTexto).join(', ');
 /* As linhas do horário que o site mostra: uma linha toda vazia (sem dias nem
    horas) não aparece — ficava uma linha em branco na lista. */
 const HORARIO = (Array.isArray(def.horario) ? def.horario : [])
@@ -503,6 +519,7 @@ const ic = {
   filtro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8Z"/></svg>',
   fb: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06C2 17.08 5.66 21.24 10.44 22v-7.02H7.9v-2.92h2.54V9.85c0-2.52 1.5-3.91 3.77-3.91 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57v1.89h2.78l-.44 2.92h-2.34V22C18.34 21.24 22 17.08 22 12.06Z"/></svg>',
   ig: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41-.56-.22-.96-.48-1.38-.9-.42-.42-.68-.82-.9-1.38-.16-.42-.36-1.06-.41-2.23C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.42 2.17 8.8 2.16 12 2.16Zm0 5.68a4.16 4.16 0 1 0 0 8.32 4.16 4.16 0 0 0 0-8.32Zm0 6.86a2.7 2.7 0 1 1 0-5.4 2.7 2.7 0 0 1 0 5.4Zm5.3-7.02a.97.97 0 1 1-1.94 0 .97.97 0 0 1 1.94 0Z"/></svg>',
+  email: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
   tiktok: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.6 5.8a5 5 0 0 1-1.4-3.3h-3.2v13a2.6 2.6 0 1 1-2.6-2.6c.27 0 .53.04.78.12V9.7a5.9 5.9 0 0 0-.78-.05 5.85 5.85 0 1 0 5.85 5.85V8.9a8.2 8.2 0 0 0 4.75 1.52V7.2a4.9 4.9 0 0 1-3.4-1.4Z"/></svg>',
 };
 
@@ -719,12 +736,20 @@ function rodape() {
   const numero = (t) => `<li class="rodape__contacto">${ic.tel}
       <span><a href="${esc(t.href)}">${esc(t.texto)}</a>
       <small>(${esc(t.nota)})</small></span></li>`;
+  const email = EMAIL ? `
+          <li class="rodape__contacto">${ic.email}
+      <span><a href="${esc(`mailto:${EMAIL}`)}">${esc(EMAIL)}</a></span></li>` : '';
+  /* A frase da marca e onde é o stand. Sem a frase, não fica um ponto solto no
+     princípio («. Stand em…»); com pontuação no fim, não se lhe junta outra. */
+  const reclamo = temTexto(def.textos.reclamo) ? def.textos.reclamo.trim() : '';
+  const frase = [reclamo && esc(/[.!?…]$/.test(reclamo) ? reclamo : `${reclamo}.`),
+    `Stand em ${esc(ONDE_ESTAMOS)}, com oficina própria.`].filter(Boolean).join(' ');
   return `<footer class="rodape">
   <div class="envolve">
     <div class="rodape__grelha">
       <div>
         <div class="rodape__marca">${logoSVG}</div>
-        <p class="rodape__texto">${esc(def.textos.reclamo)}. Stand em Vila Verde, Braga, com oficina própria.</p>
+        <p class="rodape__texto">${frase}</p>
         <div class="rodape__redes">
           ${rede(REDES.instagram, ic.ig, 'Instagram')}
           ${rede(REDES.facebook, ic.fb, 'Facebook')}
@@ -749,7 +774,7 @@ function rodape() {
       <div>
         <h3>Contactos</h3>
         <ul class="rodape__lista rodape__lista--icones">
-          ${TELEFONES.map(numero).join('\n          ')}
+          ${TELEFONES.map(numero).join('\n          ')}${email}
           <!-- Sem a linha do «Enviar mensagem»: o WhatsApp já está no ícone das
                redes, logo abaixo, e a lista fica só com os números. -->
         </ul>
@@ -894,6 +919,7 @@ const standLD = {
   image: abs('assets/img/stand-960.webp'),
   logo: abs('assets/img/logo.svg'),
   telephone: TELEFONE_1.internacional,
+  ...(EMAIL ? { email: EMAIL } : {}),
   address: {
     '@type': 'PostalAddress',
     streetAddress: def.stand.morada,
@@ -1337,7 +1363,7 @@ ${vitrine(lista)}
     <div class="visita">
       <div class="visita__info">
         <p class="sobretitulo">Venha ver ao vivo</p>
-        <h2 class="h-secao">Estamos em Vila Verde</h2>
+        <h2 class="h-secao">Estamos em ${esc(def.stand.localidade)}</h2>
         <p class="visita__lead">Passe pelo stand sem marcação.</p>
         <ul class="visita__factos">
           <li>${ic.pin}<span><b>${esc(def.stand.morada)}</b><br>${localidadeDoStand()}</span></li>
@@ -1737,7 +1763,11 @@ function paginaViatura(v) {
     ...(nKm(v.km) ? { mileageFromOdometer: { '@type': 'QuantitativeValue', value: v.km, unitCode: 'KMT' } } : {}),
     ...(v.caixa ? { vehicleTransmission: v.caixa } : {}),
     ...(v.combustivel ? { fuelType: v.combustivel } : {}),
-    ...(v.ano ? { productionDate: String(v.ano) } : {}),
+    /* O ano de produção é o «Ano de construção» quando o dono o põe (o DL 74/93
+       pede-o quando difere do da matrícula, e a ficha mostra-o); sem ele, é o
+       da primeira matrícula. Antes ia sempre o da matrícula, e o Google ficava a
+       dizer outra coisa que a ficha. */
+    ...(Number.isInteger(v.ano_construcao) || v.ano ? { productionDate: String(Number.isInteger(v.ano_construcao) ? v.ano_construcao : v.ano) } : {}),
     /* Sem preço publicado, o Offer vai sem `price`: marcar um preço que não
        está visível na página é expressamente proibido pelo Google. */
     offers: {
@@ -1775,6 +1805,8 @@ function paginaContactos() {
   const telefones = GRUPOS_DE_TELEFONES.map((g) => `<li>${ic.tel}<span><b>${g.telefones
     .map((t) => `<a href="${esc(t.href)}">${esc(t.texto)}</a>`).join('\n            · ')}</b>
             <small>(${esc(g.nota)})</small></span></li>`).join('\n          ');
+  const email = EMAIL ? `
+          <li>${ic.email}<span><b><a href="${esc(`mailto:${EMAIL}`)}">${esc(EMAIL)}</a></b></span></li>` : '';
   const corpo = `
 <section class="secao">
   <div class="envolve">
@@ -1792,7 +1824,7 @@ function paginaContactos() {
           <li>${ic.pin}<span><b>${esc(s.morada)}</b><br>${localidadeDoStand()}</span></li>
           ${telefones}
           <li>${ic.zap}<span><b><a href="${esc(waMe())}" rel="noopener">WhatsApp</a></b>
-            <small>Mande a matrícula ou o modelo que procura</small></span></li>
+            <small>Mande a matrícula ou o modelo que procura</small></span></li>${email}
         </ul>
 
         <ul class="horario horario--visita" id="horario-contactos">
@@ -2130,24 +2162,14 @@ function main() {
 `);
   }
 
-  /* páginas legais: markdown simples convertido no build */
-  for (const [ficheiro, destino] of Object.entries({
-    'privacidade.md': 'privacidade/index.html',
-    'termos.md': 'termos/index.html',
-    'garantia.md': 'garantia/index.html',
-    'resolucao-de-litigios.md': 'resolucao-de-litigios/index.html',
-  })) {
-    const caminho = join(RAIZ, 'conteudo', ficheiro);
-    if (!existsSync(caminho)) continue;
-    const bruto = readFileSync(caminho, 'utf8');
-    const [, cab, md] = bruto.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/) ?? [null, '', bruto];
-    const meta = Object.fromEntries(cab.split('\n').filter(Boolean)
-      .map((l) => [l.slice(0, l.indexOf(':')).trim(), l.slice(l.indexOf(':') + 1).trim()]));
+  /* páginas legais: markdown simples convertido no build, com os dados do
+     stand nos marcadores (ver PAGINAS_LEGAIS, mais abaixo) */
+  for (const { destino, meta, md } of PAGINAS_LEGAIS) {
     escrever(destino, pagina({
       pag: destino.replace('index.html', ''),
       titulo: `${meta.titulo} | LR Motors`,
       descricao: meta.descricao ?? meta.titulo,
-      corpo: `<div class="envolve"><article class="texto">${marcarDown(md)}</article></div>`,
+      corpo: `<div class="envolve"><article class="texto">${preencherMarcadores(marcarDown(md))}</article></div>`,
     }));
   }
 
@@ -2190,6 +2212,93 @@ ${urls.map((p) => `  <url><loc>${esc(abs(p))}</loc><lastmod>${hoje}</lastmod></u
     for (const f of naoPublicados) console.log(`    - ${f}`);
   }
 }
+
+/* ------------------------------------------- os dados nas páginas legais */
+/* OS DADOS DO STAND NAS PÁGINAS LEGAIS.
+   ---------------------------------------------------------------------------
+   Os Termos, a Política de privacidade e a Garantia tinham a denominação, a
+   forma jurídica, o capital, o NIF, o CAE, a sede e os telefones ESCRITOS À MÃO
+   nos ficheiros de conteudo/, e o gerador não os via: o dono mudava o telefone
+   no backoffice e as páginas onde a lei manda estar um contacto (DL 7/2004,
+   art. 10.º) ficavam com o antigo — e um fixo lá ficava a dizer «rede móvel».
+   A «Sede social» e o capital, o CAE e a forma jurídica nem chegavam ao site.
+   Agora os ficheiros escrevem {{marcadores}}, que se preenchem daqui:
+
+   · um marcador que não existe PÁRA a construção, com o ficheiro e a lista dos
+     que existem (é uma gralha no conteúdo, e um «{{telefone_l}}» publicado
+     numa página legal é pior do que não publicar);
+   · um obrigatório vazio também pára (os dados legais: as regras já não os
+     deixam chegar aqui vazios; isto é para quem corra o gerador à mão);
+   · numa linha de lista («- CAE {{empresa.cae}}»), um marcador vazio tira a
+     linha inteira — sem CAE não fica «CAE » sozinho, e sem email não há linha
+     do email;
+   · os valores entram DEPOIS do markdown, escapados: um asterisco ou um
+     «[x](…)» num dado do stand é texto, nunca formatação nem uma ligação.
+
+   A SEDE é a «Sede social» dos Dados do stand quando está preenchida (e é
+   outra morada); sem ela, é a do stand — os Termos dizem então «Sede e stand»,
+   como sempre disseram. */
+const sedeSocial = def.sede_social && typeof def.sede_social === 'object' && !Array.isArray(def.sede_social) ? def.sede_social : {};
+const enderecoDe = (m) => [m.morada, [m.codigo_postal, m.localidade].filter(temTexto).map((x) => x.trim()).join(' '), m.distrito]
+  .filter(temTexto).map((x) => x.trim()).join(', ');
+const SEDE_A_PARTE = ['morada', 'codigo_postal', 'localidade'].some((k) => temTexto(sedeSocial[k]))
+  && enderecoDe(sedeSocial) !== enderecoDe(def.stand);
+const SEDE = SEDE_A_PARTE ? sedeSocial : def.stand;
+/* nome → [valor, o campo do backoffice quando é obrigatório] */
+const MARCADORES = new Map(Object.entries({
+  'empresa.denominacao_social': [def.empresa.denominacao_social, 'Dados legais da empresa › Denominação social'],
+  'empresa.nome_comercial': [def.empresa.nome_comercial],
+  'empresa.forma_juridica': [def.empresa.forma_juridica, 'Dados legais da empresa › Forma jurídica'],
+  'empresa.capital_social': [def.empresa.capital_social, 'Dados legais da empresa › Capital social'],
+  'empresa.nif': [def.empresa.nif, 'Dados legais da empresa › NIF'],
+  'empresa.cae': [def.empresa.cae],
+  'sede.rotulo': [SEDE_A_PARTE ? 'Sede' : 'Sede e stand'],
+  'sede.endereco': [enderecoDe(SEDE), 'Morada do stand (ou Sede social)'],
+  'sede.morada': [SEDE.morada],
+  'sede.codigo_postal': [SEDE.codigo_postal],
+  'sede.localidade': [SEDE.localidade],
+  'stand.endereco_se_a_sede_e_outra': [SEDE_A_PARTE ? enderecoDe(def.stand) : ''],
+  'telefones': [TELEFONES_EM_TEXTO],
+  'telefone_1.texto': [TELEFONE_1.texto],
+  'telefone_1.nota': [TELEFONE_1.nota],
+  'contactos.email': [EMAIL],
+}).map(([nome, [valor, obrigatorio]]) => [nome, { valor: valor === undefined || valor === null ? '' : String(valor).trim(), obrigatorio }]));
+const RE_MARCADOR = /\{\{\s*([^{}\s]+)\s*\}\}/g;
+function semMarcadoresPartidos(md, ficheiro) {
+  const parar = (porque) => {
+    console.error(`\nERRO: conteudo/${ficheiro}: ${porque}\n`);
+    process.exit(1);
+  };
+  return md.split('\n').filter((linha) => {
+    const nomes = [...linha.matchAll(RE_MARCADOR)].map((m) => m[1]);
+    for (const nome of nomes) {
+      const m = MARCADORES.get(nome);
+      if (!m) parar(`o marcador «{{${nome}}}» não existe. Os que existem: ${[...MARCADORES.keys()].join(', ')}.`);
+      if (!m.valor && m.obrigatorio) parar(`«{{${nome}}}» está vazio — preencha «${m.obrigatorio}» nos Dados do stand (é obrigatório por lei).`);
+    }
+    return !(/^\s*- /.test(linha) && nomes.some((n) => !MARCADORES.get(n).valor));
+  }).join('\n');
+}
+/* Depois do markdown: o valor escapado, por função (um «$» num dado não é um
+   padrão de substituição) e numa passagem só (um valor com «{{…}}» lá dentro
+   não se volta a ler). */
+const preencherMarcadores = (html) => html.replace(RE_MARCADOR, (_, nome) => esc(MARCADORES.get(nome).valor));
+/* Lidas e conferidas antes de main() apagar o _site: um marcador partido pára
+   a construção sem ter escrito nada. */
+const PAGINAS_LEGAIS = Object.entries({
+  'privacidade.md': 'privacidade/index.html',
+  'termos.md': 'termos/index.html',
+  'garantia.md': 'garantia/index.html',
+  'resolucao-de-litigios.md': 'resolucao-de-litigios/index.html',
+}).flatMap(([ficheiro, destino]) => {
+  const caminho = join(RAIZ, 'conteudo', ficheiro);
+  if (!existsSync(caminho)) return [];
+  const bruto = readFileSync(caminho, 'utf8');
+  const [, cab, md] = bruto.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/) ?? [null, '', bruto];
+  const meta = Object.fromEntries(cab.split('\n').filter(Boolean)
+    .map((l) => [l.slice(0, l.indexOf(':')).trim(), l.slice(l.indexOf(':') + 1).trim()]));
+  return [{ destino, meta, md: semMarcadoresPartidos(md, ficheiro) }];
+});
 
 /* Markdown mínimo: só o que as páginas legais usam. Não vale a pena uma
    dependência para converter títulos, listas e ligações. */

@@ -4,7 +4,7 @@
  *   · o CI do site (.github/guardas.mjs), antes de gerar o site;
  *   · o gerador (scripts/gerar.mjs), que tira daqui o horário que dá ao Google
  *     (lerHorario), a nota do custo da chamada de cada telefone (notaDaChamada)
- *     e o que é um endereço que se possa pôr num link;
+ *     e o que é um email ou um endereço que se possa pôr num link;
  *   · o painel, no browser (o erro aparece por baixo do campo, antes de gravar);
  *   · o Worker do painel, ao gravar (recusa os problemas NOVOS que não sejam
  *     lembretes).
@@ -303,6 +303,9 @@ const RE_WHATSAPP = /^3519[1236][0-9]{7}$/;
 const RE_TELEFONE_TEXTO = /^[0-9 +.-]+$/;
 const RE_CP = /^[0-9]{4}-[0-9]{3}$/;
 export const RE_EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
+/* O email que o site mostra (Contactos, rodapé, Termos, JSON-LD): só um que
+   passe aqui. O mesmo teste nas regras e no gerador. */
+export const emailValido = (v) => typeof v === 'string' && v.length <= TAMANHOS.email && RE_EMAIL.test(v.trim());
 /* Lenta de propósito: uma matrícula estrangeira, ou um formato antigo, não pode
    impedir o dono de gravar. Apanha o que não é matrícula nenhuma («não tem»). */
 const RE_MATRICULA = /^[A-Za-z0-9]+(?:[- ][A-Za-z0-9]+)*$/;
@@ -779,8 +782,8 @@ export function problemasDasDefinicoes(d) {
     telefone(2, false);
     if (vazio(c.whatsapp)) bloqueia('contactos.whatsapp', 'contactos', 'contactos.whatsapp', 'Preencha o WhatsApp: é para onde vão os botões «WhatsApp» de todas as páginas.');
     else if (!(typeof c.whatsapp === 'string' && RE_WHATSAPP.test(c.whatsapp))) bloqueia('contactos.whatsapp', 'contactos', 'contactos.whatsapp', 'O WhatsApp é um telemóvel: escreve-se 351 e o número, só algarismos, sem espaços nem + (ex.: 351961053363).');
-    if (!vazio(c.email) && !(typeof c.email === 'string' && c.email.length <= TAMANHOS.email && RE_EMAIL.test(c.email.trim()))) {
-      avisa('contactos.email', 'contactos', 'contactos.email', 'O email não está bem escrito (ex.: geral@lrmotorsautomoveis.pt, sem acentos nem espaços). Corrija-o ou deixe-o vazio.');
+    if (!vazio(c.email) && !emailValido(c.email)) {
+      avisa('contactos.email', 'contactos', 'contactos.email', 'O email não está bem escrito (ex.: geral@lrmotorsautomoveis.pt, sem acentos nem espaços): enquanto estiver assim, não aparece no site. Corrija-o ou deixe-o vazio.');
     }
   }
 

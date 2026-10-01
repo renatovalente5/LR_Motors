@@ -35,7 +35,7 @@ Não tem de provar nada quanto à origem do defeito no **primeiro ano**: presume
 
 ## Como accionar
 
-Contacte-nos assim que detectar o problema, pelo telefone **961 053 363** (Chamada para a rede móvel nacional) ou no stand. Temos **oficina de mecânica própria**, o que na prática significa que a maioria das situações se resolve em casa e sem demoras.
+Contacte-nos assim que detectar o problema, pelo telefone **{{telefone_1.texto}}** ({{telefone_1.nota}}) ou no stand. Temos **oficina de mecânica própria**, o que na prática significa que a maioria das situações se resolve em casa e sem demoras.
 
 Guarde a factura e o contrato: são o que comprova a data de entrega.
 
