@@ -3,8 +3,8 @@
  * Quatro leitores, e os quatro têm de ouvir o mesmo:
  *   · o CI do site (.github/guardas.mjs), antes de gerar o site;
  *   · o gerador (scripts/gerar.mjs), que tira daqui o horário que dá ao Google
- *     (lerHorario) e a nota do custo da chamada de cada telefone
- *     (notaDaChamada);
+ *     (lerHorario), a nota do custo da chamada de cada telefone (notaDaChamada)
+ *     e o que é um endereço que se possa pôr num link;
  *   · o painel, no browser (o erro aparece por baixo do campo, antes de gravar);
  *   · o Worker do painel, ao gravar (recusa os problemas NOVOS que não sejam
  *     lembretes).
@@ -26,7 +26,7 @@
  *                  WhatsApp) e os dados legais da empresa (CSC art. 171.º).
  *   · neutraliza — uma viatura, só na cópia que o gerador lê (o ficheiro do
  *                  repositório não muda — ver neutralizar()): sem marca ou sem
- *                  modelo, ou com um valor que partia a página dela, fica
+ *                  modelo, ou com um valor que não pode ir para o site, fica
  *                  escondida do site; uma fotografia que não existe, ou que não é
  *                  da biblioteca, não aparece. Um problema de UMA viatura nunca
  *                  pára a publicação das outras.
@@ -288,9 +288,11 @@ const milhares = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
    mudanças de linha à entrada (há um na descrição do Opel Corsa). */
 const RE_CONTROLO_LINHA = /[\u0000-\u001F\u007F]/;
 const RE_CONTROLO_TEXTO = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
-/* Num <script> do JSON-LD (o gerador escreve JSON.stringify(...) lá dentro, sem
-   escapar o «<»), «</script» fecha o elemento a meio e «<!--» muda a forma como
-   o browser o lê: a página parte-se, e o resto do JSON aparece como texto. */
+/* «</script» e «<!--»: dentro de um <script> do JSON-LD, um fecha o elemento a
+   meio e o outro muda a forma como o browser o lê. O gerador escapa o «<» lá
+   dentro desde 1 out 2026, e já não partem nada; mas não há texto honesto que os
+   precise, e continuam fora (a viatura escondida, ou a publicação parada se
+   estiverem nos dados do stand) — uma segunda rede, para um commit à mão. */
 const RE_PARTE_A_PAGINA = /<\/script|<!--/i;
 
 /* Telefones portugueses, 9 algarismos: telemóvel (91, 92, 93, 96) e fixo (2…;
@@ -307,7 +309,10 @@ const RE_MATRICULA = /^[A-Za-z0-9]+(?:[- ][A-Za-z0-9]+)*$/;
 /* O endereço da página: o que o painel gera (gerarSlug). */
 const RE_SLUG = /^[a-z0-9]+(?:-[a-z0-9]+)*$/;
 
-function urlHttps(v) {
+/* Um endereço https:// inteiro, sem espaços, aspas nem «<>». O gerador só põe
+   num link das redes ou do mapa o que passar aqui (um «javascript:» nunca chega
+   a um href, mesmo vindo de um commit à mão). */
+export function urlHttps(v) {
   if (typeof v !== 'string' || !/^https:\/\/[^\s"'<>\\]+$/.test(v.trim())) return false;
   try { return new URL(v.trim()).protocol === 'https:'; } catch { return false; }
 }
@@ -560,16 +565,17 @@ export function problemasDaViatura(v, ctx = {}) {
     if (vazio(x)) neutraliza(campo, 'esconder', campo, `Falta ${nomeCampo}: a viatura fica escondida do site até ${nomeCampo} estar preenchid${campo === 'marca' ? 'a' : 'o'}.`);
     else if (typeof x !== 'string') neutraliza(campo, 'esconder', campo, `${campo === 'marca' ? 'A marca' : 'O modelo'} tem de ser texto: a viatura fica escondida do site até ser corrigid${campo === 'marca' ? 'a' : 'o'}.`);
   }
-  /* O que partia a página desta viatura: o gerador escreve o estado num
-     atributo class, e o preço, o ano e os quilómetros em atributos data-, tal e
-     qual (sem escapar); e qualquer texto vai para o JSON-LD, onde «</script» ou
-     «<!--» partem o resto da página. Só um commit à mão chega aqui. */
+  /* O que partia a página desta viatura até 1 out 2026: aspas no estado ou num
+     número (iam tal e qual para atributos do cartão), e «</script» ou «<!--»
+     num texto (no JSON-LD). O gerador escapa-os agora e já não partem nada; mas
+     nenhum dado honesto os tem, e a viatura continua escondida — uma segunda
+     rede. Só um commit à mão chega aqui. */
   const partem = [];
   for (const campo of ['estado', 'preco', 'ano', 'km']) if (typeof v[campo] === 'string' && v[campo].includes('"')) partem.push(campo);
   for (const [caminho, t] of textosDe(v)) if (RE_PARTE_A_PAGINA.test(t)) partem.push(caminho.split('.')[0]);
   if (partem.length) {
     const campos = [...new Set(partem)];
-    neutraliza('partia-a-pagina', 'esconder', campos[0], `${campos.map((c) => `«${NOMES_CAMPOS[c] || c}»`).join(', ')}: tem caracteres que partiam a página do site (aspas no estado ou num número, ou «</script» ou «<!--» num texto). A viatura fica escondida do site até isso ser corrigido.`, { campos });
+    neutraliza('partia-a-pagina', 'esconder', campos[0], `${campos.map((c) => `«${NOMES_CAMPOS[c] || c}»`).join(', ')}: tem caracteres que não podem ir para o site (aspas no estado ou num número, ou «</script» ou «<!--» num texto). A viatura fica escondida do site até isso ser corrigido.`, { campos });
   }
 
   // --- fotografias ---------------------------------------------------------
@@ -721,11 +727,13 @@ export function problemasDasDefinicoes(d) {
   }
   if (!Array.isArray(d.horario)) bloqueia('horario:forma', 'horario', 'horario', 'O horário não está gravado, e sem ele o site não se consegue gerar. Escreva pelo menos uma linha e grave outra vez.');
 
-  /* Um texto que o gerador escreve no JSON-LD de todas as páginas. */
+  /* Um texto que o gerador escreve no JSON-LD de todas as páginas. Desde 1 out
+     2026 o gerador escapa-o e já não parte nada (ver RE_PARTE_A_PAGINA); fica
+     como estava, uma segunda rede para um commit à mão. */
   const partidos = textosDe(Object.fromEntries(Object.entries(d).filter(([k]) => !BLOQUEADOS_DEFINICOES.includes(k)))).filter(([, t]) => RE_PARTE_A_PAGINA.test(t));
   if (partidos.length) {
     const seccao = partidos[0][0].split('.')[0];
-    bloqueia('partia-a-pagina', tem(SECCOES_DEFINICOES, seccao) ? seccao : null, partidos[0][0], 'Um texto tem «</script» ou «<!--», que partiam todas as páginas do site. Apague-o e escreva outra vez.');
+    bloqueia('partia-a-pagina', tem(SECCOES_DEFINICOES, seccao) ? seccao : null, partidos[0][0], 'Um texto tem «</script» ou «<!--», que não podem ir para o site. Apague-o e escreva-o outra vez.');
   }
 
   /* Um texto de um campo, pelo rótulo que o dono vê (o do .pages.yml).
@@ -786,12 +794,14 @@ export function problemasDasDefinicoes(d) {
     textoSimples(s.distrito, 'stand.distrito', 'stand', 'stand.distrito', 'Distrito', TAMANHOS.distrito, { vazio: 'avisa', porque: 'aparece na morada, no rodapé e na página de Contactos.' });
     textoSimples(s.pais, 'stand.pais', 'stand', 'stand.pais', 'País', TAMANHOS.pais);
     if (!vazio(s.mapa) && !(urlHttps(s.mapa) && s.mapa.length <= TAMANHOS.url)) avisa('stand.mapa', 'stand', 'stand.mapa', 'O link do Google Maps tem de começar por https:// (copie-o do botão «Partilhar» do Google Maps).');
-    /* As coordenadas vão tal e qual para o endereço do botão «Como chegar»: um
-       texto podia partir a página; em falta, o botão fica sem destino. */
+    /* As coordenadas são o destino do botão «Como chegar» e o ponto do stand
+       que o site dá ao Google. Sem elas (ou fora do mapa), o gerador leva o
+       botão à morada e não dá ponto nenhum ao Google. Um texto no lugar de um
+       número só chega num commit à mão, e pára como sempre parou. */
     for (const [k, rotulo, max] of [['latitude', 'Latitude', 90], ['longitude', 'Longitude', 180]]) {
       const x = s[k];
       const campo = `stand.${k}`;
-      if (ausente(x) || x === '') avisa(`stand.${k}`, 'stand', campo, `Preencha «${rotulo}»: sem as coordenadas, o botão «Como chegar» fica sem destino.`);
+      if (ausente(x) || x === '') avisa(`stand.${k}`, 'stand', campo, `Preencha «${rotulo}»: sem as coordenadas, o botão «Como chegar» leva à morada e não ao ponto exacto do stand.`);
       else if (typeof x !== 'number' || !Number.isFinite(x)) bloqueia(`stand.${k}:forma`, 'stand', campo, `«${rotulo}» tem de ser um número (ex.: 41.6469), sem texto à volta.`);
       else if (Math.abs(x) > max) avisa(`stand.${k}`, 'stand', campo, `«${rotulo}» não é uma coordenada (vai de -${max} a ${max}).`);
     }

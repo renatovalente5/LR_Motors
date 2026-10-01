@@ -21,10 +21,10 @@ import { createHash } from 'node:crypto';
 import { join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 /* As regras dos dados (as mesmas da guarda do CI e do painel): daqui sai o que
-   o site diz ao Google do horário e a nota do custo da chamada de cada
-   telefone. Um sítio só — o que as regras dizem que não se percebe é
-   exactamente o que aqui fica de fora. */
-import { lerHorario, notaDaChamada } from '../.github/regras.mjs';
+   o site diz ao Google do horário, a nota do custo da chamada de cada telefone,
+   e o que é um endereço que se possa pôr num link. Um sítio só — o que as
+   regras dizem que não se percebe é exactamente o que aqui fica de fora. */
+import { lerHorario, notaDaChamada, urlHttps } from '../.github/regras.mjs';
 
 const RAIZ = dirname(dirname(fileURLToPath(import.meta.url)));
 const SAIDA = join(RAIZ, '_site');
@@ -177,6 +177,15 @@ function versao(caminho) {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+/* JSON DENTRO DE UM <script> (o JSON-LD e a lista das fotografias da galeria).
+   O JSON.stringify não escapa o «<», e dentro de um <script> um «</script» num
+   texto do dono fecha o elemento a meio e um «<!--» muda a forma como o browser
+   o lê: o resto do JSON aparecia como texto na página. O «<» passa ao escape
+   barra-u-003c, que para quem lê o JSON é o mesmo carácter e que o HTML não tem
+   por onde ver. (Escrito em duas partes de propósito: as ferramentas de edição
+   trocam o escape inteiro pelo próprio «<», e aí isto deixava de escapar fosse o
+   que fosse, sem erro nenhum.) */
+const jsonNoScript = (x) => JSON.stringify(x).replace(/</g, '\\' + 'u003c');
 const temTexto = (x) => typeof x === 'string' && x.trim() !== '';
 
 /* -------------------------------------------------- os contactos do stand */
@@ -213,6 +222,31 @@ const GRUPOS_DE_TELEFONES = TELEFONES.reduce((grupos, t) => {
   else grupos.push({ nota: t.nota, telefones: [t] });
   return grupos;
 }, []);
+/* O WhatsApp vai num endereço (wa.me/…), codificado: um valor estranho num
+   commit à mão não sai do atributo. */
+const WHATSAPP = String(def.contactos.whatsapp ?? '').trim();
+const waMe = (mensagem) => `https://wa.me/${encodeURIComponent(WHATSAPP)}${mensagem ? `?text=${encodeURIComponent(mensagem)}` : ''}`;
+
+/* A morada numa linha: o mapa embutido, e o «Como chegar» sem coordenadas. */
+const MORADA_NUMA_LINHA = `${def.stand.morada}, ${def.stand.codigo_postal} ${def.stand.localidade}`;
+/* As coordenadas só contam como números dentro do mapa. Sem elas, o «Como
+   chegar» leva à morada e o JSON-LD não leva ponto nenhum; antes, um valor em
+   falta dava «destination=undefined,undefined» e um texto ia tal e qual para o
+   endereço. */
+const coordenada = (x, max) => (typeof x === 'number' && Number.isFinite(x) && Math.abs(x) <= max ? x : null);
+const LATITUDE = coordenada(def.stand.latitude, 90);
+const LONGITUDE = coordenada(def.stand.longitude, 180);
+const TEM_COORDENADAS = LATITUDE !== null && LONGITUDE !== null;
+const COMO_CHEGAR = `https://www.google.com/maps/dir/?api=1&destination=${TEM_COORDENADAS ? `${LATITUDE},${LONGITUDE}` : encodeURIComponent(MORADA_NUMA_LINHA)}`;
+/* O link do Google Maps que o dono copiou. Se não for um https:// (vazio, mal
+   colado, ou um «javascript:» de um commit à mão), um feito da morada: o link
+   do rodapé e o botão «Abrir no Google Maps» nunca ficam sem destino. */
+const LINK_DO_MAPA = urlHttps(def.stand.mapa) ? def.stand.mapa.trim() : `https://www.google.com/maps?q=${encodeURIComponent(MORADA_NUMA_LINHA)}`;
+/* As redes: só um endereço https:// chega a um link ou ao JSON-LD (o mesmo
+   teste das regras). As outras não aparecem. */
+const redeSocial = (x) => (urlHttps(x) ? x.trim() : '');
+const REDES = { instagram: redeSocial(def.redes.instagram), facebook: redeSocial(def.redes.facebook), tiktok: redeSocial(def.redes.tiktok) };
+
 /* As linhas do horário que o site mostra: uma linha toda vazia (sem dias nem
    horas) não aparece — ficava uma linha em branco na lista. */
 const HORARIO = (Array.isArray(def.horario) ? def.horario : [])
@@ -231,7 +265,8 @@ const nEuro = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' €';
 const temPreco = (v) => typeof v.preco === 'number' && v.preco > 0;
 const precoTexto = (v) => temPreco(v) ? nEuro(v.preco) : 'Sob consulta';
 
-const nKm = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' km';
+/* Só um número dá quilómetros: um texto num commit à mão saía «NaN km». */
+const nKm = (n) => (typeof n === 'number' && Number.isFinite(n) ? new Intl.NumberFormat('pt-PT').format(n) + ' km' : null);
 
 /* Texto que o cliente escreve num campo de várias linhas do backoffice.
    ---------------------------------------------------------------------------
@@ -592,7 +627,7 @@ function fitaMarcas(marcas) {
     const marca = logo
       ? `<span class="marca-cartao__logo"><svg viewBox="${logo.viewBox}" width="${md.w}" height="${md.h}" aria-hidden="true" focusable="false"><use href="#m-${chaveMarca(m)}"/></svg></span>`
       : `<span class="marca-cartao__logo marca-cartao__logo--sigla" aria-hidden="true">${esc(inicial(m))}</span>`;
-    return `<li class="fita__item${extra ? ' fita__item--extra' : ''}"${deco ? ' aria-hidden="true"' : ''}><a class="marca-cartao" href="${u('viaturas/?marca=' + encodeURIComponent(m))}"${deco ? ' tabindex="-1"' : ''}>
+    return `<li class="fita__item${extra ? ' fita__item--extra' : ''}"${deco ? ' aria-hidden="true"' : ''}><a class="marca-cartao" href="${esc(u('viaturas/?marca=' + encodeURIComponent(m)))}"${deco ? ' tabindex="-1"' : ''}>
         ${marca}
         <span class="marca-cartao__nome">${esc(m)}</span>
       </a></li>`;
@@ -654,7 +689,7 @@ function cabecalho(pag) {
       <span class="topo__tel">${ic.tel}
         <span><a href="${esc(t1.href)}">${esc(t1.texto)}</a>
         <small>(${esc(t1.nota)})</small></span></span>
-      <a class="topo__zap" href="https://wa.me/${def.contactos.whatsapp}" rel="noopener" aria-label="WhatsApp">${ic.zap}</a>
+      <a class="topo__zap" href="${esc(waMe())}" rel="noopener" aria-label="WhatsApp">${ic.zap}</a>
     </div>
     <button class="hamburger" type="button" id="btn-menu" aria-label="Abrir menu" aria-expanded="false" aria-controls="menu"><span></span></button>
   </div>
@@ -666,7 +701,7 @@ function cabecalho(pag) {
     <p class="menu__rotulo">Fale connosco</p>
     <div class="menu__contactos">
       <a class="menu__acao" href="${esc(t1.href)}">${ic.tel}<span>Ligar</span></a>
-      <a class="menu__acao" href="https://wa.me/${def.contactos.whatsapp}" rel="noopener">${ic.zap}<span>WhatsApp</span></a>
+      <a class="menu__acao" href="${esc(waMe())}" rel="noopener">${ic.zap}<span>WhatsApp</span></a>
       <a class="menu__acao" href="${u('contactos/')}">${ic.pin}<span>Onde estamos</span></a>
     </div>
     <p class="nota-chamada">${esc(t1.texto)} · (${esc(t1.nota)})</p>
@@ -691,10 +726,10 @@ function rodape() {
         <div class="rodape__marca">${logoSVG}</div>
         <p class="rodape__texto">${esc(def.textos.reclamo)}. Stand em Vila Verde, Braga, com oficina própria.</p>
         <div class="rodape__redes">
-          ${rede(def.redes.instagram, ic.ig, 'Instagram')}
-          ${rede(def.redes.facebook, ic.fb, 'Facebook')}
-          ${rede(def.redes.tiktok, ic.tiktok, 'TikTok')}
-          <a class="rodape__rede" href="https://wa.me/${def.contactos.whatsapp}" target="_blank" rel="noopener" aria-label="WhatsApp">${ic.zap}</a>
+          ${rede(REDES.instagram, ic.ig, 'Instagram')}
+          ${rede(REDES.facebook, ic.fb, 'Facebook')}
+          ${rede(REDES.tiktok, ic.tiktok, 'TikTok')}
+          <a class="rodape__rede" href="${esc(waMe())}" target="_blank" rel="noopener" aria-label="WhatsApp">${ic.zap}</a>
         </div>
       </div>
       <div>
@@ -706,7 +741,7 @@ function rodape() {
                reais — onze carros e nenhum todo-o-terreno — o link de off-road
                passou a levar a uma lista vazia. Um link do rodapé que não
                devolve nada é pior do que não existir. -->
-          ${tiposEmStock.map((t) => `<li><a href="${u('viaturas/?tipo=' + encodeURIComponent(t.valor))}">${esc(t.rotulo)}</a></li>`).join('\n          ')}
+          ${tiposEmStock.map((t) => `<li><a href="${esc(u('viaturas/?tipo=' + encodeURIComponent(t.valor)))}">${esc(t.rotulo)}</a></li>`).join('\n          ')}
           <li><a href="${u('servicos/')}">Serviços</a></li>
           <li><a href="${u('sobre/')}">Sobre nós</a></li>
         </ul>
@@ -723,7 +758,7 @@ function rodape() {
         <h3>Onde estamos</h3>
         <ul class="rodape__lista rodape__lista--icones">
           <li class="rodape__contacto">${ic.pin}
-            <span><a href="${esc(def.stand.mapa)}" target="_blank" rel="noopener">${esc(def.stand.morada)}<br>${localidadeDoStand()}</a></span></li>
+            <span><a href="${esc(LINK_DO_MAPA)}" target="_blank" rel="noopener">${esc(def.stand.morada)}<br>${localidadeDoStand()}</a></span></li>
           <li class="rodape__contacto">${ic.relogio}
             <span><ul class="horario">
               ${HORARIO.map((h) => `<li><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
@@ -799,7 +834,7 @@ function pagina({ pag = '', titulo: t, descricao, corpo, jsonld = [], og, classe
 <link rel="icon" href="${u('assets/img/favicon.svg')}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="${u('assets/img/apple-touch-icon.png')}">
 <link rel="stylesheet" href="${versao('assets/css/estilo.css')}">
-${jsonld.map((j) => `<script type="application/ld+json">${JSON.stringify(j)}</script>`).join('\n')}
+${jsonld.map((j) => `<script type="application/ld+json">${jsonNoScript(j)}</script>`).join('\n')}
 </head>
 <body class="${classe}">
 ${cabecalho(pag)}
@@ -867,14 +902,14 @@ const standLD = {
     ...(temTexto(def.stand.distrito) ? { addressRegion: def.stand.distrito } : {}),
     addressCountry: 'PT',
   },
-  geo: { '@type': 'GeoCoordinates', latitude: def.stand.latitude, longitude: def.stand.longitude },
+  ...(TEM_COORDENADAS ? { geo: { '@type': 'GeoCoordinates', latitude: LATITUDE, longitude: LONGITUDE } } : {}),
   /* O HORÁRIO SAI DOS DADOS (lerHorario, nas regras), e não daqui. Esteve
      escrito à mão — segunda a sexta 9h-19h, sábado 9h-13h — e o dono mudava o
      horário no backoffice e o Google ficava com o antigo. Uma linha que não se
      perceba fica de fora (e o dono é lembrado de como a escrever); se nenhuma
      se perceber, não vai horário nenhum, que é melhor do que um errado. */
   ...(HORARIO_GOOGLE.length ? { openingHoursSpecification: HORARIO_GOOGLE } : {}),
-  sameAs: [def.redes.instagram, def.redes.facebook, def.redes.tiktok].filter(Boolean),
+  sameAs: [REDES.instagram, REDES.facebook, REDES.tiktok].filter(Boolean),
   department: {
     '@type': 'AutoRepair',
     name: 'Oficina LR Motors',
@@ -919,7 +954,7 @@ const migalhasLD = (itens) => {
 function cartao(v, { prioridade = false } = {}) {
   const f = fotos(v)[0];
   const img = f
-    ? `<img src="${f.srcCartao}" srcset="${f.srcsetCartao}"
+    ? `<img src="${esc(f.srcCartao)}" srcset="${esc(f.srcsetCartao)}"
          sizes="(max-width: 620px) 100vw, (max-width: 1000px) 46vw, 30vw"
          alt="${esc(tituloLongo(v))}" width="960" height="720"
          ${prioridade ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">`
@@ -988,12 +1023,14 @@ function cartao(v, { prioridade = false } = {}) {
      fragmento. Sem isso, quem chega por um link antigo com leitor de ecrã ou
      teclado aterra com o foco no princípio do documento, e a página parece não
      ter ido a lado nenhum. */
-  return `<article class="cartao cartao--${v.estado}"${estaVendida(v) ? ` id="v-${esc(v.slug)}" tabindex="-1"` : ''}
+  /* A classe leva um dos quatro estados (estadoDe), e não o valor tal e qual:
+     aspas num estado escrito à mão saíam do atributo. O resto vai escapado. */
+  return `<article class="cartao cartao--${estadoDe(v)}"${estaVendida(v) ? ` id="v-${esc(v.slug)}" tabindex="-1"` : ''}
     data-tipo="${esc(v.tipo)}" data-marca="${esc(v.marca)}" data-combustivel="${esc(v.combustivel)}"
-    data-caixa="${esc(v.caixa)}" data-preco="${v.preco ?? ''}" data-ano="${v.ano ?? ''}"
-    data-km="${v.km ?? ''}" data-estado="${esc(v.estado)}"
+    data-caixa="${esc(v.caixa)}" data-preco="${esc(v.preco ?? '')}" data-ano="${esc(v.ano ?? '')}"
+    data-km="${esc(v.km ?? '')}" data-estado="${esc(v.estado)}"
     data-procura="${esc([tituloLongo(v), v.carrocaria, v.combustivel].filter(Boolean).join(' ').toLowerCase())}">
-${estaVendida(v) ? corpo : `  <a href="${u('viaturas/' + v.slug + '/')}" style="display:contents" aria-label="Ver ${esc(tituloLongo(v))}">
+${estaVendida(v) ? corpo : `  <a href="${esc(u('viaturas/' + v.slug + '/'))}" style="display:contents" aria-label="Ver ${esc(tituloLongo(v))}">
 ${corpo}
   </a>`}
 </article>`;
@@ -1090,17 +1127,17 @@ function vitrine(lista) {
       `<div><dt>${esc(k)}</dt><dd>${esc(String(val))}</dd></div>`).join('');
 
     return `<li class="vit-item"><article class="vit-cartao">
-      <a class="vit-cartao__link" href="${u('viaturas/' + v.slug + '/')}">
+      <a class="vit-cartao__link" href="${esc(u('viaturas/' + v.slug + '/'))}">
         <div class="vit-cartao__cabeca">
           <h3 class="vit-cartao__linha">
             <span class="vit-cartao__nome">${esc([v.marca, v.modelo].filter(Boolean).join(' '))}</span>
-            <span class="vit-cartao__preco">${precoTexto(v)}</span>
+            <span class="vit-cartao__preco">${esc(precoTexto(v))}</span>
           </h3>
           <p class="vit-cartao__versao">${esc(v.versao || v.carrocaria || '')}</p>
           <p class="vit-cartao__selos">${selos.join('')}</p>
         </div>
         <div class="vit-cartao__foto">
-          ${f ? `<img src="${f.src}" srcset="${f.srcset}" sizes="(max-width: 700px) 78vw, 400px"
+          ${f ? `<img src="${esc(f.src)}" srcset="${esc(f.srcset)}" sizes="(max-width: 700px) 78vw, 400px"
                alt="${esc(tituloLongo(v))}" width="1600" height="1200"
                ${i < 3 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">`
             : '<div class="vit-cartao__semfoto">Sem fotografia</div>'}
@@ -1317,7 +1354,7 @@ ${vitrine(lista)}
         <div class="visita__acoes">
           <!-- Os mesmos dois botões da página de Contactos, pela mesma ordem. -->
           <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} Ligar agora</a>
-          <a class="btn btn--contorno" href="https://www.google.com/maps/dir/?api=1&amp;destination=${def.stand.latitude},${def.stand.longitude}"
+          <a class="btn btn--contorno" href="${esc(COMO_CHEGAR)}"
              target="_blank" rel="noopener">${ic.pin} Como chegar</a>
         </div>
       </div>
@@ -1350,8 +1387,7 @@ ${vitrine(lista)}
    consentimento: o embed do Google instala cookies antes de qualquer
    interacção, e o consentimento tem de ser prévio (art. 5.º da Lei 41/2004). */
 function mapa() {
-  const s = def.stand;
-  const q = encodeURIComponent(`${s.morada}, ${s.codigo_postal} ${s.localidade}`);
+  const q = encodeURIComponent(MORADA_NUMA_LINHA);
   return `<div class="mapa" id="mapa" data-mapa="https://www.google.com/maps?q=${q}&output=embed">
     <!-- O texto diz agora que isto é o mapa E porque é que aparece. Motivo: com
          o aviso de cookies a falar só de cookies, quem carrega em «Apenas
@@ -1365,7 +1401,7 @@ function mapa() {
          instalar cookies. Se escolheu «Apenas necessários» no aviso de cookies, é por isso.</p>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center">
         <button class="btn btn--principal" type="button" id="btn-mapa">Carregar o mapa</button>
-        <a class="btn btn--contorno" href="${esc(s.mapa)}" target="_blank" rel="noopener">Abrir no Google Maps</a>
+        <a class="btn btn--contorno" href="${esc(LINK_DO_MAPA)}" target="_blank" rel="noopener">Abrir no Google Maps</a>
       </div>
     </div>
   </div>`;
@@ -1429,7 +1465,7 @@ function paginaViaturas() {
     <div class="vazio" id="vazio" hidden>
       <h3>Nenhuma viatura com estes filtros</h3>
       <p>Experimente alargar a pesquisa — ou diga-nos o que procura e nós encontramos.</p>
-      <a class="btn btn--principal" href="https://wa.me/${def.contactos.whatsapp}" rel="noopener">${ic.zap} Dizer o que procuro</a>
+      <a class="btn btn--principal" href="${esc(waMe())}" rel="noopener">${ic.zap} Dizer o que procuro</a>
     </div>
 
     ${vendidas.length && def.opcoes.mostrar_vendidos ? `
@@ -1523,7 +1559,7 @@ function paginaViatura(v) {
   const galeria = fs_.length ? `
 <div class="galeria">
   <div class="galeria__principal">
-    <img id="foto-principal" src="${fs_[0].src}" srcset="${fs_[0].srcset}"
+    <img id="foto-principal" src="${esc(fs_[0].src)}" srcset="${esc(fs_[0].srcset)}"
          sizes="(max-width: 980px) 100vw, 62vw" alt="${esc(nome)}"
          width="1600" height="1200" fetchpriority="high" decoding="async">
     ${fs_.length > 1 ? `
@@ -1533,7 +1569,7 @@ function paginaViatura(v) {
   </div>
   ${fs_.length > 1 ? `<div class="galeria__tiras" role="tablist" aria-label="Fotografias">
     ${fs_.map((f, i) => `<button class="tira" type="button" role="tab" data-i="${i}" aria-current="${i === 0}"
-      aria-label="Fotografia ${i + 1}"><img src="${f.srcCartao}" alt="" width="96" height="72" loading="lazy" decoding="async"></button>`).join('')}
+      aria-label="Fotografia ${i + 1}"><img src="${esc(f.srcCartao)}" alt="" width="96" height="72" loading="lazy" decoding="async"></button>`).join('')}
   </div>` : ''}
 </div>
 <dialog class="lightbox" id="lightbox">
@@ -1545,7 +1581,7 @@ function paginaViatura(v) {
     <span class="lightbox__contador"><span id="lb-n">1</span> de ${fs_.length}</span>` : ''}
   </div>
 </dialog>
-<script type="application/json" id="fotos-json">${JSON.stringify(fs_.map((f) => ({ src: f.src, srcset: f.srcset })))}</script>`
+<script type="application/json" id="fotos-json">${jsonNoScript(fs_.map((f) => ({ src: f.src, srcset: f.srcset })))}</script>`
     : '<div class="galeria__principal" style="display:grid;place-items:center;color:var(--tinta-3)">Sem fotografias</div>';
 
   /* Linhas vazias e espaços em volta fora: o campo é uma lista escrita à mão
@@ -1618,7 +1654,7 @@ function paginaViatura(v) {
           <div class="painel__acoes">
             <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} ${esc(TELEFONE_1.texto)}</a>
             <p class="nota-chamada">(${esc(TELEFONE_1.nota)})</p>
-            <a class="btn btn--zap" href="https://wa.me/${def.contactos.whatsapp}?text=${encodeURIComponent('Olá! Tenho interesse no ' + nome + ' — ' + abs('viaturas/' + v.slug + '/'))}" rel="noopener">${ic.zap} Perguntar no WhatsApp</a>
+            <a class="btn btn--zap" href="${esc(waMe('Olá! Tenho interesse no ' + nome + ' — ' + abs('viaturas/' + v.slug + '/')))}" rel="noopener">${ic.zap} Perguntar no WhatsApp</a>
             <a class="btn btn--contorno" href="${u('contactos/')}">${ic.pin} Como chegar ao stand</a>
           </div>
           <!-- Sem «Ref.»: o que lá estava era o slug do endereço, um
@@ -1684,7 +1720,7 @@ function paginaViatura(v) {
 
 <div class="barra-contacto">
   <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} Ligar</a>
-  <a class="btn btn--zap" href="https://wa.me/${def.contactos.whatsapp}" rel="noopener">${ic.zap} WhatsApp</a>
+  <a class="btn btn--zap" href="${esc(waMe())}" rel="noopener">${ic.zap} WhatsApp</a>
 </div>`;
 
   /* Product + Offer: é o tipo que ainda produz resultado enriquecido no Google.
@@ -1698,7 +1734,7 @@ function paginaViatura(v) {
     image: fs_.slice(0, 6).map((f) => abs(f.src.replace(BASE + '/', ''))),
     brand: { '@type': 'Brand', name: v.marca },
     ...(v.cor ? { color: v.cor } : {}),
-    ...(v.km != null ? { mileageFromOdometer: { '@type': 'QuantitativeValue', value: v.km, unitCode: 'KMT' } } : {}),
+    ...(nKm(v.km) ? { mileageFromOdometer: { '@type': 'QuantitativeValue', value: v.km, unitCode: 'KMT' } } : {}),
     ...(v.caixa ? { vehicleTransmission: v.caixa } : {}),
     ...(v.combustivel ? { fuelType: v.combustivel } : {}),
     ...(v.ano ? { productionDate: String(v.ano) } : {}),
@@ -1755,7 +1791,7 @@ function paginaContactos() {
         <ul class="visita__factos">
           <li>${ic.pin}<span><b>${esc(s.morada)}</b><br>${localidadeDoStand()}</span></li>
           ${telefones}
-          <li>${ic.zap}<span><b><a href="https://wa.me/${def.contactos.whatsapp}" rel="noopener">WhatsApp</a></b>
+          <li>${ic.zap}<span><b><a href="${esc(waMe())}" rel="noopener">WhatsApp</a></b>
             <small>Mande a matrícula ou o modelo que procura</small></span></li>
         </ul>
 
@@ -1766,7 +1802,7 @@ function paginaContactos() {
         ${notaVisita()}
         <div class="visita__acoes">
           <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} Ligar agora</a>
-          <a class="btn btn--contorno" href="https://www.google.com/maps/dir/?api=1&amp;destination=${s.latitude},${s.longitude}"
+          <a class="btn btn--contorno" href="${esc(COMO_CHEGAR)}"
              target="_blank" rel="noopener">${ic.pin} Como chegar</a>
         </div>
         <p class="nota-chamada">(${esc(TELEFONE_1.nota)})</p>
@@ -1834,7 +1870,7 @@ function paginaServicos() {
       </div>
       <div class="faixa-cta__acoes">
         <a class="btn btn--principal" href="${u('viaturas/')}">Ver as viaturas ${ic.seta}</a>
-        <a class="btn btn--zap" href="https://wa.me/${def.contactos.whatsapp}" rel="noopener">${ic.zap} Dizer o que procuro</a>
+        <a class="btn btn--zap" href="${esc(waMe())}" rel="noopener">${ic.zap} Dizer o que procuro</a>
       </div>
     </div>
   </div>
@@ -2077,18 +2113,18 @@ function main() {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(tituloLongo(v))} — vendido | LR Motors</title>
 <meta name="description" content="${esc(legenda)}">
-<meta http-equiv="refresh" content="0; url=${comAncora}">
+<meta http-equiv="refresh" content="0; url=${esc(comAncora)}">
 <meta property="og:type" content="website">
 <meta property="og:title" content="${esc(tituloLongo(v))} — vendido">
 <meta property="og:description" content="${esc(legenda)}">
-<meta property="og:image" content="${cartao}">
-<meta property="og:url" content="${destino}">
+<meta property="og:image" content="${esc(cartao)}">
+<meta property="og:url" content="${esc(destino)}">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 <body style="font-family:system-ui,sans-serif;padding:2rem;text-align:center;color:#0E1726">
 <p><strong>${esc(tituloLongo(v))}</strong></p>
 <p>Esta viatura já foi vendida.</p>
-<p><a href="${comAncora}">Ver as viaturas em stock</a></p>
+<p><a href="${esc(comAncora)}">Ver as viaturas em stock</a></p>
 </body>
 </html>
 `);
@@ -2125,7 +2161,7 @@ function main() {
   const hoje = new Date().toISOString().slice(0, 10);
   escrever('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map((p) => `  <url><loc>${abs(p)}</loc><lastmod>${hoje}</lastmod></url>`).join('\n')}
+${urls.map((p) => `  <url><loc>${esc(abs(p))}</loc><lastmod>${hoje}</lastmod></url>`).join('\n')}
 </urlset>
 `);
   /* /fotos/ é a ferramenta interna de reduzir fotografias — não é conteúdo do
