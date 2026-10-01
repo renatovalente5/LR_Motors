@@ -398,6 +398,9 @@ const tituloLongo = (v) => [v.marca, v.modelo, v.versao].filter(Boolean).join(' 
    resultado é o mesmo. */
 const BIBLIOTECA = 'assets/veiculos';
 const DERIVADAS = 'assets/fotos';
+/* O que pode sair destas duas pastas para o site: só imagens — ver
+   publicavel(), mais abaixo. */
+const IMAGEM_PUBLICAVEL = /\.(?:jpe?g|png|webp)$/i;
 const pastaDerivada = (rel) =>
   rel === BIBLIOTECA || rel.startsWith(BIBLIOTECA + '/') ? DERIVADAS + rel.slice(BIBLIOTECA.length) : rel;
 const ficheirosDe = (rel) => (existsSync(join(RAIZ, rel)) ? readdirSync(join(RAIZ, rel)) : []);
@@ -475,6 +478,16 @@ function fotos(v) {
     const { limpo, larguras, naBiblioteca } = resolver(c);
     const ha = larguras.length > 0 || Boolean(naBiblioteca);
     if (!ha) console.warn(umaLinha(`  !! ${v.slug}: a foto ${limpo} está na lista mas não existe — ignorada`));
+    /* Sem variantes, a galeria serviria o ficheiro da biblioteca — e se ele
+       não for uma imagem que o site publica (um .heic, que o Pillow da
+       publicação não lê; ou outra coisa com o mesmo nome), o publicavel()
+       deixa-o fora do _site e a página ficava com uma imagem partida, a
+       capa incluída. Salta-se, como a que não existe: o cartão de partilha
+       já saltava (é a mesma fotografia, a capa e o cartão). */
+    else if (!larguras.length && !IMAGEM_PUBLICAVEL.test(naBiblioteca)) {
+      console.warn(umaLinha(`  !! ${v.slug}: a foto ${limpo} não é uma imagem que o site publique — ignorada`));
+      return false;
+    }
     return ha;
   });
 
@@ -2012,6 +2025,20 @@ function publicavel(origem) {
   const resto = rel.slice((daBiblioteca ? BIBLIOTECA : DERIVADAS).length + 1);
   const nome = resto.split('/').pop();
   const base = semSufixo(nome);
+
+  /* Caso 0: só imagens. Quem grava conteúdo escreve nestas pastas — o Pages
+     CMS aceita qualquer ficheiro no Media — e o site servia tudo o que lá
+     estivesse, e na ORIGEM DO SITE: um .html ou um .svg na pasta de uma viatura
+     corria JavaScript em nome de lrmotorsautomoveis.pt. Daqui só saem jpg,
+     jpeg, png e webp, o que o scripts/otimizar-imagens.py prepara e os browsers
+     mostram. (O .heic que ele aceita, o Pillow da publicação não o lê: sairia
+     o ficheiro do telemóvel em bruto, com as coordenadas.) O resto fica de fora
+     e avisa no registo da publicação. */
+  if (!IMAGEM_PUBLICAVEL.test(nome)) {
+    console.warn(umaLinha(`  !! ${rel}: não é uma fotografia (só vão para o site jpg, jpeg, png e webp) — fica de fora`));
+    naoPublicados.push(`${rel} (não é uma fotografia)`);
+    return false;
+  }
 
   /* Caso 1: solto na raiz, que é onde o backoffice grava quando não se abre
      primeiro a pasta de uma viatura. Vale para a fotografia e para as variantes

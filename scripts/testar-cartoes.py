@@ -119,10 +119,6 @@ def verificar(titulo, esperado):
     capa, cartao = cor_da_capa(), cor_do_cartao()
     if esperado == 'LOGOTIPO':
         bate = cartao == 'LOGOTIPO'
-    elif esperado == 'SALTA':
-        # A capa é um ficheiro que o browser também não mostra; o cartão não pode
-        # ficar preso no anterior — tem de descer para a fotografia seguinte.
-        bate = igual(cartao, CORES['A']) and capa == 'ILEGIVEL'
     else:
         bate = igual(cartao, esperado) and igual(capa, esperado)
     print(('  ok   ' if bate else '  FALHA') + f' {titulo:52} capa={capa} cartão={cartao}')
@@ -160,7 +156,11 @@ print('\numa fotografia que o Pillow não abre (uma .heic do iPhone)')
 montar()
 (arvore / 'assets/veiculos/carro/IMG.heic').write_bytes(b'\x00\x00\x00\x18ftypheic' + b'\x00' * 200)
 mexer_na_lista(lambda f: ['assets/veiculos/carro/IMG.heic'] + f)
-verificar('salta para a seguinte em vez de ficar presa', 'SALTA')
+# Nem o cartão nem a capa ficam presos nela: descem os dois para a seguinte. A
+# capa era o .heic em bruto, que o browser também não mostra; o site deixou de
+# o publicar (das pastas das fotografias só saem jpg, jpeg, png e webp), e a
+# galeria salta-o como salta uma que não existe.
+verificar('salta para a seguinte em vez de ficar presa', CORES['A'])
 
 print('\no anúncio fica sem fotografia nenhuma')
 montar()

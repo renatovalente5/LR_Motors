@@ -423,6 +423,34 @@ try {
   }
 
   /* ================================================================== */
+  secao('das pastas das fotografias só saem imagens');
+  {
+    /* Quem grava conteúdo escreve na biblioteca (o Pages CMS aceita qualquer
+       ficheiro no Media), e o site publicava tudo o que lá estivesse, na origem
+       do site: um .html ou um .svg numa pasta de viatura corria JavaScript em
+       lrmotorsautomoveis.pt. Só jpg, jpeg, png e webp (sem ligar a maiúsculas);
+       o resto fica de fora e avisa — também numa subpasta, também nas geradas,
+       e também uma «fotografia» solta na raiz que uma viatura diga usar. */
+    const B = `assets/veiculos/${J}`;
+    const fora = [`${B}/teste.html`, `${B}/teste.svg`, `${B}/teste.txt`, `${B}/.htaccess`, `${B}/sem-extensao`, `${B}/IMG_1.HEIC`, `${B}/fundo/teste.html`,
+      `assets/fotos/${J}/intruso.html`, 'assets/veiculos/solta.svg'];
+    const dentro = [`${B}/IMG_2.JPG`, `${B}/IMG_3.jpeg`, `${B}/IMG_4.png`, `${B}/IMG_5.webp`];
+    const ficheiros = Object.fromEntries([...fora, ...dentro].map((f) => [f, f.endsWith('.svg') ? '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>' : '<script>alert(1)</script>']));
+    const vs = clonar(VIATURAS); vs[J].fotos = [...vs[J].fotos, 'assets/veiculos/solta.svg', ...dentro];
+    const g = gerar({ viaturas: vs, ficheiros });
+    const publicado = (rel) => existsSync(join(g.dir, '_site', rel));
+    certo(g.status === 0 && fora.every((f) => !publicado(f)) && dentro.every(publicado),
+      `das ${fora.length} que não são imagens (.html, .svg, .txt, .htaccess, sem extensão, .HEIC, numa subpasta, nas geradas, solta na raiz e «em uso») nenhuma vai para o _site; as 4 imagens vão (JPG, jpeg, png, webp)`,
+      JSON.stringify({ publicadas: fora.filter(publicado), faltam: dentro.filter((f) => !publicado(f)), err: g.err.slice(-300) }));
+    const avisadas = fora.filter((f) => g.err.includes(`!! ${f}: não é uma fotografia`));
+    certo(avisadas.length === fora.length, '   e cada uma avisa no registo da publicação, com o caminho', fora.filter((f) => !avisadas.includes(f)).join(', '));
+    const pagina = g.ler(`viaturas/${J}/index.html`) || '';
+    certo(!pagina.includes('solta.svg') && dentro.every((f) => pagina.includes(f.split('/').pop())) && g.err.includes(`!! ${J}: a foto assets/veiculos/solta.svg não é uma imagem que o site publique — ignorada`),
+      '   e a galeria não aponta para o que não foi publicado (a «solta.svg» da lista sai da galeria, com aviso; as imagens ficam)');
+    g.apagar();
+  }
+
+  /* ================================================================== */
   secao('a consola do CI: os dados não abrem comandos do runner');
   {
     /* O runner lê comandos no que o gerador escreve (.github/consola.mjs): uma
