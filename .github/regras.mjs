@@ -254,7 +254,8 @@ export function mesesDeGarantia(texto) {
    deixa mudanças de linha). O que sobrar de «**» aparece no site tal e qual. */
 export function negritoCerto(s, { porParagrafo = true } = {}) {
   if (typeof s !== 'string') return true;
-  const partes = porParagrafo ? s.replace(/\r\n?/g, '\n').split(/\n{2,}/) : [s];
+  const t = s.replace(/[\u2028\u2029]/g, '\n');
+  const partes = porParagrafo ? t.replace(/\r\n?/g, '\n').split(/\n{2,}/) : [t];
   const re = porParagrafo ? /\*\*([^*\n]+)\*\*/g : /\*\*([^*]+)\*\*/g;
   return partes.every((p) => !p.replace(re, '$1').includes('**'));
 }
@@ -270,6 +271,8 @@ const ausente = (v) => v === undefined || v === null;
    espaços passa a nada. */
 const vazio = (v) => ausente(v) || (typeof v === 'string' && v.trim() === '');
 const temTexto = (v) => typeof v === 'string' && v.trim() !== '';
+/* O gerador apara todos os textos à entrada (limparCampos): «SUV » é «SUV». */
+const aparado = (v) => (typeof v === 'string' ? v.trim() : v);
 const inteiroEntre = (v, a, b) => typeof v === 'number' && Number.isInteger(v) && v >= a && v <= b;
 const duasCasas = (x) => typeof x === 'number' && Number.isFinite(x) && Math.abs(x * 100 - Math.round(x * 100)) < 1e-6;
 const bytesDe = (s) => new TextEncoder().encode(s).length;
@@ -354,10 +357,14 @@ function lerJson(valor) {
 
 /* À venda NO SITE, como o gerador decide: publicada (tudo menos `false`) e não
    vendida. É a estas que a lei dos usados se aplica — o anúncio. */
-export const aVendaNoSite = (v) => eObjecto(v) && v.publicado !== false && v.estado !== 'vendido';
+export const aVendaNoSite = (v) => eObjecto(v) && v.publicado !== false && aparado(v.estado) !== 'vendido';
+/* O nome que o ecrã mostra: marca, modelo e versão, numa linha só (sem
+   caracteres invisíveis nem mudanças de linha), cortado a 80. */
 export const nomeDaViatura = (v, slug) => {
-  const n = eObjecto(v) ? ['marca', 'modelo', 'versao'].map((k) => v[k]).filter(temTexto).map((x) => x.trim()).join(' ') : '';
-  return n || slug || 'viatura sem nome';
+  const n = eObjecto(v) ? ['marca', 'modelo', 'versao'].map((k) => v[k]).filter(temTexto).join(' ')
+    .replace(/[\u0000-\u001F\u007F]+/g, ' ').replace(/\s+/g, ' ').trim() : '';
+  const curto = n.length > 80 ? `${n.slice(0, 79)}…` : n;
+  return curto || slug || 'viatura sem nome';
 };
 const ecraDaViatura = (v, slug, pasta) => `${pasta === 'vendidas' ? 'Vendidas' : 'Viaturas'} › ${nomeDaViatura(v, slug)}`;
 
@@ -441,7 +448,7 @@ export function problemasDaViatura(v, ctx = {}) {
 
   // --- valores fora da lista (erro de campo no painel) --------------------
   const deLista = (campo, valores, obrigatorio, mensagem) => {
-    const x = v[campo];
+    const x = aparado(v[campo]);
     if (vazio(x)) { if (obrigatorio) avisa(campo, campo, mensagem); return; }
     if (!valores.includes(x)) avisa(campo, campo, mensagem);
   };
@@ -547,11 +554,12 @@ export function problemasDasDefinicoes(d) {
   const avisa = (chave, seccao, campo, mensagem, extra = {}) => out.push({ classe: 'avisa', chave: `definicoes:${chave}`, ficheiro, ecra: seccao ? ecraDe(seccao) : 'Dados do stand', campo, mensagem, ...extra });
   if (!eObjecto(d)) { bloqueia('forma', null, undefined, 'Os dados do stand não têm a forma certa. Só o Renato os pode corrigir.'); return out; }
 
-  /* As secções que o gerador lê sem perguntar. */
+  /* As secções que o gerador lê sem perguntar. Faltam quando todos os campos
+     delas ficam vazios: o Pages CMS não grava uma secção vazia. */
   for (const s of ['contactos', 'stand', 'redes', 'textos', 'opcoes', 'empresa']) {
-    if (!eObjecto(d[s])) bloqueia(`${s}:forma`, s, s, `A secção «${SECCOES_DEFINICOES[s]}» não está gravada (sem ela o site não se consegue gerar). Só o Renato a pode repor.`);
+    if (!eObjecto(d[s])) bloqueia(`${s}:forma`, s, s, `A secção «${SECCOES_DEFINICOES[s]}» não está gravada, e sem ela o site não se consegue gerar. Preencha os campos dela e grave outra vez.`);
   }
-  if (!Array.isArray(d.horario)) bloqueia('horario:forma', 'horario', 'horario', 'O horário não está gravado como uma lista de linhas (sem ele o site não se consegue gerar). Só o Renato o pode repor.');
+  if (!Array.isArray(d.horario)) bloqueia('horario:forma', 'horario', 'horario', 'O horário não está gravado, e sem ele o site não se consegue gerar. Escreva pelo menos uma linha e grave outra vez.');
 
   /* Um texto que o gerador escreve no JSON-LD de todas as páginas. */
   const partidos = textosDe(Object.fromEntries(Object.entries(d).filter(([k]) => !BLOQUEADOS_DEFINICOES.includes(k)))).filter(([, t]) => RE_PARTE_A_PAGINA.test(t));
@@ -560,14 +568,18 @@ export function problemasDasDefinicoes(d) {
     bloqueia('partia-a-pagina', tem(SECCOES_DEFINICOES, seccao) ? seccao : null, partidos[0][0], 'Um texto tem «</script» ou «<!--», que partiam todas as páginas do site. Apague-o e escreva outra vez.');
   }
 
-  const textoSimples = (valor, chave, seccao, campo, nome, max, { obrigatorio = false, linha = true, classeVazio = 'avisa' } = {}) => {
+  /* Um texto de um campo, pelo rótulo que o dono vê (o do .pages.yml).
+     vazio: a classe quando falta ('bloqueia' — a lei; 'avisa' — fica um buraco
+     no site) ou null (opcional); porque: o que acontece no site sem ele. */
+  const textoSimples = (valor, chave, seccao, campo, rotulo, max, { vazio: classeVazio = null, porque = '', linha = true } = {}) => {
     if (vazio(valor)) {
-      if (obrigatorio) (classeVazio === 'bloqueia' ? bloqueia : avisa)(chave, seccao, campo, `${nome} está vazio${classeVazio === 'bloqueia' ? ' (a lei obriga a mostrá-lo)' : ''}.`);
+      if (classeVazio === 'bloqueia') bloqueia(chave, seccao, campo, `Preencha «${rotulo}»: é obrigatório por lei, e sem isso o site não é publicado.`);
+      else if (classeVazio) avisa(chave, seccao, campo, `Preencha «${rotulo}»: ${porque || 'sem isso fica um espaço em branco no site.'}`);
       return false;
     }
-    if (typeof valor !== 'string') { (classeVazio === 'bloqueia' ? bloqueia : avisa)(chave, seccao, campo, `${nome} tem de ser texto.`); return false; }
-    if (valor.length > max) avisa(`${chave}:tamanho`, seccao, campo, `${nome} tem mais de ${max} caracteres (tem ${valor.length}).`);
-    if ((linha ? RE_CONTROLO_LINHA : RE_CONTROLO_TEXTO).test(valor)) avisa(`${chave}:controlo`, seccao, campo, `${nome} tem caracteres invisíveis. Escreva-o outra vez.`);
+    if (typeof valor !== 'string') { (classeVazio === 'bloqueia' ? bloqueia : avisa)(chave, seccao, campo, `«${rotulo}» tem de ser texto.`); return false; }
+    if (valor.length > max) avisa(`${chave}:tamanho`, seccao, campo, `«${rotulo}» tem mais de ${max} caracteres (tem ${valor.length}).`);
+    if ((linha ? RE_CONTROLO_LINHA : RE_CONTROLO_TEXTO).test(valor)) avisa(`${chave}:controlo`, seccao, campo, `«${rotulo}» tem caracteres invisíveis${linha ? ' (ex.: uma mudança de linha)' : ''}. Escreva-o outra vez.`);
     return true;
   };
 
@@ -582,48 +594,47 @@ export function problemasDasDefinicoes(d) {
     const telefone = (n, obrigatorio) => {
       const num = c[`telefone_${n}`]; const txt = c[`telefone_${n}_texto`];
       const campoNum = `contactos.telefone_${n}`; const campoTxt = `contactos.telefone_${n}_texto`;
+      const rNum = `Telefone ${n} (só dígitos)`; const rTxt = `Telefone ${n} (como aparece)`;
       if (!obrigatorio && vazio(num) && vazio(txt)) {
         avisa(`contactos.telefone_${n}:vazio`, 'contactos', campoNum, `Sem o telefone ${n}, o rodapé e a página de Contactos mostram uma linha de telefone vazia.`, { lembrete: true });
         return;
       }
-      if (vazio(num)) bloqueia(`contactos.telefone_${n}`, 'contactos', campoNum, `O telefone ${n} (só dígitos) está vazio${obrigatorio ? ': é o número dos botões «Ligar» de todas as páginas' : ', e o «como aparece» está preenchido'}.`);
-      else if (!(typeof num === 'string' && RE_TELEMOVEL.test(num))) bloqueia(`contactos.telefone_${n}`, 'contactos', campoNum, `O telefone ${n} tem de ser um número de telemóvel português, com 9 algarismos e sem espaços (ex.: 961053363): o site diz «Chamada para a rede móvel nacional» junto dele.`);
-      if (vazio(txt)) bloqueia(`contactos.telefone_${n}_texto`, 'contactos', campoTxt, `O telefone ${n} (como aparece) está vazio: é o que se lê no site (ex.: 961 053 363).`);
+      if (vazio(num)) bloqueia(`contactos.telefone_${n}`, 'contactos', campoNum, obrigatorio ? `Preencha «${rNum}»: é o número dos botões «Ligar» de todas as páginas.` : `Preencha «${rNum}» (o «como aparece» está preenchido), ou apague os dois.`);
+      else if (!(typeof num === 'string' && RE_TELEMOVEL.test(num))) bloqueia(`contactos.telefone_${n}`, 'contactos', campoNum, `«${rNum}» tem de ser um número de telemóvel português, com 9 algarismos e sem espaços (ex.: 961053363): o site diz «Chamada para a rede móvel nacional» junto dele.`);
+      if (vazio(txt)) bloqueia(`contactos.telefone_${n}_texto`, 'contactos', campoTxt, `Preencha «${rTxt}»: é o número que se lê no site (ex.: 961 053 363).`);
       else {
         const digitos = typeof txt === 'string' ? txt.replace(/[^0-9]/g, '').replace(/^351(?=[0-9]{9}$)/, '') : '';
-        if (!(typeof txt === 'string' && RE_TELEFONE_TEXTO.test(txt) && txt.length <= TAMANHOS.telefoneTexto)) bloqueia(`contactos.telefone_${n}_texto`, 'contactos', campoTxt, `O telefone ${n} (como aparece) só pode ter algarismos e espaços (ex.: 961 053 363).`);
-        else if (typeof num === 'string' && RE_TELEMOVEL.test(num) && digitos !== num) bloqueia(`contactos.telefone_${n}_texto`, 'contactos', campoTxt, `O telefone ${n} (como aparece) não é o mesmo número do telefone ${n} (só dígitos): o site mostrava um número e ligava para outro.`);
+        if (!(typeof txt === 'string' && RE_TELEFONE_TEXTO.test(txt) && txt.length <= TAMANHOS.telefoneTexto)) bloqueia(`contactos.telefone_${n}_texto`, 'contactos', campoTxt, `«${rTxt}» só pode ter algarismos e espaços (ex.: 961 053 363).`);
+        else if (typeof num === 'string' && RE_TELEMOVEL.test(num) && digitos !== num) bloqueia(`contactos.telefone_${n}_texto`, 'contactos', campoTxt, `«${rTxt}» não é o mesmo número de «${rNum}»: o site mostrava um número e ligava para outro.`);
       }
     };
     telefone(1, true);
     telefone(2, false);
-    if (vazio(c.whatsapp)) bloqueia('contactos.whatsapp', 'contactos', 'contactos.whatsapp', 'O WhatsApp está vazio: é para onde vão os botões «WhatsApp» de todas as páginas.');
+    if (vazio(c.whatsapp)) bloqueia('contactos.whatsapp', 'contactos', 'contactos.whatsapp', 'Preencha o WhatsApp: é para onde vão os botões «WhatsApp» de todas as páginas.');
     else if (!(typeof c.whatsapp === 'string' && RE_WHATSAPP.test(c.whatsapp))) bloqueia('contactos.whatsapp', 'contactos', 'contactos.whatsapp', 'O WhatsApp escreve-se 351 e o número, só algarismos, sem espaços nem + (ex.: 351961053363).');
     if (!vazio(c.email) && !(typeof c.email === 'string' && c.email.length <= TAMANHOS.email && RE_EMAIL.test(c.email.trim()))) {
-      avisa('contactos.email', 'contactos', 'contactos.email', 'O email não está bem escrito (ex.: geral@lrmotorsautomoveis.pt — sem acentos nem espaços), ou fica vazio.');
+      avisa('contactos.email', 'contactos', 'contactos.email', 'O email não está bem escrito (ex.: geral@lrmotorsautomoveis.pt, sem acentos nem espaços). Corrija-o ou deixe-o vazio.');
     }
   }
 
   // --- morada do stand (DL 7/2004: o endereço geográfico) -------------------
   const s = d.stand;
   if (eObjecto(s)) {
-    textoSimples(s.morada, 'stand.morada', 'stand', 'stand.morada', 'A rua do stand', TAMANHOS.morada, { obrigatorio: true, classeVazio: 'bloqueia' });
-    if (vazio(s.codigo_postal)) bloqueia('stand.codigo_postal', 'stand', 'stand.codigo_postal', 'O código postal do stand está vazio (a lei obriga a mostrar a morada).');
+    textoSimples(s.morada, 'stand.morada', 'stand', 'stand.morada', 'Rua', TAMANHOS.morada, { vazio: 'bloqueia' });
+    if (vazio(s.codigo_postal)) bloqueia('stand.codigo_postal', 'stand', 'stand.codigo_postal', 'Preencha «Código postal»: é obrigatório por lei, e sem isso o site não é publicado.');
     else if (!(typeof s.codigo_postal === 'string' && RE_CP.test(s.codigo_postal.trim()))) bloqueia('stand.codigo_postal', 'stand', 'stand.codigo_postal', 'O código postal escreve-se 0000-000.');
-    textoSimples(s.localidade, 'stand.localidade', 'stand', 'stand.localidade', 'A localidade do stand', TAMANHOS.localidade, { obrigatorio: true, classeVazio: 'bloqueia' });
-    textoSimples(s.distrito, 'stand.distrito', 'stand', 'stand.distrito', 'O distrito do stand', TAMANHOS.distrito, { obrigatorio: true });
-    textoSimples(s.pais, 'stand.pais', 'stand', 'stand.pais', 'O país', TAMANHOS.pais);
+    textoSimples(s.localidade, 'stand.localidade', 'stand', 'stand.localidade', 'Localidade', TAMANHOS.localidade, { vazio: 'bloqueia' });
+    textoSimples(s.distrito, 'stand.distrito', 'stand', 'stand.distrito', 'Distrito', TAMANHOS.distrito, { vazio: 'avisa', porque: 'aparece na morada, no rodapé e na página de Contactos.' });
+    textoSimples(s.pais, 'stand.pais', 'stand', 'stand.pais', 'País', TAMANHOS.pais);
     if (!vazio(s.mapa) && !(urlHttps(s.mapa) && s.mapa.length <= TAMANHOS.url)) avisa('stand.mapa', 'stand', 'stand.mapa', 'O link do Google Maps tem de começar por https:// (copie-o do botão «Partilhar» do Google Maps).');
     /* As coordenadas vão tal e qual para o endereço do botão «Como chegar»: um
        texto podia partir a página; em falta, o botão fica sem destino. */
-    for (const k of ['latitude', 'longitude']) {
+    for (const [k, rotulo, max] of [['latitude', 'Latitude', 90], ['longitude', 'Longitude', 180]]) {
       const x = s[k];
       const campo = `stand.${k}`;
-      const nome = k === 'latitude' ? 'A latitude' : 'A longitude';
-      const max = k === 'latitude' ? 90 : 180;
-      if (ausente(x) || x === '') avisa(`stand.${k}`, 'stand', campo, `${nome} do stand está vazia: o botão «Como chegar» fica sem destino.`);
-      else if (typeof x !== 'number' || !Number.isFinite(x)) bloqueia(`stand.${k}:forma`, 'stand', campo, `${nome} do stand tem de ser um número (ex.: 41.6469), sem texto à volta.`);
-      else if (Math.abs(x) > max) avisa(`stand.${k}`, 'stand', campo, `${nome} do stand não é uma coordenada (vai de -${max} a ${max}).`);
+      if (ausente(x) || x === '') avisa(`stand.${k}`, 'stand', campo, `Preencha «${rotulo}»: sem as coordenadas, o botão «Como chegar» fica sem destino.`);
+      else if (typeof x !== 'number' || !Number.isFinite(x)) bloqueia(`stand.${k}:forma`, 'stand', campo, `«${rotulo}» tem de ser um número (ex.: 41.6469), sem texto à volta.`);
+      else if (Math.abs(x) > max) avisa(`stand.${k}`, 'stand', campo, `«${rotulo}» não é uma coordenada (vai de -${max} a ${max}).`);
     }
   }
 
@@ -633,34 +644,35 @@ export function problemasDasDefinicoes(d) {
     if (h.length === 0) avisa('horario:vazio', 'horario', 'horario', 'O horário está vazio: o rodapé e a página de Contactos ficam sem horário.');
     if (h.length > TAMANHOS.horarioLinhas) avisa('horario:linhas', 'horario', 'horario', `O horário tem ${h.length} linhas; o máximo é ${TAMANHOS.horarioLinhas}.`);
     h.forEach((linha, i) => {
-      if (!eObjecto(linha)) { bloqueia(`horario.${i + 1}:forma`, 'horario', `horario.${i}`, `A ${i + 1}.ª linha do horário não está preenchida (sem ela o site não se consegue gerar). Apague-a e escreva-a outra vez.`); return; }
-      textoSimples(linha.dias, `horario.${i + 1}.dias`, 'horario', `horario.${i}.dias`, `Na ${i + 1}.ª linha do horário, os dias`, TAMANHOS.dias, { obrigatorio: true });
-      textoSimples(linha.horas, `horario.${i + 1}.horas`, 'horario', `horario.${i}.horas`, `Na ${i + 1}.ª linha do horário, as horas`, TAMANHOS.horas, { obrigatorio: true });
+      if (!eObjecto(linha)) { bloqueia(`horario.${i + 1}:forma`, 'horario', `horario.${i}`, `A ${i + 1}.ª linha do horário não está preenchida, e sem ela o site não se consegue gerar. Apague-a e escreva-a outra vez.`); return; }
+      const porque = `na ${i + 1}.ª linha do horário fica um espaço em branco.`;
+      textoSimples(linha.dias, `horario.${i + 1}.dias`, 'horario', `horario.${i}.dias`, 'Dias', TAMANHOS.dias, { vazio: 'avisa', porque });
+      textoSimples(linha.horas, `horario.${i + 1}.horas`, 'horario', `horario.${i}.horas`, 'Horas', TAMANHOS.horas, { vazio: 'avisa', porque });
     });
   }
 
   // --- redes sociais --------------------------------------------------------
   const r = d.redes;
   if (eObjecto(r)) {
-    for (const [k, nome] of [['instagram', 'Instagram'], ['facebook', 'Facebook'], ['tiktok', 'TikTok']]) {
-      if (!vazio(r[k]) && !(urlHttps(r[k]) && r[k].length <= TAMANHOS.url)) avisa(`redes.${k}`, 'redes', `redes.${k}`, `O endereço do ${nome} tem de começar por https:// (copie-o do browser), ou fica vazio.`);
+    for (const [k, rotulo] of [['instagram', 'Instagram'], ['facebook', 'Facebook'], ['tiktok', 'TikTok']]) {
+      if (!vazio(r[k]) && !(urlHttps(r[k]) && r[k].length <= TAMANHOS.url)) avisa(`redes.${k}`, 'redes', `redes.${k}`, `O endereço do ${rotulo} tem de começar por https:// (copie-o do browser). Corrija-o ou deixe-o vazio.`);
     }
   }
 
   // --- textos do site -------------------------------------------------------
   const t = d.textos;
   if (eObjecto(t)) {
-    textoSimples(t.reclamo, 'textos.reclamo', 'textos', 'textos.reclamo', 'A frase da marca', TAMANHOS.reclamo, { obrigatorio: true });
-    textoSimples(t.hero_titulo, 'textos.hero_titulo', 'textos', 'textos.hero_titulo', 'O título da página inicial', TAMANHOS.titulo, { obrigatorio: true });
-    textoSimples(t.hero_texto, 'textos.hero_texto', 'textos', 'textos.hero_texto', 'O texto da página inicial', TAMANHOS.heroTexto, { obrigatorio: true, linha: false });
-    textoSimples(t.sobre_titulo, 'textos.sobre_titulo', 'textos', 'textos.sobre_titulo', 'O título do «Sobre nós»', TAMANHOS.titulo, { obrigatorio: true });
-    textoSimples(t.sobre_texto, 'textos.sobre_texto', 'textos', 'textos.sobre_texto', 'O texto do «Sobre nós»', TAMANHOS.sobreTexto, { obrigatorio: true, linha: false });
-    textoSimples(t.locais, 'textos.locais', 'textos', 'textos.locais', 'O «Onde estamos»', TAMANHOS.locais);
+    textoSimples(t.reclamo, 'textos.reclamo', 'textos', 'textos.reclamo', 'Frase da marca', TAMANHOS.reclamo, { vazio: 'avisa' });
+    textoSimples(t.hero_titulo, 'textos.hero_titulo', 'textos', 'textos.hero_titulo', 'Título da página inicial', TAMANHOS.titulo, { vazio: 'avisa' });
+    textoSimples(t.hero_texto, 'textos.hero_texto', 'textos', 'textos.hero_texto', 'Texto da página inicial', TAMANHOS.heroTexto, { vazio: 'avisa', linha: false });
+    textoSimples(t.sobre_titulo, 'textos.sobre_titulo', 'textos', 'textos.sobre_titulo', 'Título do "Sobre nós"', TAMANHOS.titulo, { vazio: 'avisa' });
+    textoSimples(t.sobre_texto, 'textos.sobre_texto', 'textos', 'textos.sobre_texto', 'Texto do "Sobre nós"', TAMANHOS.sobreTexto, { vazio: 'avisa', linha: false });
+    textoSimples(t.locais, 'textos.locais', 'textos', 'textos.locais', 'Onde estamos (texto livre)', TAMANHOS.locais);
     /* O gerador faz (aviso_visita || '').trim(): um número ou uma lista aqui
        rebentava a geração do site inteiro. */
     const av = t.aviso_visita;
-    if (!ausente(av) && typeof av !== 'string') bloqueia('textos.aviso_visita:forma', 'textos', 'textos.aviso_visita', 'O aviso sobre visitas noutro local tem de ser texto (sem isso o site não se consegue gerar). Apague-o e escreva outra vez.');
-    else if (textoSimples(av, 'textos.aviso_visita', 'textos', 'textos.aviso_visita', 'O aviso sobre visitas noutro local', TAMANHOS.avisoVisita) && !negritoCerto(av, { porParagrafo: false })) {
+    if (!ausente(av) && typeof av !== 'string') bloqueia('textos.aviso_visita:forma', 'textos', 'textos.aviso_visita', '«Aviso sobre visitas noutro local» tem de ser texto, e assim o site não se consegue gerar. Apague-o e escreva-o outra vez.');
+    else if (textoSimples(av, 'textos.aviso_visita', 'textos', 'textos.aviso_visita', 'Aviso sobre visitas noutro local', TAMANHOS.avisoVisita) && !negritoCerto(av, { porParagrafo: false })) {
       avisa('textos.aviso_visita:negrito', 'textos', 'textos.aviso_visita', 'No aviso sobre visitas há um ** sem par: o negrito escreve-se **assim**. Sem par, os asteriscos aparecem no site.');
     }
   }
@@ -668,22 +680,22 @@ export function problemasDasDefinicoes(d) {
   // --- opções --------------------------------------------------------------
   const o = d.opcoes;
   if (eObjecto(o) && typeof o.mostrar_vendidos !== 'boolean') {
-    avisa('opcoes.mostrar_vendidos', 'opcoes', 'opcoes.mostrar_vendidos', '«Mostrar secção "Já vendidas"» não está gravado (sim ou não): vale como «não».');
+    avisa('opcoes.mostrar_vendidos', 'opcoes', 'opcoes.mostrar_vendidos', '«Mostrar secção "Já vendidas" na listagem» não está gravado (sim ou não): vale como «não».');
   }
 
   // --- dados legais da empresa (CSC art. 171.º) ------------------------------
   /* Vale mais o site ficar na versão anterior do que ir para o ar sem eles. */
   const e = d.empresa;
   if (eObjecto(e)) {
-    textoSimples(e.denominacao_social, 'empresa.denominacao_social', 'empresa', 'empresa.denominacao_social', 'A denominação social', TAMANHOS.denominacao, { obrigatorio: true, classeVazio: 'bloqueia' });
-    textoSimples(e.forma_juridica, 'empresa.forma_juridica', 'empresa', 'empresa.forma_juridica', 'A forma jurídica', TAMANHOS.formaJuridica, { obrigatorio: true, classeVazio: 'bloqueia' });
-    if (vazio(e.nif)) bloqueia('empresa.nif', 'empresa', 'empresa.nif', 'O NIF está vazio (a lei obriga a mostrá-lo).');
-    else if (!nifValido(typeof e.nif === 'string' ? e.nif.trim() : e.nif)) bloqueia('empresa.nif', 'empresa', 'empresa.nif', 'O NIF não é válido (9 algarismos, o primeiro não é 0, e o último tem de bater certo com os outros). Confira-o na certidão.');
-    if (textoSimples(e.capital_social, 'empresa.capital_social', 'empresa', 'empresa.capital_social', 'O capital social', TAMANHOS.capitalSocial, { obrigatorio: true, classeVazio: 'bloqueia' }) && !/[0-9]/.test(e.capital_social)) {
+    textoSimples(e.denominacao_social, 'empresa.denominacao_social', 'empresa', 'empresa.denominacao_social', 'Denominação social', TAMANHOS.denominacao, { vazio: 'bloqueia' });
+    textoSimples(e.forma_juridica, 'empresa.forma_juridica', 'empresa', 'empresa.forma_juridica', 'Forma jurídica', TAMANHOS.formaJuridica, { vazio: 'bloqueia' });
+    if (vazio(e.nif)) bloqueia('empresa.nif', 'empresa', 'empresa.nif', 'Preencha «NIF»: é obrigatório por lei, e sem isso o site não é publicado.');
+    else if (!nifValido(typeof e.nif === 'string' ? e.nif.trim() : e.nif)) bloqueia('empresa.nif', 'empresa', 'empresa.nif', 'O NIF não é válido (9 algarismos, o primeiro não é 0, e o último tem de bater certo com os outros). Confira-o na certidão permanente.');
+    if (textoSimples(e.capital_social, 'empresa.capital_social', 'empresa', 'empresa.capital_social', 'Capital social', TAMANHOS.capitalSocial, { vazio: 'bloqueia' }) && !/[0-9]/.test(e.capital_social)) {
       avisa('empresa.capital_social:formato', 'empresa', 'empresa.capital_social', 'O capital social escreve-se em euros, com algarismos (ex.: 20.000,00 €).');
     }
-    textoSimples(e.nome_comercial, 'empresa.nome_comercial', 'empresa', 'empresa.nome_comercial', 'O nome comercial', TAMANHOS.nomeComercial, { obrigatorio: true });
-    textoSimples(e.cae, 'empresa.cae', 'empresa', 'empresa.cae', 'O CAE', TAMANHOS.cae);
+    textoSimples(e.nome_comercial, 'empresa.nome_comercial', 'empresa', 'empresa.nome_comercial', 'Nome comercial', TAMANHOS.nomeComercial, { vazio: 'avisa', porque: 'é o nome que aparece no topo da página inicial e no rodapé.' });
+    textoSimples(e.cae, 'empresa.cae', 'empresa', 'empresa.cae', 'CAE', TAMANHOS.cae);
   }
 
   // --- sede social (opcional: hoje não está no ficheiro) ---------------------
@@ -692,14 +704,15 @@ export function problemasDasDefinicoes(d) {
     if (!eObjecto(sd)) avisa('sede_social', 'sede_social', 'sede_social', 'A sede social não tem a forma certa: apague-a e escreva-a outra vez.');
     else {
       const preenchida = ['morada', 'codigo_postal', 'localidade'].some((k) => !vazio(sd[k]));
+      const porque = 'a morada da sede fica incompleta (ou apague-a toda).';
       if (preenchida) {
-        textoSimples(sd.morada, 'sede_social.morada', 'sede_social', 'sede_social.morada', 'A rua da sede', TAMANHOS.morada, { obrigatorio: true });
-        textoSimples(sd.localidade, 'sede_social.localidade', 'sede_social', 'sede_social.localidade', 'A localidade da sede', TAMANHOS.localidade, { obrigatorio: true });
+        textoSimples(sd.morada, 'sede_social.morada', 'sede_social', 'sede_social.morada', 'Rua', TAMANHOS.morada, { vazio: 'avisa', porque });
+        textoSimples(sd.localidade, 'sede_social.localidade', 'sede_social', 'sede_social.localidade', 'Localidade', TAMANHOS.localidade, { vazio: 'avisa', porque });
         if (vazio(sd.codigo_postal) || !(typeof sd.codigo_postal === 'string' && RE_CP.test(sd.codigo_postal.trim()))) {
           avisa('sede_social.codigo_postal', 'sede_social', 'sede_social.codigo_postal', 'O código postal da sede escreve-se 0000-000.');
         }
       }
-      textoSimples(sd.distrito, 'sede_social.distrito', 'sede_social', 'sede_social.distrito', 'O distrito da sede', TAMANHOS.distrito);
+      textoSimples(sd.distrito, 'sede_social.distrito', 'sede_social', 'sede_social.distrito', 'Distrito', TAMANHOS.distrito);
     }
   }
   return out;
@@ -772,7 +785,7 @@ export function problemas(dados = {}, opcoes = {}) {
     if (ficheiros.length < 2) continue;
     lista.push({
       classe: 'bloqueia', chave: `viatura:${slug}:repetida`, ficheiro: ficheiros[0], ficheiros, slug, ecra: `Viaturas › ${slug}`,
-      mensagem: `Há ${ficheiros.length} viaturas com o mesmo endereço («${slug}»): ${ficheiros.join(' e ')}. Apague a que está a mais (provavelmente a das Vendidas, se a viatura voltou ao stock).`,
+      mensagem: `Há ${ficheiros.length} viaturas com o mesmo endereço («${slug}»)${ficheiros.some((f) => f.includes('/vendidas/')) && ficheiros.some((f) => !f.includes('/vendidas/')) ? ', uma nas Viaturas e outra nas Vendidas' : ''}: o site não sabe qual mostrar. Apague a que está a mais.`,
     });
   }
   return lista;
