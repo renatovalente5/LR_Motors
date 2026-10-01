@@ -23,6 +23,8 @@
  *   · o varrimento: apagar cada chave de cada viatura e do definicoes.json dá
  *     o problema certo, com o ecrã nomeado, ou nada se o campo é opcional;
  *   · 30 problemas → 9 anotações + «e mais 21», e os 30 no resumo;
+ *   · na consola, nenhum dado abre um comando do runner (uma mudança de linha
+ *     a começar por «::», ou um «##[» em qualquer sítio — .github/consola.mjs);
  *   · a cópia que o gerador lê muda só o que tem de mudar, e nada sem nada;
  *   · a guarda e o gerador verdadeiro contam as fotografias em falta da mesma
  *     maneira;
@@ -39,6 +41,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as R from './regras.mjs';
 import * as G from './guardas.mjs';
+import { umaLinha } from './consola.mjs';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PY = process.env.PYTHON || 'python3';
@@ -646,6 +649,33 @@ try {
     rmSync(dir, { recursive: true, force: true });
   }
   certo(G.anotacoes([{ classe: 'avisa', ficheiro: 'data/x.json', ecra: 'A, b: c', mensagem: '50% feito\nlinha 2' }])[0] === '::warning file=data/x.json,title=A%2C b%3A c::50%25 feito%0Alinha 2', 'as anotações escapam %, mudanças de linha, : e ,');
+  {
+    /* A CONSOLA. O runner lê comandos no que a guarda escreve: «::x::» no
+       princípio de uma linha, e «##[x]» em QUALQUER sítio de uma linha (ver
+       .github/consola.mjs). A listagem leva os dados tal e qual — o nome da
+       viatura, o caminho de uma fotografia, o texto da garantia — e nenhum pode
+       abrir um comando: as únicas linhas de comando são as anotações da própria
+       guarda. As linhas partem-se como o runner as parte: \n, \r e \r\n. */
+    const d = dadosDeHoje();
+    d.viaturas[P].fotos.push('LINHA-A\n::error title=Injectado::pela fotografia.jpg');   // a mensagem da foto-invalida leva o nome
+    d.viaturas[P].modelo = 'Puma ##[warning]Injectado pelo modelo';                      // o ecrã e o «MUDA NO SITE» levam o nome
+    d.viaturas[J].garantia = '36 meses\r##[error]Injectado pela garantia';               // o lembrete dos 3 anos leva o texto
+    const dir = repoDeEnsaio(d);
+    const r = guardaEm(dir);
+    const n = correr('node', [GUARDA, '--neutralizar', dir]);
+    const daGuarda = new Set(G.anotacoes(r.relatorio ? r.relatorio.problemas : []));
+    const comandos = (out) => out.split(/\r\n|\r|\n/).filter((l) => !daGuarda.has(l) && (l.trimStart().startsWith('::') || l.includes('##[')));
+    const maus = [...comandos(r.out), ...comandos(n.out)];
+    certo(r.status === 0 && n.status === 0 && daGuarda.size > 0 && maus.length === 0,
+      'na consola, um dado com uma mudança de linha ou um «##[» não abre comando nenhum do runner (as únicas linhas de comando são as anotações da guarda)', maus.slice(0, 4).join(' ‖ '));
+    certo(/NO SITE {2}Viaturas › Ford Puma ## \[warning\]Injectado pelo modelo/.test(r.out) && /«LINHA-A ::error title=Injectado::pela fotografia\.jpg»/.test(r.out) && /no site: Ford Puma ## \[warning\]Injectado/.test(n.out),
+      '   e o texto continua lá, numa linha só, para quem lê a corrida', [...r.out.split('\n'), ...n.out.split('\n')].filter((l) => /Injectado/.test(l)).slice(0, 4).join(' ‖ '));
+    rmSync(dir, { recursive: true, force: true });
+  }
+  {
+    const LS = String.fromCharCode(0x2028); const PS = String.fromCharCode(0x2029); const NEL = String.fromCharCode(0x85);
+    certo(umaLinha(`a\nb\r\nc${LS}d${NEL}e\u0000f${PS}g ##[error]x ###[y]`) === 'a b c d e f g ## [error]x ### [y]', 'umaLinha: o controlo (C0, DEL, C1) e os separadores de linha passam a espaço, e o «##[» leva um espaço');
+  }
 
   /* ================================================================== */
   secao('a cópia que o gerador lê');
