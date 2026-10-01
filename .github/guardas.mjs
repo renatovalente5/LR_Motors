@@ -77,8 +77,16 @@ export function lerDados(raiz) {
    readdirSync, ficheiros e pastas). É com isto que regras.fotografiaExiste()
    faz a MESMA conta do gerador. */
 export function listarPastaEm(raiz) {
+  /* Cada pasta lê-se uma vez por corrida: há viaturas com 30 fotografias na
+     mesma pasta. */
+  const lidas = new Map();
   return (pasta) => {
-    try { return readdirSync(join(raiz, pasta)); } catch { return []; }
+    if (!lidas.has(pasta)) {
+      let nomes = [];
+      try { nomes = readdirSync(join(raiz, pasta)); } catch { nomes = []; }
+      lidas.set(pasta, nomes);
+    }
+    return lidas.get(pasta);
   };
 }
 
