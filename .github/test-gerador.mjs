@@ -423,6 +423,25 @@ try {
   }
 
   /* ================================================================== */
+  secao('/fotos/ leva ao painel');
+  {
+    /* Era a ferramenta das fotografias (reduzia-as e mandava-as por um Worker,
+       com uma chave pessoal do GitHub). Desde a troca, as fotografias
+       carregam-se no painel, e o endereço que o stand tem guardado no telemóvel
+       leva lá: refresh a zero, a ligação à vista, sem JavaScript, fora dos
+       motores de busca. */
+    const g = gerar();
+    const f = g.ler('fotos/index.html') || '';
+    const PAINEL = 'https://backoffice.lrmotorsautomoveis.pt/';
+    certo(g.status === 0 && f.includes(`<meta http-equiv="refresh" content="0; url=${PAINEL}">`) && new RegExp(`<a href="${PAINEL}" rel="nofollow">[^<]+</a>`).test(f)
+      && f.includes('<meta name="robots" content="noindex, nofollow">') && !/<script|\son[a-z]+=/i.test(f),
+    'o /fotos/ leva ao painel: refresh a zero segundos, a ligação à vista, noindex, e sem JavaScript', f.slice(0, 700));
+    certo(!/__WORKER_FOTOS__|workers\.dev|senha|localStorage/i.test(f) && /^Disallow: \/fotos\/$/m.test(g.ler('robots.txt') || '') && !(g.ler('sitemap.xml') || '').includes('/fotos/'),
+      '   e já não leva a ferramenta antiga nem o endereço do Worker; fora do sitemap, e Disallow no robots.txt');
+    g.apagar();
+  }
+
+  /* ================================================================== */
   secao('das pastas das fotografias só saem imagens');
   {
     /* Quem grava conteúdo escreve na biblioteca (o Pages CMS aceita qualquer

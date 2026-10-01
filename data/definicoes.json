@@ -55,8 +55,5 @@
   },
   "opcoes": {
     "mostrar_vendidos": true
-  },
-  "tecnico": {
-    "worker_fotos": "https://lrmotors-fotos.renato-lima-valente-dcb.workers.dev"
   }
 }
