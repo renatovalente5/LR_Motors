@@ -388,17 +388,19 @@ try {
     ['uma linha do horário vazia (null)', def((x) => { x.horario[1] = null; }), 'bloqueia', 'definicoes:horario.2:forma'],
     ['telefone 1 vazio', def((x) => { x.contactos.telefone_1 = ''; }), 'bloqueia', 'definicoes:contactos.telefone_1'],
     ['telefone 1 com 8 algarismos', def((x) => { x.contactos.telefone_1 = '96105336'; }), 'bloqueia', 'definicoes:contactos.telefone_1'],
-    ['telefone 1 fixo (o site diz «rede móvel»)', def((x) => { x.contactos.telefone_1 = '253123456'; x.contactos.telefone_1_texto = '253 123 456'; }), 'bloqueia', 'definicoes:contactos.telefone_1'],
+    ['telefone 1 que não é telemóvel nem fixo (um 800: o site não sabe que nota pôr)', def((x) => { x.contactos.telefone_1 = '800123456'; x.contactos.telefone_1_texto = '800 123 456'; }), 'bloqueia', 'definicoes:contactos.telefone_1'],
+    ['telefone 2 começado por 20 (não há fixos 20)', def((x) => { x.contactos.telefone_2 = '203123456'; x.contactos.telefone_2_texto = '203 123 456'; }), 'bloqueia', 'definicoes:contactos.telefone_2'],
+    ['telefone 2 fixo com o «como aparece» de outro número', def((x) => { x.contactos.telefone_2 = '253123456'; x.contactos.telefone_2_texto = '253 123 457'; }), 'bloqueia', 'definicoes:contactos.telefone_2_texto'],
     ['telefone 1 com espaços', def((x) => { x.contactos.telefone_1 = '961 053 363'; }), 'bloqueia', 'definicoes:contactos.telefone_1'],
     ['telefone 1 (como aparece) com HTML', def((x) => { x.contactos.telefone_1_texto = '961 053 363 <b>'; }), 'bloqueia', 'definicoes:contactos.telefone_1_texto'],
     ['telefone 1 (como aparece) com outro número', def((x) => { x.contactos.telefone_1_texto = '916 228 513'; }), 'bloqueia', 'definicoes:contactos.telefone_1_texto'],
     ['telefone 1 (como aparece) vazio', def((x) => { delete x.contactos.telefone_1_texto; }), 'bloqueia', 'definicoes:contactos.telefone_1_texto'],
-    ['sem o telefone 2 (os dois campos vazios)', def((x) => { x.contactos.telefone_2 = ''; delete x.contactos.telefone_2_texto; }), 'avisa', 'definicoes:contactos.telefone_2:vazio', undefined, true],
     ['telefone 2 vazio com o «como aparece» preenchido', def((x) => { delete x.contactos.telefone_2; }), 'bloqueia', 'definicoes:contactos.telefone_2'],
     ['telefone 2 preenchido sem o «como aparece»', def((x) => { x.contactos.telefone_2_texto = ''; }), 'bloqueia', 'definicoes:contactos.telefone_2_texto'],
     ['WhatsApp vazio', def((x) => { delete x.contactos.whatsapp; }), 'bloqueia', 'definicoes:contactos.whatsapp'],
     ['WhatsApp sem o 351', def((x) => { x.contactos.whatsapp = '961053363'; }), 'bloqueia', 'definicoes:contactos.whatsapp'],
     ['WhatsApp com +', def((x) => { x.contactos.whatsapp = '+351961053363'; }), 'bloqueia', 'definicoes:contactos.whatsapp'],
+    ['WhatsApp de um fixo (351 + 2…)', def((x) => { x.contactos.whatsapp = '351253123456'; }), 'bloqueia', 'definicoes:contactos.whatsapp'],
     ['email com acento', def((x) => { x.contactos.email = 'geral@lrmotorsautomóveis.pt'; }), 'avisa', 'definicoes:contactos.email'],
     ['rua do stand vazia', def((x) => { x.stand.morada = ' '; }), 'bloqueia', 'definicoes:stand.morada'],
     ['código postal do stand vazio', def((x) => { delete x.stand.codigo_postal; }), 'bloqueia', 'definicoes:stand.codigo_postal'],
@@ -412,6 +414,16 @@ try {
     ['latitude 200', def((x) => { x.stand.latitude = 200; }), 'avisa', 'definicoes:stand.latitude'],
     ['horário sem linhas', def((x) => { x.horario = []; }), 'avisa', 'definicoes:horario:vazio'],
     ['uma linha do horário sem os dias', def((x) => { x.horario[0].dias = ''; }), 'avisa', 'definicoes:horario.1.dias'],
+    ['uma linha do horário toda vazia (o site não a mostra)', def((x) => { x.horario.push({ dias: ' ', horas: '' }); }), 'avisa', 'definicoes:horario.4:vazia'],
+    ['uma linha do horário que é {} (o backoffice apaga as chaves vazias)', def((x) => { x.horario.splice(1, 0, {}); }), 'avisa', 'definicoes:horario.2:vazia'],
+    ['horário: dias que o Google não percebe («Feriados»)', def((x) => { x.horario.push({ dias: 'Feriados', horas: '10h-13h' }); }), 'avisa', 'definicoes:horario.4:google', undefined, true],
+    ['horário: dias com um parêntese («Segunda a sexta (exceto feriados)»)', def((x) => { x.horario[0].dias = 'Segunda a sexta (exceto feriados)'; }), 'avisa', 'definicoes:horario.1:google', undefined, true],
+    ['horário: horas que o Google não percebe («Por marcação»)', def((x) => { x.horario[1].horas = 'Por marcação'; }), 'avisa', 'definicoes:horario.2:google', undefined, true],
+    ['horário: dois intervalos que se sobrepõem', def((x) => { x.horario[0].horas = '9h-13h e 12h-19h'; }), 'avisa', 'definicoes:horario.1:google', undefined, true],
+    ['horário: um intervalo ao contrário («19h-9h»)', def((x) => { x.horario[1].horas = '19h-9h'; }), 'avisa', 'definicoes:horario.2:google', undefined, true],
+    ['horário: o sábado em duas linhas (1.ª)', def((x) => { x.horario[0].dias = 'Segunda a sábado'; }), 'avisa', 'definicoes:horario.1:google', undefined, true],
+    ['horário: o sábado em duas linhas (2.ª)', def((x) => { x.horario[0].dias = 'Segunda a sábado'; }), 'avisa', 'definicoes:horario.2:google', undefined, true],
+    ['horário: o domingo aberto numa linha e fechado noutra', def((x) => { x.horario.push({ dias: 'Domingo', horas: '10h-13h' }); }), 'avisa', 'definicoes:horario.3:google', undefined, true],
     ['Instagram «javascript:»', def((x) => { x.redes.instagram = 'javascript:alert(1)'; }), 'avisa', 'definicoes:redes.instagram'],
     ['título da página inicial vazio', def((x) => { x.textos.hero_titulo = ''; }), 'avisa', 'definicoes:textos.hero_titulo'],
     ['frase da marca com 81 caracteres', def((x) => { x.textos.reclamo = 'x'.repeat(81); }), 'avisa', 'definicoes:textos.reclamo:tamanho'],
@@ -455,6 +467,13 @@ try {
     ['uma linha vazia na lista das fotografias (o gerador deita-a fora)', viat(J, (v) => { v.fotos.push(''); })],
     ['descrição com **negrito** certo e U+2028 (como a do Corsa)', viat(J, (v) => { v.descricao = 'Viatura **nacional**,\u2028revista.\n\n**Garantia** incluída.'; })],
     ['outro telemóvel no telefone 2', def((x) => { x.contactos.telefone_2 = '931234567'; x.contactos.telefone_2_texto = '931 234 567'; })],
+    ['um fixo no telefone 1 (o site diz «rede fixa» junto dele)', def((x) => { x.contactos.telefone_1 = '253123456'; x.contactos.telefone_1_texto = '253 123 456'; })],
+    ['um fixo de Lisboa no telefone 2, escrito «21 123 4567»', def((x) => { x.contactos.telefone_2 = '211234567'; x.contactos.telefone_2_texto = '21 123 4567'; })],
+    ['sem o telefone 2 (os dois campos vazios: o site mostra só o 1, sem linha vazia)', def((x) => { x.contactos.telefone_2 = ''; delete x.contactos.telefone_2_texto; }), def((x) => { delete x.contactos.telefone_2; delete x.contactos.telefone_2_texto; })],
+    ['horário de outras maneiras que o Google percebe', def((x) => { x.horario = [{ dias: '2.ª a 6.ª', horas: '9h-12h30 e 14h-19h' }, { dias: 'Sábados', horas: 'Das 9:00 às 13:00' }, { dias: 'Domingos e feriados', horas: 'Encerrado' }]; }),
+      def((x) => { x.horario = [{ dias: 'Seg-Sex', horas: '9.00-19.00' }, { dias: 'Fim de semana', horas: 'Fechado' }]; }), def((x) => { x.horario = [{ dias: 'Todos os dias', horas: '24 horas' }]; })],
+    ['o domingo fechado em duas linhas (dizem o mesmo)', def((x) => { x.horario.push({ dias: 'Domingo', horas: 'Encerrado' }); })],
+    ['uma linha fechada com dias que o Google não percebe («Feriados» · «Fechado»: não lhe tira nada)', def((x) => { x.horario.push({ dias: 'Feriados', horas: 'Fechado' }); })],
     ['telefone 1 (como aparece) com «+351»', def((x) => { x.contactos.telefone_1_texto = '+351 961 053 363'; })],
     ['email válido', def((x) => { x.contactos.email = 'geral@lrmotorsautomoveis.pt'; })],
     ['TikTok com https', def((x) => { x.redes.tiktok = 'https://www.tiktok.com/@lrmotors'; })],
@@ -708,6 +727,73 @@ try {
     const e = (c, s = 'a') => R.fotografiaExiste(c, s, l);
     certo(e('assets/veiculos/a/x.jpg') && e('assets/veiculos/a/y.jpg') && e('assets/veiculos/a/z.jpg') && e('assets/veiculos/a/z-1600.webp') && e('/assets/veiculos/a/x.jpg') && e('x.jpg') && e('assets/veiculos/solta.jpg') && e('assets/veiculos/a/pasta.jpg')
       && !e('assets/veiculos/a/w.jpg') && !e('assets/veiculos/b/x.jpg') && !e('x.jpg', 'b'), 'fotografiaExiste: o nome, o nome sem extensão, as geradas, a barra à frente, só o nome (na pasta da viatura), a raiz da biblioteca — como o resolver() do gerador');
+  }
+
+  /* ================================================================== */
+  secao('o horário que o site dá ao Google (lerHorario), casos reais e hostis');
+  {
+    const D = (x) => JSON.stringify(R.lerDiasDoHorario(x));
+    const H = (x) => JSON.stringify(R.lerHorasDoHorario(x));
+    const NBSP = String.fromCharCode(0xA0); const TRAVESSAO = String.fromCharCode(0x2014);
+    const SS = '[0,1,2,3,4]';
+    const DIAS = [
+      ['Segunda a sexta', SS], ['segunda à sexta', SS], ['De segunda-feira a sexta-feira', SS], ['2.ª a 6.ª', SS], ['2ª-6ª', SS], ['Seg-Sex', SS],
+      ['Seg. a Sex.', SS], ['Das segundas às sextas', SS], ['Segunda até sexta', SS], ['Dias úteis', SS], ['  SEGUNDA   A SEXTA ', SS],
+      ['Sábado', '[5]'], ['Sábados', '[5]'], ['Aos sábados', '[5]'], ['Sáb.', '[5]'], ['Domingo', '[6]'],
+      ['Sábado e domingo', '[5,6]'], ['Fim de semana', '[5,6]'], ['Fins-de-semana', '[5,6]'], ['Seg/Qua/Sex', '[0,2,4]'], ['Segunda, quarta e sexta', '[0,2,4]'],
+      ['Todos os dias', '[0,1,2,3,4,5,6]'], ['Segunda a domingo', '[0,1,2,3,4,5,6]'], ['Sexta a segunda', '[0,4,5,6]'], ['Segunda a sexta e sábado', '[0,1,2,3,4,5]'],
+      ['Feriados', 'null'], ['Domingos e feriados', 'null'], ['Segunda a sexta (exceto feriados)', 'null'], ['segunda a segunda', 'null'], ['Sábado de manhã', 'null'],
+      ['Segunda,', 'null'], ['', 'null'], ['   ', 'null'], ['constructor', 'null'], ['__proto__', 'null'], ['</script><script>alert(1)</script>', 'null'], ['x'.repeat(5000), 'null'],
+    ];
+    const falhasD = DIAS.filter(([t, e]) => D(t) !== e).map(([t, e]) => `«${t.slice(0, 30)}» deu ${D(t)}, esperava ${e}`);
+    const naoTexto = [null, undefined, 5, {}, [], ['Sábado']].every((x) => R.lerDiasDoHorario(x) === null && R.lerHorasDoHorario(x) === null);
+    certo(falhasD.length === 0 && naoTexto, `lerDiasDoHorario: ${DIAS.length} formas, das que o dono escreve às hostis (as que não percebe dão null; o que não é texto também)`, falhasD.join(' | '));
+    const U = '[["09:00","19:00"]]';
+    const HORAS = [
+      ['09:00 – 19:00', U], [`09:00 ${TRAVESSAO} 19:00`, U], [`09:00${NBSP}–${NBSP}19:00`, U], ['9h-19h', U], ['9h às 19h', U], ['de 9h a 19h', U], ['9h até às 19h', U],
+      ['9.00-19.00', U], ['9 às 19 horas', U], ['9:00h-19:00h', U], ['09h00 - 19h00', U], ['9 h - 19 h', U], ['9-19', U],
+      ['Das 9:00 às 13:00 / 14:30 às 19:00', '[["09:00","13:00"],["14:30","19:00"]]'], ['9h-12h30 e 14h-19h', '[["09:00","12:30"],["14:00","19:00"]]'],
+      ['9h-13h, 14h-19h', '[["09:00","13:00"],["14:00","19:00"]]'], ['14h-19h e 9h-13h', '[["09:00","13:00"],["14:00","19:00"]]'],
+      ['18h-24h', '[["18:00","23:59"]]'], ['24 horas', '[["00:00","23:59"]]'], ['Aberto 24h', '[["00:00","23:59"]]'],
+      ['Fechado', '"fechado"'], ['Encerrado', '"fechado"'], ['FECHADO.', '"fechado"'],
+      ['Por marcação', 'null'], ['até às 19h', 'null'], ['19h-9h', 'null'], ['9h-9h', 'null'], ['9h-13h e 12h-19h', 'null'], ['9h-25h', 'null'], ['9h60-10h', 'null'], ['24h-24h', 'null'],
+      ['9h - 19h (almoço 13h-14h)', 'null'], ['9h-19h; sábado 9h-13h', 'null'], ['</script><script>alert(1)</script>', 'null'], ['', 'null'], ['x'.repeat(5000), 'null'],
+    ];
+    const falhasH = HORAS.filter(([t, e]) => H(t) !== e).map(([t, e]) => `«${t.slice(0, 30)}» deu ${H(t)}, esperava ${e}`);
+    certo(falhasH.length === 0, `lerHorasDoHorario: ${HORAS.length} formas (traços, espaço inquebrável, «h», «:», «.», dois intervalos, meia-noite, fechado; e as que não se percebem)`, falhasH.join(' | '));
+    const t0 = Date.now();
+    for (const lixo of ['9h-'.repeat(4000), 'a '.repeat(5000), 'segunda a '.repeat(1000), '1'.repeat(10000), '9h e '.repeat(3000)]) { R.lerHorasDoHorario(lixo); R.lerDiasDoHorario(lixo); }
+    certo(Date.now() - t0 < 500, `   e texto hostil comprido não o encrava (${Date.now() - t0} ms para cinco de 10 000 caracteres)`);
+    /* Os dados de hoje dão EXACTAMENTE o JSON-LD que estava escrito à mão no gerador. */
+    const aMao = [
+      { '@type': 'OpeningHoursSpecification', dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], opens: '09:00', closes: '19:00' },
+      { '@type': 'OpeningHoursSpecification', dayOfWeek: 'Saturday', opens: '09:00', closes: '13:00' },
+    ];
+    const deHoje = R.lerHorario(HOJE.definicoes.horario);
+    certo(JSON.stringify(deHoje.especificacao) === JSON.stringify(aMao) && deHoje.linhas.map((l) => l.estado).join() === 'aberto,aberto,fechado',
+      'o horário de hoje dá, byte a byte, o JSON-LD que estava escrito à mão no gerador (e o domingo «Fechado» não vai)', JSON.stringify(deHoje));
+    const contra = R.lerHorario([{ dias: 'Segunda a sábado', horas: '9h-19h' }, { dias: 'Sábado', horas: '9h-13h' }, { dias: 'Domingo', horas: 'Fechado' }, { dias: 'Domingo', horas: 'Encerrado' }]);
+    certo(contra.especificacao.length === 0 && contra.linhas.map((l) => `${l.estado}:${l.motivo || ''}`).join() === 'nao-percebido:repetido,nao-percebido:repetido,fechado:,fechado:'
+      && JSON.stringify(contra.linhas[0].repetidos) === '[5]', 'um dia em duas linhas: as duas saem (o sábado aberto em duas); dois «fechado» no mesmo dia não se contradizem', JSON.stringify(contra.linhas));
+    const buracos = [{ dias: 'Sábado', horas: '9h-13h' }]; buracos[2] = { dias: 'Domingo', horas: '10h-12h' };
+    const b = R.lerHorario(buracos);
+    certo(b.linhas.map((l) => l.estado).join() === 'aberto,vazio,aberto' && b.especificacao.length === 2 && R.lerHorario(null).especificacao.length === 0 && R.lerHorario({ dias: 'Sábado' }).linhas.length === 0,
+      'uma lista com buracos, uma linha null, um horário que não é lista: sem rebentar', JSON.stringify(b.linhas));
+    const doisIntervalos = R.lerHorario([{ dias: 'Sábado e domingo', horas: '9h-13h / 14h30-19h' }]).especificacao;
+    certo(JSON.stringify(doisIntervalos) === JSON.stringify([
+      { '@type': 'OpeningHoursSpecification', dayOfWeek: ['Saturday', 'Sunday'], opens: '09:00', closes: '13:00' },
+      { '@type': 'OpeningHoursSpecification', dayOfWeek: ['Saturday', 'Sunday'], opens: '14:30', closes: '19:00' }]), 'dois intervalos na mesma linha: duas entradas com os mesmos dias', JSON.stringify(doisIntervalos));
+  }
+  {
+    const rede = (n) => R.redeDoTelefone(n);
+    const moveis = ['961053363', '916228513', '912345678', '921234567', '931234567'];
+    const fixos = ['253123456', '211234567', '221234567', '291234567', '296123456'];
+    const nenhum = ['203123456', '800123456', '707123456', '808123456', '308123456', '901234567', '96105336', '9610533630', '961 053 363', '+351961053363', '351961053363', ' 961053363', '', 961053363, null, undefined];
+    certo(moveis.every((n) => rede(n) === 'movel') && fixos.every((n) => rede(n) === 'fixa') && nenhum.every((n) => rede(n) === null),
+      `redeDoTelefone: ${moveis.length} telemóveis (91, 92, 93, 96), ${fixos.length} fixos (2…), e ${nenhum.length} que não são nenhum dos dois (20…, 800, 707, 808, 30…, 90…, curtos, compridos, com espaços, com o 351, números do JSON)`,
+      [...moveis, ...fixos, ...nenhum].map((n) => `${n}:${rede(n)}`).join(' '));
+    certo(R.notaDaChamada('961053363') === 'Chamada para a rede móvel nacional' && R.notaDaChamada('253123456') === 'Chamada para a rede fixa nacional' && R.notaDaChamada('800123456') === null,
+      'notaDaChamada: «Chamada para a rede móvel nacional» / «Chamada para a rede fixa nacional», e null quando não há nota certa');
   }
 
   /* ================================================================== */

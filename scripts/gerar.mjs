@@ -20,6 +20,11 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync
 import { createHash } from 'node:crypto';
 import { join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+/* As regras dos dados (as mesmas da guarda do CI e do painel): daqui sai o que
+   o site diz ao Google do horário e a nota do custo da chamada de cada
+   telefone. Um sítio só — o que as regras dizem que não se percebe é
+   exactamente o que aqui fica de fora. */
+import { lerHorario, notaDaChamada } from '../.github/regras.mjs';
 
 const RAIZ = dirname(dirname(fileURLToPath(import.meta.url)));
 const SAIDA = join(RAIZ, '_site');
@@ -171,6 +176,53 @@ function versao(caminho) {
 /* ------------------------------------------------------------- utilitários */
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+
+const temTexto = (x) => typeof x === 'string' && x.trim() !== '';
+
+/* -------------------------------------------------- os contactos do stand */
+/* OS TELEFONES, como o site os mostra: só os que existem — sem o telefone 2 não
+   fica uma linha vazia em lado nenhum — e cada um com a nota do custo da
+   chamada da rede DELE, junto do número e com a mesma visibilidade (DL 59/2021).
+   A rede sai do próprio número (notaDaChamada, nas regras): um fixo diz «rede
+   fixa», um telemóvel «rede móvel». Até 1 out 2026 a nota estava escrita à mão
+   em todos os sítios, sempre «rede móvel», e por isso um fixo não se podia pôr.
+
+   Um número que não seja nem uma coisa nem outra PÁRA a construção: o site não
+   sabe que nota escrever, e uma nota errada é pior do que não publicar. A guarda
+   do CI e o painel recusam-no antes; isto é para quem corra o gerador à mão. */
+const TELEFONES = [1, 2].flatMap((n) => {
+  const numero = def.contactos[`telefone_${n}`];
+  const texto = def.contactos[`telefone_${n}_texto`];
+  if (n > 1 && !temTexto(numero) && !temTexto(texto)) return [];
+  const nota = typeof numero === 'string' ? notaDaChamada(numero.trim()) : null;
+  if (!nota || !temTexto(texto)) {
+    console.error(`\nERRO: o telefone ${n} (Dados do stand › Contactos) não se pode publicar: ${JSON.stringify(numero ?? null)} / ${JSON.stringify(texto ?? null)}.`);
+    console.error('«Só dígitos» tem de ser um telemóvel (91, 92, 93, 96…) ou um fixo (2…) português, de 9 algarismos, e «como aparece» tem de estar');
+    console.error('preenchido: o site escreve junto de cada número o custo da chamada para a rede dele, e assim não sabe qual é.\n');
+    process.exit(1);
+  }
+  return [{ texto: texto.trim(), internacional: `+351${numero.trim()}`, href: `tel:+351${numero.trim()}`, nota }];
+});
+const TELEFONE_1 = TELEFONES[0];
+/* Agrupados pela rede, pela ordem em que estão: dois do mesmo tipo partilham a
+   nota, como sempre se escreveu («961 053 363 · 916 228 513 (Chamada para a rede
+   móvel nacional)»); um fixo e um telemóvel levam cada um a sua. */
+const GRUPOS_DE_TELEFONES = TELEFONES.reduce((grupos, t) => {
+  const ultimo = grupos[grupos.length - 1];
+  if (ultimo && ultimo.nota === t.nota) ultimo.telefones.push(t);
+  else grupos.push({ nota: t.nota, telefones: [t] });
+  return grupos;
+}, []);
+/* As linhas do horário que o site mostra: uma linha toda vazia (sem dias nem
+   horas) não aparece — ficava uma linha em branco na lista. */
+const HORARIO = (Array.isArray(def.horario) ? def.horario : [])
+  .filter((h) => h && typeof h === 'object' && (temTexto(h.dias) || temTexto(h.horas)));
+/* O horário que o Google lê (o openingHoursSpecification do JSON-LD do stand). */
+const HORARIO_GOOGLE = lerHorario(def.horario).especificacao;
+/* «4730-251 Vila Verde, Braga», já escapado: sem o distrito, não fica uma
+   vírgula solta no fim. */
+const localidadeDoStand = () => [`${esc(def.stand.codigo_postal)} ${esc(def.stand.localidade)}`, temTexto(def.stand.distrito) ? esc(def.stand.distrito) : '']
+  .filter(Boolean).join(', ');
 
 const nEuro = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' €';
 /* Sem preço publicado não se inventa nem se escreve 0: diz-se que é sob
@@ -582,7 +634,7 @@ function cabecalho(pag) {
     return `<a class="${cls}" href="${u(href)}"${activo}>${txt}${extra}</a>`;
   }).join('');
 
-  const c = def.contactos;
+  const t1 = TELEFONE_1;
   /* Barra flutuante e arredondada, destacada das margens: logótipo à esquerda,
      navegação a seguir e o contacto à direita.
 
@@ -600,9 +652,9 @@ function cabecalho(pag) {
     <nav class="topo__nav" aria-label="Principal">${nav('topo__link')}</nav>
     <div class="topo__dir">
       <span class="topo__tel">${ic.tel}
-        <span><a href="tel:+351${c.telefone_1}">${c.telefone_1_texto}</a>
-        <small>(Chamada para a rede móvel nacional)</small></span></span>
-      <a class="topo__zap" href="https://wa.me/${c.whatsapp}" rel="noopener" aria-label="WhatsApp">${ic.zap}</a>
+        <span><a href="${esc(t1.href)}">${esc(t1.texto)}</a>
+        <small>(${esc(t1.nota)})</small></span></span>
+      <a class="topo__zap" href="https://wa.me/${def.contactos.whatsapp}" rel="noopener" aria-label="WhatsApp">${ic.zap}</a>
     </div>
     <button class="hamburger" type="button" id="btn-menu" aria-label="Abrir menu" aria-expanded="false" aria-controls="menu"><span></span></button>
   </div>
@@ -613,24 +665,25 @@ function cabecalho(pag) {
   <div class="menu__pe">
     <p class="menu__rotulo">Fale connosco</p>
     <div class="menu__contactos">
-      <a class="menu__acao" href="tel:+351${c.telefone_1}">${ic.tel}<span>Ligar</span></a>
-      <a class="menu__acao" href="https://wa.me/${c.whatsapp}" rel="noopener">${ic.zap}<span>WhatsApp</span></a>
+      <a class="menu__acao" href="${esc(t1.href)}">${ic.tel}<span>Ligar</span></a>
+      <a class="menu__acao" href="https://wa.me/${def.contactos.whatsapp}" rel="noopener">${ic.zap}<span>WhatsApp</span></a>
       <a class="menu__acao" href="${u('contactos/')}">${ic.pin}<span>Onde estamos</span></a>
     </div>
-    <p class="nota-chamada">${c.telefone_1_texto} · (Chamada para a rede móvel nacional)</p>
+    <p class="nota-chamada">${esc(t1.texto)} · (${esc(t1.nota)})</p>
   </div>
 </div>`;
 }
 
 function rodape() {
-  const s = def.stand, e = def.empresa;
+  const e = def.empresa;
   const rede = (href, svg, nome) => href
     ? `<a class="rodape__rede" href="${esc(href)}" target="_blank" rel="noopener me" aria-label="${nome}">${svg}</a>` : '';
   /* O custo da chamada tem de aparecer junto de CADA número, com a mesma
-     visibilidade — art. 3.º do DL 59/2021. Vai entre parênteses. */
-  const numero = (tel, texto) => `<li class="rodape__contacto">${ic.tel}
-      <span><a href="tel:+351${tel}">${texto}</a>
-      <small>(Chamada para a rede móvel nacional)</small></span></li>`;
+     visibilidade — art. 3.º do DL 59/2021. Vai entre parênteses, e é o da rede
+     de cada número (ver TELEFONES). Sem o telefone 2, a linha dele não existe. */
+  const numero = (t) => `<li class="rodape__contacto">${ic.tel}
+      <span><a href="${esc(t.href)}">${esc(t.texto)}</a>
+      <small>(${esc(t.nota)})</small></span></li>`;
   return `<footer class="rodape">
   <div class="envolve">
     <div class="rodape__grelha">
@@ -661,8 +714,7 @@ function rodape() {
       <div>
         <h3>Contactos</h3>
         <ul class="rodape__lista rodape__lista--icones">
-          ${numero(def.contactos.telefone_1, def.contactos.telefone_1_texto)}
-          ${numero(def.contactos.telefone_2, def.contactos.telefone_2_texto)}
+          ${TELEFONES.map(numero).join('\n          ')}
           <!-- Sem a linha do «Enviar mensagem»: o WhatsApp já está no ícone das
                redes, logo abaixo, e a lista fica só com os números. -->
         </ul>
@@ -671,10 +723,10 @@ function rodape() {
         <h3>Onde estamos</h3>
         <ul class="rodape__lista rodape__lista--icones">
           <li class="rodape__contacto">${ic.pin}
-            <span><a href="${esc(s.mapa)}" target="_blank" rel="noopener">${esc(s.morada)}<br>${esc(s.codigo_postal)} ${esc(s.localidade)}, ${esc(s.distrito)}</a></span></li>
+            <span><a href="${esc(def.stand.mapa)}" target="_blank" rel="noopener">${esc(def.stand.morada)}<br>${localidadeDoStand()}</a></span></li>
           <li class="rodape__contacto">${ic.relogio}
             <span><ul class="horario">
-              ${def.horario.map((h) => `<li><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
+              ${HORARIO.map((h) => `<li><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
             </ul></span></li>
         </ul>
       </div>
@@ -806,25 +858,27 @@ const standLD = {
   url: abs(''),
   image: abs('assets/img/stand-960.webp'),
   logo: abs('assets/img/logo.svg'),
-  telephone: '+351' + def.contactos.telefone_1,
+  telephone: TELEFONE_1.internacional,
   address: {
     '@type': 'PostalAddress',
     streetAddress: def.stand.morada,
     postalCode: def.stand.codigo_postal,
     addressLocality: def.stand.localidade,
-    addressRegion: def.stand.distrito,
+    ...(temTexto(def.stand.distrito) ? { addressRegion: def.stand.distrito } : {}),
     addressCountry: 'PT',
   },
   geo: { '@type': 'GeoCoordinates', latitude: def.stand.latitude, longitude: def.stand.longitude },
-  openingHoursSpecification: [
-    { '@type': 'OpeningHoursSpecification', dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], opens: '09:00', closes: '19:00' },
-    { '@type': 'OpeningHoursSpecification', dayOfWeek: 'Saturday', opens: '09:00', closes: '13:00' },
-  ],
+  /* O HORÁRIO SAI DOS DADOS (lerHorario, nas regras), e não daqui. Esteve
+     escrito à mão — segunda a sexta 9h-19h, sábado 9h-13h — e o dono mudava o
+     horário no backoffice e o Google ficava com o antigo. Uma linha que não se
+     perceba fica de fora (e o dono é lembrado de como a escrever); se nenhuma
+     se perceber, não vai horário nenhum, que é melhor do que um errado. */
+  ...(HORARIO_GOOGLE.length ? { openingHoursSpecification: HORARIO_GOOGLE } : {}),
   sameAs: [def.redes.instagram, def.redes.facebook, def.redes.tiktok].filter(Boolean),
   department: {
     '@type': 'AutoRepair',
     name: 'Oficina LR Motors',
-    telephone: '+351' + def.contactos.telefone_1,
+    telephone: TELEFONE_1.internacional,
     address: {
       '@type': 'PostalAddress',
       streetAddress: def.stand.morada, postalCode: def.stand.codigo_postal,
@@ -1143,7 +1197,7 @@ function paginaInicial() {
          (Sem crases neste comentário. Ele vive dentro de um template literal, e
          uma crase aqui abre um literal aninhado — já parti o gerador três vezes
          com isto.) -->
-    <p class="sobretitulo sobretitulo--claro">${esc(def.empresa.nome_comercial)} · ${esc(def.stand.localidade)}</p>
+    <p class="sobretitulo sobretitulo--claro">${[def.empresa.nome_comercial, def.stand.localidade].filter(temTexto).map(esc).join(' · ')}</p>
     <h1 class="hero__titulo">${esc(def.textos.hero_titulo)}</h1>
     <p class="hero__texto">${esc(def.textos.hero_texto)}</p>
   </div>
@@ -1249,20 +1303,20 @@ ${vitrine(lista)}
         <h2 class="h-secao">Estamos em Vila Verde</h2>
         <p class="visita__lead">Passe pelo stand sem marcação.</p>
         <ul class="visita__factos">
-          <li>${ic.pin}<span><b>${esc(def.stand.morada)}</b><br>${esc(def.stand.codigo_postal)} ${esc(def.stand.localidade)}, ${esc(def.stand.distrito)}</span></li>
-          <li>${ic.tel}<span><b><a href="tel:+351${def.contactos.telefone_1}">${def.contactos.telefone_1_texto}</a></b>
-            <small>(Chamada para a rede móvel nacional)</small></span></li>
+          <li>${ic.pin}<span><b>${esc(def.stand.morada)}</b><br>${localidadeDoStand()}</span></li>
+          <li>${ic.tel}<span><b><a href="${esc(TELEFONE_1.href)}">${esc(TELEFONE_1.texto)}</a></b>
+            <small>(${esc(TELEFONE_1.nota)})</small></span></li>
         </ul>
         <!-- O dia de hoje é marcado pelo JS, não pelo gerador: o site é
              estático e o HTML de segunda-feira ficaria a dizer «hoje» no
              sábado. Sem JS, a lista aparece inteira e certa na mesma. -->
         <ul class="horario horario--visita" id="horario-inicio">
-          ${def.horario.map((h) => `<li data-dias="${esc(h.dias)}"><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
+          ${HORARIO.map((h) => `<li data-dias="${esc(h.dias)}"><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
         </ul>
         ${notaVisita()}
         <div class="visita__acoes">
           <!-- Os mesmos dois botões da página de Contactos, pela mesma ordem. -->
-          <a class="btn btn--principal" href="tel:+351${def.contactos.telefone_1}">${ic.tel} Ligar agora</a>
+          <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} Ligar agora</a>
           <a class="btn btn--contorno" href="https://www.google.com/maps/dir/?api=1&amp;destination=${def.stand.latitude},${def.stand.longitude}"
              target="_blank" rel="noopener">${ic.pin} Como chegar</a>
         </div>
@@ -1562,8 +1616,8 @@ function paginaViatura(v) {
           ${aviso}
           ${notaVisita('nota-visita--painel')}
           <div class="painel__acoes">
-            <a class="btn btn--principal" href="tel:+351${def.contactos.telefone_1}">${ic.tel} ${def.contactos.telefone_1_texto}</a>
-            <p class="nota-chamada">(Chamada para a rede móvel nacional)</p>
+            <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} ${esc(TELEFONE_1.texto)}</a>
+            <p class="nota-chamada">(${esc(TELEFONE_1.nota)})</p>
             <a class="btn btn--zap" href="https://wa.me/${def.contactos.whatsapp}?text=${encodeURIComponent('Olá! Tenho interesse no ' + nome + ' — ' + abs('viaturas/' + v.slug + '/'))}" rel="noopener">${ic.zap} Perguntar no WhatsApp</a>
             <a class="btn btn--contorno" href="${u('contactos/')}">${ic.pin} Como chegar ao stand</a>
           </div>
@@ -1629,7 +1683,7 @@ function paginaViatura(v) {
 </section>
 
 <div class="barra-contacto">
-  <a class="btn btn--principal" href="tel:+351${def.contactos.telefone_1}">${ic.tel} Ligar</a>
+  <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} Ligar</a>
   <a class="btn btn--zap" href="https://wa.me/${def.contactos.whatsapp}" rel="noopener">${ic.zap} WhatsApp</a>
 </div>`;
 
@@ -1678,6 +1732,13 @@ function paginaViatura(v) {
 
 function paginaContactos() {
   const s = def.stand;
+  /* Uma linha por rede: os números do mesmo tipo juntos, com a nota uma vez
+     (hoje, os dois telemóveis numa linha, como sempre); um fixo e um telemóvel,
+     cada um na sua linha, com a sua nota. Sem o telefone 2, só o 1 — antes
+     ficava «961 053 363 · » com uma ligação vazia. */
+  const telefones = GRUPOS_DE_TELEFONES.map((g) => `<li>${ic.tel}<span><b>${g.telefones
+    .map((t) => `<a href="${esc(t.href)}">${esc(t.texto)}</a>`).join('\n            · ')}</b>
+            <small>(${esc(g.nota)})</small></span></li>`).join('\n          ');
   const corpo = `
 <section class="secao">
   <div class="envolve">
@@ -1692,25 +1753,23 @@ function paginaContactos() {
         <p class="visita__lead">Passe pelo stand, ligue-nos ou mande mensagem. Respondemos no próprio dia.</p>
 
         <ul class="visita__factos">
-          <li>${ic.pin}<span><b>${esc(s.morada)}</b><br>${esc(s.codigo_postal)} ${esc(s.localidade)}, ${esc(s.distrito)}</span></li>
-          <li>${ic.tel}<span><b><a href="tel:+351${def.contactos.telefone_1}">${def.contactos.telefone_1_texto}</a>
-            · <a href="tel:+351${def.contactos.telefone_2}">${def.contactos.telefone_2_texto}</a></b>
-            <small>(Chamada para a rede móvel nacional)</small></span></li>
+          <li>${ic.pin}<span><b>${esc(s.morada)}</b><br>${localidadeDoStand()}</span></li>
+          ${telefones}
           <li>${ic.zap}<span><b><a href="https://wa.me/${def.contactos.whatsapp}" rel="noopener">WhatsApp</a></b>
             <small>Mande a matrícula ou o modelo que procura</small></span></li>
         </ul>
 
         <ul class="horario horario--visita" id="horario-contactos">
-          ${def.horario.map((h) => `<li data-dias="${esc(h.dias)}"><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
+          ${HORARIO.map((h) => `<li data-dias="${esc(h.dias)}"><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
         </ul>
 
         ${notaVisita()}
         <div class="visita__acoes">
-          <a class="btn btn--principal" href="tel:+351${def.contactos.telefone_1}">${ic.tel} Ligar agora</a>
+          <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} Ligar agora</a>
           <a class="btn btn--contorno" href="https://www.google.com/maps/dir/?api=1&amp;destination=${s.latitude},${s.longitude}"
              target="_blank" rel="noopener">${ic.pin} Como chegar</a>
         </div>
-        <p class="nota-chamada">(Chamada para a rede móvel nacional)</p>
+        <p class="nota-chamada">(${esc(TELEFONE_1.nota)})</p>
       </div>
       <div class="visita__mapa">${mapa()}</div>
     </div>
@@ -1719,7 +1778,7 @@ function paginaContactos() {
   return pagina({
     pag: 'contactos/',
     titulo: 'Contactos — LR Motors, Vila Verde (Braga)',
-    descricao: `Stand LR Motors em ${s.morada}, ${s.codigo_postal} ${s.localidade}. Telefones ${def.contactos.telefone_1_texto} e ${def.contactos.telefone_2_texto}. Horário e mapa.`,
+    descricao: `Stand LR Motors em ${s.morada}, ${s.codigo_postal} ${s.localidade}. ${TELEFONES.length > 1 ? 'Telefones' : 'Telefone'} ${TELEFONES.map((t) => t.texto).join(' e ')}. Horário e mapa.`,
     corpo,
     jsonld: [standLD, migalhasLD([{ nome: 'Início', href: '' }, { nome: 'Contactos' }])],
   });

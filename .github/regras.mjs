@@ -1,7 +1,10 @@
 /* AS REGRAS DOS DADOS DA LR MOTORS, NUM SÓ SÍTIO.
  *
- * Três leitores, e os três têm de ouvir o mesmo:
+ * Quatro leitores, e os quatro têm de ouvir o mesmo:
  *   · o CI do site (.github/guardas.mjs), antes de gerar o site;
+ *   · o gerador (scripts/gerar.mjs), que tira daqui o horário que dá ao Google
+ *     (lerHorario) e a nota do custo da chamada de cada telefone
+ *     (notaDaChamada);
  *   · o painel, no browser (o erro aparece por baixo do campo, antes de gravar);
  *   · o Worker do painel, ao gravar (recusa os problemas NOVOS que não sejam
  *     lembretes).
@@ -18,8 +21,9 @@
  * CADA PROBLEMA TEM UMA CLASSE (plano, §4):
  *   · bloqueia   — a publicação pára e o site fica como estava. Só a estrutura
  *                  (um JSON que não se lê, um ficheiro sem a forma que o gerador
- *                  precisa, um valor que ele escreve tal e qual no HTML de TODAS
- *                  as páginas) e os dados legais da empresa (CSC art. 171.º).
+ *                  precisa, um valor de que TODAS as páginas dependem — os
+ *                  telefones, de que sai a nota do custo da chamada, e o
+ *                  WhatsApp) e os dados legais da empresa (CSC art. 171.º).
  *   · neutraliza — uma viatura, só na cópia que o gerador lê (o ficheiro do
  *                  repositório não muda — ver neutralizar()): sem marca ou sem
  *                  modelo, ou com um valor que partia a página dela, fica
@@ -289,8 +293,11 @@ const RE_CONTROLO_TEXTO = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/;
    o browser o lê: a página parte-se, e o resto do JSON aparece como texto. */
 const RE_PARTE_A_PAGINA = /<\/script|<!--/i;
 
+/* Telefones portugueses, 9 algarismos: telemóvel (91, 92, 93, 96) e fixo (2…;
+   o 20 não existe no plano de numeração). O WhatsApp é sempre um telemóvel. */
 const RE_TELEMOVEL = /^9[1236][0-9]{7}$/;
-const RE_WHATSAPP = /^351[29][0-9]{8}$/;
+const RE_FIXO = /^2[1-9][0-9]{7}$/;
+const RE_WHATSAPP = /^3519[1236][0-9]{7}$/;
 const RE_TELEFONE_TEXTO = /^[0-9 +.-]+$/;
 const RE_CP = /^[0-9]{4}-[0-9]{3}$/;
 export const RE_EMAIL = /^[A-Za-z0-9._%+-]+@[A-Za-z0-9-]+(\.[A-Za-z0-9-]+)*\.[A-Za-z]{2,}$/;
@@ -304,6 +311,15 @@ function urlHttps(v) {
   if (typeof v !== 'string' || !/^https:\/\/[^\s"'<>\\]+$/.test(v.trim())) return false;
   try { return new URL(v.trim()).protocol === 'https:'; } catch { return false; }
 }
+
+/* A REDE DE UM TELEFONE, para a nota do custo da chamada que o site escreve
+   junto de cada número (DL 59/2021): 'movel', 'fixa', ou null para o que não é
+   nenhum dos dois (um 800, um 707, um 30…, um número estrangeiro) — aí o site
+   não sabe que nota escrever, e estas regras não o deixam gravar. O
+   scripts/gerar.mjs escreve a nota a partir DAQUI (notaDaChamada). */
+export const redeDoTelefone = (n) => (typeof n !== 'string' ? null : RE_TELEMOVEL.test(n) ? 'movel' : RE_FIXO.test(n) ? 'fixa' : null);
+export const NOTAS_DA_CHAMADA = { movel: 'Chamada para a rede móvel nacional', fixa: 'Chamada para a rede fixa nacional' };
+export const notaDaChamada = (n) => { const r = redeDoTelefone(n); return r ? NOTAS_DA_CHAMADA[r] : null; };
 
 /* Um caminho de fotografia como o painel e o Pages CMS os escrevem: dentro de
    assets/veiculos/ (com ou sem a barra à frente), ou só o nome do ficheiro (o
@@ -351,6 +367,148 @@ function lerJson(valor) {
   if (ausente(valor)) return { ausente: true };
   if (typeof valor !== 'string') return { obj: valor, texto: null };
   try { return { obj: JSON.parse(valor), texto: valor }; } catch (e) { return { ilegivel: String((e && e.message) || e).slice(0, 120), texto: valor }; }
+}
+
+/* ------------------------------------------------------------------ */
+/* O horário, como o Google o lê                                        */
+/* ------------------------------------------------------------------ */
+
+/* O HORÁRIO É TEXTO LIVRE no backoffice («Segunda a sexta» · «09:00 – 19:00»),
+   e o site mostra-o tal e qual. O Google lê-o do JSON-LD do stand
+   (openingHoursSpecification), que tem de ser dias da semana e horas certas.
+   lerHorario() traduz as formas portuguesas comuns; uma linha que não perceba
+   fica FORA do JSON-LD — melhor nada do que um horário errado no Google — e o
+   problemasDasDefinicoes() lembra o dono de como a escrever. O scripts/gerar.mjs
+   escreve o JSON-LD a partir DAQUI: o que esta função não percebe é exactamente
+   o que lá fica de fora. Nunca adivinha: uma palavra que não conheça, e a linha
+   não se percebe. */
+export const DIAS_DA_SEMANA = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday', 'Sunday'];
+const DIAS_COM_ARTIGO = ['a segunda', 'a terça', 'a quarta', 'a quinta', 'a sexta', 'o sábado', 'o domingo'];
+
+/* Minúsculas, sem acentos («à» é «a»; o NFKD desfaz o «ª» de «2.ª» em «a»),
+   os traços todos iguais e um espaço só. */
+const normalizarHorario = (s) => String(s).normalize('NFKD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+  .replace(/[\u2010-\u2015\u2212]/g, '-').replace(/\s+/g, ' ').trim();
+
+const DIA = new Map([
+  ['segunda', 0], ['seg', 0], ['2a', 0], ['terca', 1], ['ter', 1], ['3a', 1], ['quarta', 2], ['qua', 2], ['4a', 2],
+  ['quinta', 3], ['qui', 3], ['5a', 3], ['sexta', 4], ['sex', 4], ['6a', 4], ['sabado', 5], ['sab', 5], ['domingo', 6], ['dom', 6],
+]);
+const GRUPOS_DE_DIAS = new Map([['todos', [0, 1, 2, 3, 4, 5, 6]], ['uteis', [0, 1, 2, 3, 4]], ['fds', [5, 6]]]);
+const SEPARA_DIAS = new Set([',', 'e', '/', '&', '+', ';']);
+const ATE_AO_DIA = new Set(['a', 'as', 'ate', '-']);
+const ANTES_DO_DIA = new Set(['de', 'da', 'das', 'do', 'dos', 'ao', 'aos', 'a', 'as', 'nas', 'nos']);
+/* «sábados» é «sábado»; um Map, e não um objecto, para «constructor» não ser um dia. */
+const diaDe = (f) => (DIA.has(f) ? DIA.get(f) : f.endsWith('s') && DIA.has(f.slice(0, -1)) ? DIA.get(f.slice(0, -1)) : null);
+
+/* Os dias de uma linha: [0..6] (0 é a segunda), por ordem, ou null se não se
+   percebe. «Segunda a sexta», «De segunda-feira a sexta-feira», «2.ª a 6.ª»,
+   «Seg-Sex», «Sábados», «Sábado e domingo», «Segunda, quarta e sexta», «Todos
+   os dias», «Dias úteis», «Fim de semana», «Sexta a segunda» (dá a volta à
+   semana). «Feriados», «exceto», parênteses, «segunda a segunda»: não. */
+export function lerDiasDoHorario(texto) {
+  if (typeof texto !== 'string') return null;
+  const s = normalizarHorario(texto)
+    .replace(/([0-9]) ?\. ?a\b/g, '$1a')
+    .replace(/(?:-| )feiras?\b/g, '')
+    .replace(/\btodos os dias(?: da semana)?\b|\bdiariamente\b/g, ' todos ')
+    .replace(/\bdias uteis\b/g, ' uteis ')
+    .replace(/\bfi(?:m|ns)[ -]de[ -]semana\b/g, ' fds ')
+    .replace(/\./g, ' ');
+  const f = s.match(/[a-z0-9]+|[^a-z0-9\s]/g) || [];
+  const dias = new Set();
+  let i = 0;
+  for (;;) {
+    while (i < f.length && ANTES_DO_DIA.has(f[i])) i++;
+    if (i >= f.length) return null;
+    if (GRUPOS_DE_DIAS.has(f[i])) { for (const d of GRUPOS_DE_DIAS.get(f[i])) dias.add(d); i++; } else {
+      const de = diaDe(f[i]);
+      if (de === null) return null;
+      i++;
+      if (i < f.length && ATE_AO_DIA.has(f[i])) {
+        i++;
+        while (i < f.length && ANTES_DO_DIA.has(f[i])) i++;
+        const ate = i < f.length ? diaDe(f[i]) : null;
+        if (ate === null || ate === de) return null;
+        for (let d = de; ; d = (d + 1) % 7) { dias.add(d); if (d === ate) break; }
+        i++;
+      } else dias.add(de);
+    }
+    if (i >= f.length) break;
+    if (!SEPARA_DIAS.has(f[i])) return null;
+    i++;
+  }
+  return [...dias].sort((a, b) => a - b);
+}
+
+/* As horas de uma linha: 'fechado', [['09:00', '13:00'], ['14:30', '19:00']]
+   (por ordem, sem se sobreporem), ou null se não se percebe. «09:00 – 19:00»,
+   «9h-19h», «9h às 19h», «Das 9:00 às 13:00 / 14:30 às 19:00», «9h-12h30 e
+   14h-19h», «9.00-19.00», «9 às 19 horas», «Fechado», «Encerrado», «24 horas».
+   O fecho à meia-noite («24h», «24:00») vai como 23:59, como o Google o quer.
+   «Por marcação», «até às 19h», um intervalo ao contrário ou sobreposto: não. */
+const HORA = '([0-9]{1,2})(?:(?:h|:|\\.)([0-9]{2})h?|h)?';
+const RE_INTERVALO = new RegExp(`^(?:das? |de )?${HORA} ?(?:-|a|as|ate|ate as) ?${HORA}$`);
+const minutosDe = (h, m) => {
+  const H = Number(h); const M = m === undefined ? 0 : Number(m);
+  return H > 24 || M > 59 || (H === 24 && M > 0) ? null : H * 60 + M;
+};
+const hhmm = (t) => (t >= 1440 ? '23:59' : `${String(Math.floor(t / 60)).padStart(2, '0')}:${String(t % 60).padStart(2, '0')}`);
+export function lerHorasDoHorario(texto) {
+  if (typeof texto !== 'string') return null;
+  const s = normalizarHorario(texto).replace(/\.$/, '');
+  if (/^(?:fechad[oa]s?|encerrad[oa]s?)$/.test(s)) return 'fechado';
+  if (/^(?:aberto )?24 ?(?:h|horas)$/.test(s)) return [['00:00', '23:59']];
+  const t = s.replace(/([0-9]) ?horas?\b/g, '$1h').replace(/([0-9]) h\b/g, '$1h');
+  const intervalos = [];
+  for (const parte of t.split(/ ?(?:[\/,;+&|]|\be\b) ?/)) {
+    const m = parte.match(RE_INTERVALO);
+    if (!m) return null;
+    const abre = minutosDe(m[1], m[2]); const fecha = minutosDe(m[3], m[4]);
+    if (abre === null || fecha === null || abre >= fecha) return null;
+    intervalos.push([abre, fecha]);
+  }
+  intervalos.sort((a, b) => a[0] - b[0]);
+  for (let k = 1; k < intervalos.length; k++) if (intervalos[k][0] < intervalos[k - 1][1]) return null;
+  return intervalos.map(([a, b]) => [hhmm(a), hhmm(b)]);
+}
+
+/* O horário inteiro (a lista do definicoes.json) →
+     { linhas: [{ indice, estado, dias?, horas?, motivo?, repetidos? }],
+       especificacao: [os OpeningHoursSpecification, pela ordem das linhas] }
+   estado: 'aberto'; 'fechado' (não vai nada para o Google: um dia que lá não
+   está, está fechado — e por isso os dias de uma linha fechada podem nem
+   perceber-se, «Feriados»); 'vazio' (sem linha, dias ou horas: as regras
+   dizem-no à parte); 'nao-percebido', com motivo 'dias', 'horas' ou 'repetido'
+   — um dia em duas linhas que não estão ambas fechadas é uma contradição, e
+   saem as duas. dayOfWeek: um nome quando é um dia, uma lista quando são vários. */
+export function lerHorario(horario) {
+  /* Array.from e não .map: um buraco na lista (um delete) conta como uma linha
+     vazia, e não fica um buraco no resultado. */
+  const linhas = Array.from(Array.isArray(horario) ? horario : [], (l, indice) => {
+    if (!eObjecto(l) || !temTexto(l.dias) || !temTexto(l.horas)) return { indice, estado: 'vazio' };
+    const horas = lerHorasDoHorario(l.horas);
+    const dias = lerDiasDoHorario(l.dias);
+    if (horas === 'fechado') return { indice, estado: 'fechado', dias };
+    if (!horas || !dias) return { indice, estado: 'nao-percebido', motivo: dias ? 'horas' : 'dias' };
+    return { indice, estado: 'aberto', dias, horas };
+  });
+  const lidas = linhas.filter((l) => l.dias && (l.estado === 'aberto' || l.estado === 'fechado'));
+  const contraditorios = new Set([0, 1, 2, 3, 4, 5, 6].filter((d) => {
+    const com = lidas.filter((l) => l.dias.includes(d));
+    return com.length > 1 && com.some((l) => l.estado === 'aberto');
+  }));
+  for (const l of lidas) {
+    const repetidos = l.dias.filter((d) => contraditorios.has(d));
+    if (repetidos.length) Object.assign(l, { estado: 'nao-percebido', motivo: 'repetido', repetidos });
+  }
+  const especificacao = linhas.filter((l) => l.estado === 'aberto').flatMap((l) => l.horas.map(([abre, fecha]) => ({
+    '@type': 'OpeningHoursSpecification',
+    dayOfWeek: l.dias.length === 1 ? DIAS_DA_SEMANA[l.dias[0]] : l.dias.map((d) => DIAS_DA_SEMANA[d]),
+    opens: abre,
+    closes: fecha,
+  })));
+  return { linhas, especificacao };
 }
 
 /* ------------------------------------------------------------------ */
@@ -586,34 +744,33 @@ export function problemasDasDefinicoes(d) {
   };
 
   // --- contactos ------------------------------------------------------------
-  /* O gerador escreve os telefones e o WhatsApp TAL E QUAL nos endereços
-     (tel:+351…, wa.me/…) e o «como aparece» tal e qual no HTML, em todas as
-     páginas: um valor fora da forma parte os botões de ligar do site inteiro.
-     E junto de cada número o site diz «Chamada para a rede móvel nacional» (a
-     nota está no gerador, DL 59/2021): por isso só números de telemóvel. */
+  /* O gerador escreve os telefones e o WhatsApp nos endereços (tel:+351…,
+     wa.me/…) e o «como aparece» no texto, em todas as páginas; e junto de cada
+     número a nota do custo da chamada (DL 59/2021), que sai do próprio número
+     (notaDaChamada: «rede móvel» ou «rede fixa»). Por isso: um telemóvel ou um
+     fixo português, e o «como aparece» com os mesmos algarismos. Sem o telefone
+     2, o site mostra só o 1 — sem linha vazia em lado nenhum. O WhatsApp é
+     sempre um telemóvel. */
   const c = d.contactos;
   if (eObjecto(c)) {
     const telefone = (n, obrigatorio) => {
       const num = c[`telefone_${n}`]; const txt = c[`telefone_${n}_texto`];
       const campoNum = `contactos.telefone_${n}`; const campoTxt = `contactos.telefone_${n}_texto`;
       const rNum = `Telefone ${n} (só dígitos)`; const rTxt = `Telefone ${n} (como aparece)`;
-      if (!obrigatorio && vazio(num) && vazio(txt)) {
-        avisa(`contactos.telefone_${n}:vazio`, 'contactos', campoNum, `Sem o telefone ${n}, o rodapé e a página de Contactos mostram uma linha de telefone vazia.`, { lembrete: true });
-        return;
-      }
+      if (!obrigatorio && vazio(num) && vazio(txt)) return;
       if (vazio(num)) bloqueia(`contactos.telefone_${n}`, 'contactos', campoNum, obrigatorio ? `Preencha «${rNum}»: é o número dos botões «Ligar» de todas as páginas.` : `Preencha «${rNum}» (o «como aparece» está preenchido), ou apague os dois.`);
-      else if (!(typeof num === 'string' && RE_TELEMOVEL.test(num))) bloqueia(`contactos.telefone_${n}`, 'contactos', campoNum, `«${rNum}» tem de ser um número de telemóvel português, com 9 algarismos e sem espaços (ex.: 961053363): o site diz «Chamada para a rede móvel nacional» junto dele.`);
+      else if (!redeDoTelefone(num)) bloqueia(`contactos.telefone_${n}`, 'contactos', campoNum, `«${rNum}» tem de ser um número português de 9 algarismos, sem espaços: um telemóvel (começa por 91, 92, 93 ou 96) ou um fixo (começa por 2). Ex.: 961053363 ou 253123456.`);
       if (vazio(txt)) bloqueia(`contactos.telefone_${n}_texto`, 'contactos', campoTxt, `Preencha «${rTxt}»: é o número que se lê no site (ex.: 961 053 363).`);
       else {
         const digitos = typeof txt === 'string' ? txt.replace(/[^0-9]/g, '').replace(/^351(?=[0-9]{9}$)/, '') : '';
         if (!(typeof txt === 'string' && RE_TELEFONE_TEXTO.test(txt) && txt.length <= TAMANHOS.telefoneTexto)) bloqueia(`contactos.telefone_${n}_texto`, 'contactos', campoTxt, `«${rTxt}» só pode ter algarismos e espaços (ex.: 961 053 363).`);
-        else if (typeof num === 'string' && RE_TELEMOVEL.test(num) && digitos !== num) bloqueia(`contactos.telefone_${n}_texto`, 'contactos', campoTxt, `«${rTxt}» não é o mesmo número de «${rNum}»: o site mostrava um número e ligava para outro.`);
+        else if (redeDoTelefone(num) && digitos !== num) bloqueia(`contactos.telefone_${n}_texto`, 'contactos', campoTxt, `«${rTxt}» não é o mesmo número de «${rNum}»: o site mostrava um número e ligava para outro.`);
       }
     };
     telefone(1, true);
     telefone(2, false);
     if (vazio(c.whatsapp)) bloqueia('contactos.whatsapp', 'contactos', 'contactos.whatsapp', 'Preencha o WhatsApp: é para onde vão os botões «WhatsApp» de todas as páginas.');
-    else if (!(typeof c.whatsapp === 'string' && RE_WHATSAPP.test(c.whatsapp))) bloqueia('contactos.whatsapp', 'contactos', 'contactos.whatsapp', 'O WhatsApp escreve-se 351 e o número, só algarismos, sem espaços nem + (ex.: 351961053363).');
+    else if (!(typeof c.whatsapp === 'string' && RE_WHATSAPP.test(c.whatsapp))) bloqueia('contactos.whatsapp', 'contactos', 'contactos.whatsapp', 'O WhatsApp é um telemóvel: escreve-se 351 e o número, só algarismos, sem espaços nem + (ex.: 351961053363).');
     if (!vazio(c.email) && !(typeof c.email === 'string' && c.email.length <= TAMANHOS.email && RE_EMAIL.test(c.email.trim()))) {
       avisa('contactos.email', 'contactos', 'contactos.email', 'O email não está bem escrito (ex.: geral@lrmotorsautomoveis.pt, sem acentos nem espaços). Corrija-o ou deixe-o vazio.');
     }
@@ -647,10 +804,28 @@ export function problemasDasDefinicoes(d) {
     if (h.length > TAMANHOS.horarioLinhas) avisa('horario:linhas', 'horario', 'horario', `O horário tem ${h.length} linhas; o máximo é ${TAMANHOS.horarioLinhas}.`);
     h.forEach((linha, i) => {
       if (!eObjecto(linha)) { bloqueia(`horario.${i + 1}:forma`, 'horario', `horario.${i}`, `A ${i + 1}.ª linha do horário não está preenchida, e sem ela o site não se consegue gerar. Apague-a e escreva-a outra vez.`); return; }
+      /* Toda vazia, o gerador não a mostra (não fica uma linha em branco). */
+      if (vazio(linha.dias) && vazio(linha.horas)) {
+        avisa(`horario.${i + 1}:vazia`, 'horario', `horario.${i}`, `A ${i + 1}.ª linha do horário está vazia, e não aparece no site: apague-a, ou escreva os dias e as horas.`);
+        return;
+      }
       const porque = `na ${i + 1}.ª linha do horário fica um espaço em branco.`;
       textoSimples(linha.dias, `horario.${i + 1}.dias`, 'horario', `horario.${i}.dias`, 'Dias', TAMANHOS.dias, { vazio: 'avisa', porque });
       textoSimples(linha.horas, `horario.${i + 1}.horas`, 'horario', `horario.${i}.horas`, 'Horas', TAMANHOS.horas, { vazio: 'avisa', porque });
     });
+    /* O que vai para o Google (lerHorario): a linha que não se percebe fica fora
+       do JSON-LD, e o dono fica a saber como a escrever. Só lembra — no site a
+       linha aparece como está. */
+    const citar = (t) => { const x = String(t).replace(/[\u0000-\u001F\u007F\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim(); return x.length > 40 ? `${x.slice(0, 39)}…` : x; };
+    const comE = (l) => (l.length > 1 ? `${l.slice(0, -1).join(', ')} e ${l[l.length - 1]}` : l.join(''));
+    for (const l of lerHorario(h).linhas) {
+      if (l.estado !== 'nao-percebido') continue;
+      const n = l.indice + 1;
+      const mensagem = l.motivo === 'repetido'
+        ? `A ${n}.ª linha do horário tem ${comE(l.repetidos.map((x) => DIAS_COM_ARTIGO[x]))}, que também ${l.repetidos.length === 1 ? 'está' : 'estão'} noutra linha: o Google não sabe qual das duas vale, e nenhuma delas vai para o Google (no site aparecem como estão). Escreva cada dia numa linha só (ex.: «Segunda a sexta» numa linha e «Sábado» noutra).`
+        : `O Google não percebe a ${n}.ª linha do horário («${citar(h[l.indice].dias)}» · «${citar(h[l.indice].horas)}»): fica fora do que o site diz ao Google (no site aparece como está). Para o Google a perceber, escreva os dias como «Segunda a sexta», «Sábado» ou «Sábado e domingo», e as horas como «9:00 – 19:00», «9h-13h e 14h30-19h» ou «Fechado».`;
+      avisa(`horario.${n}:google`, 'horario', `horario.${l.indice}.${l.motivo === 'horas' ? 'horas' : 'dias'}`, mensagem, { lembrete: true });
+    }
   }
 
   // --- redes sociais --------------------------------------------------------

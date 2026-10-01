@@ -50,10 +50,13 @@ def montar(pasta_fotos='carro', fotos=None):
     """Uma árvore mínima mas verdadeira: os scripts são os do repositório."""
     if (arvore / 'assets').exists():
         shutil.rmtree(arvore / 'assets')
-    for d in ('scripts', f'assets/veiculos/{pasta_fotos}', 'data/viaturas/vendidas'):
+    for d in ('scripts', '.github', f'assets/veiculos/{pasta_fotos}', 'data/viaturas/vendidas'):
         (arvore / d).mkdir(parents=True, exist_ok=True)
     for f in ('otimizar-imagens.py', 'gerar.mjs'):
         shutil.copy(RAIZ / 'scripts' / f, arvore / 'scripts' / f)
+    # O gerador lê as regras dos dados (o horário que dá ao Google, a nota do
+    # custo da chamada de cada telefone): sem elas nem arranca.
+    shutil.copy(RAIZ / '.github' / 'regras.mjs', arvore / '.github' / 'regras.mjs')
     shutil.copy(RAIZ / 'data/definicoes.json', arvore / 'data/definicoes.json')
     for pasta in ('conteudo', 'assets/css', 'assets/js', 'assets/img'):
         shutil.copytree(RAIZ / pasta, arvore / pasta, dirs_exist_ok=True)
@@ -68,8 +71,11 @@ def montar(pasta_fotos='carro', fotos=None):
 def publicar():
     subprocess.run([sys.executable, 'scripts/otimizar-imagens.py', '--varrer'],
                    cwd=arvore, capture_output=True)
-    subprocess.run(['node', 'scripts/gerar.mjs'], cwd=arvore, capture_output=True,
-                   env={**os.environ, 'BASE': '', 'SITE': 'http://teste'})
+    r = subprocess.run(['node', 'scripts/gerar.mjs'], cwd=arvore, capture_output=True, text=True,
+                       env={**os.environ, 'BASE': '', 'SITE': 'http://teste'})
+    # Um gerador que falha aqui não pode passar por «a página não existe»: diz porquê.
+    if r.returncode != 0:
+        sys.exit(f'o gerador falhou na árvore de ensaio ({r.returncode}):\n{r.stderr[-2000:]}')
 
 
 def cor_de(caminho):
