@@ -20,6 +20,11 @@ import { readFileSync, writeFileSync, mkdirSync, existsSync, readdirSync, rmSync
 import { createHash } from 'node:crypto';
 import { join, dirname, relative, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+/* As regras dos dados (as mesmas da guarda do CI e do painel): daqui sai o que
+   o site diz ao Google do horário, a nota do custo da chamada de cada telefone,
+   e o que é um email ou um endereço que se possa pôr num link. Um sítio só —
+   o que as regras dizem que não se percebe é exactamente o que aqui fica de fora. */
+import { lerHorario, notaDaChamada, emailValido, urlHttps } from '../.github/regras.mjs';
 
 const RAIZ = dirname(dirname(fileURLToPath(import.meta.url)));
 const SAIDA = join(RAIZ, '_site');
@@ -172,6 +177,103 @@ function versao(caminho) {
 const esc = (s) => String(s ?? '').replace(/[&<>"']/g, (c) =>
   ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
 
+/* JSON DENTRO DE UM <script> (o JSON-LD e a lista das fotografias da galeria).
+   O JSON.stringify não escapa o «<», e dentro de um <script> um «</script» num
+   texto do dono fecha o elemento a meio e um «<!--» muda a forma como o browser
+   o lê: o resto do JSON aparecia como texto na página. O «<» passa ao escape
+   barra-u-003c, que para quem lê o JSON é o mesmo carácter e que o HTML não tem
+   por onde ver. (Escrito em duas partes de propósito: as ferramentas de edição
+   trocam o escape inteiro pelo próprio «<», e aí isto deixava de escapar fosse o
+   que fosse, sem erro nenhum.) */
+const jsonNoScript = (x) => JSON.stringify(x).replace(/</g, '\\' + 'u003c');
+const temTexto = (x) => typeof x === 'string' && x.trim() !== '';
+
+/* -------------------------------------------------- os contactos do stand */
+/* OS TELEFONES, como o site os mostra: só os que existem — sem o telefone 2 não
+   fica uma linha vazia em lado nenhum — e cada um com a nota do custo da
+   chamada da rede DELE, junto do número e com a mesma visibilidade (DL 59/2021).
+   A rede sai do próprio número (notaDaChamada, nas regras): um fixo diz «rede
+   fixa», um telemóvel «rede móvel». Até 1 out 2026 a nota estava escrita à mão
+   em todos os sítios, sempre «rede móvel», e por isso um fixo não se podia pôr.
+
+   Um número que não seja nem uma coisa nem outra PÁRA a construção: o site não
+   sabe que nota escrever, e uma nota errada é pior do que não publicar. A guarda
+   do CI e o painel recusam-no antes; isto é para quem corra o gerador à mão. */
+const TELEFONES = [1, 2].flatMap((n) => {
+  const numero = def.contactos[`telefone_${n}`];
+  const texto = def.contactos[`telefone_${n}_texto`];
+  if (n > 1 && !temTexto(numero) && !temTexto(texto)) return [];
+  const nota = typeof numero === 'string' ? notaDaChamada(numero.trim()) : null;
+  if (!nota || !temTexto(texto)) {
+    console.error(`\nERRO: o telefone ${n} (Dados do stand › Contactos) não se pode publicar: ${JSON.stringify(numero ?? null)} / ${JSON.stringify(texto ?? null)}.`);
+    console.error('«Só dígitos» tem de ser um telemóvel (91, 92, 93, 96…) ou um fixo (2…) português, de 9 algarismos, e «como aparece» tem de estar');
+    console.error('preenchido: o site escreve junto de cada número o custo da chamada para a rede dele, e assim não sabe qual é.\n');
+    process.exit(1);
+  }
+  return [{ texto: texto.trim(), internacional: `+351${numero.trim()}`, href: `tel:+351${numero.trim()}`, nota }];
+});
+const TELEFONE_1 = TELEFONES[0];
+/* Agrupados pela rede, pela ordem em que estão: dois do mesmo tipo partilham a
+   nota, como sempre se escreveu («961 053 363 · 916 228 513 (Chamada para a rede
+   móvel nacional)»); um fixo e um telemóvel levam cada um a sua. */
+const GRUPOS_DE_TELEFONES = TELEFONES.reduce((grupos, t) => {
+  const ultimo = grupos[grupos.length - 1];
+  if (ultimo && ultimo.nota === t.nota) ultimo.telefones.push(t);
+  else grupos.push({ nota: t.nota, telefones: [t] });
+  return grupos;
+}, []);
+/* «Telefones: 961 053 363 e 916 228 513 (Chamada para a rede móvel nacional)»,
+   em texto corrido (os Termos). */
+const TELEFONES_EM_TEXTO = `${TELEFONES.length > 1 ? 'Telefones' : 'Telefone'}: ${GRUPOS_DE_TELEFONES
+  .map((g) => `${g.telefones.map((t) => t.texto).join(' e ')} (${g.nota})`).join(' e ')}`;
+
+/* O WhatsApp vai num endereço (wa.me/…), codificado: um valor estranho num
+   commit à mão não sai do atributo. */
+const WHATSAPP = String(def.contactos.whatsapp ?? '').trim();
+const waMe = (mensagem) => `https://wa.me/${encodeURIComponent(WHATSAPP)}${mensagem ? `?text=${encodeURIComponent(mensagem)}` : ''}`;
+
+/* O email esteve sempre no backoffice e nunca chegou ao site. Aparece quando é
+   um email (emailValido, nas regras): nos Contactos, no rodapé, nos Termos e no
+   JSON-LD. Vazio ou mal escrito, não aparece em lado nenhum. */
+const EMAIL = emailValido(def.contactos.email) ? def.contactos.email.trim() : '';
+
+/* A morada numa linha: o mapa embutido, e o «Como chegar» sem coordenadas. */
+const MORADA_NUMA_LINHA = `${def.stand.morada}, ${def.stand.codigo_postal} ${def.stand.localidade}`;
+/* As coordenadas só contam como números dentro do mapa. Sem elas, o «Como
+   chegar» leva à morada e o JSON-LD não leva ponto nenhum; antes, um valor em
+   falta dava «destination=undefined,undefined» e um texto ia tal e qual para o
+   endereço. */
+const coordenada = (x, max) => (typeof x === 'number' && Number.isFinite(x) && Math.abs(x) <= max ? x : null);
+const LATITUDE = coordenada(def.stand.latitude, 90);
+const LONGITUDE = coordenada(def.stand.longitude, 180);
+const TEM_COORDENADAS = LATITUDE !== null && LONGITUDE !== null;
+const COMO_CHEGAR = `https://www.google.com/maps/dir/?api=1&destination=${TEM_COORDENADAS ? `${LATITUDE},${LONGITUDE}` : encodeURIComponent(MORADA_NUMA_LINHA)}`;
+/* O link do Google Maps que o dono copiou. Se não for um https:// (vazio, mal
+   colado, ou um «javascript:» de um commit à mão), um feito da morada: o link
+   do rodapé e o botão «Abrir no Google Maps» nunca ficam sem destino. */
+const LINK_DO_MAPA = urlHttps(def.stand.mapa) ? def.stand.mapa.trim() : `https://www.google.com/maps?q=${encodeURIComponent(MORADA_NUMA_LINHA)}`;
+/* As redes: só um endereço https:// chega a um link ou ao JSON-LD (o mesmo
+   teste das regras). As outras não aparecem. */
+const redeSocial = (x) => (urlHttps(x) ? x.trim() : '');
+const REDES = { instagram: redeSocial(def.redes.instagram), facebook: redeSocial(def.redes.facebook), tiktok: redeSocial(def.redes.tiktok) };
+
+/* «Onde estamos (texto livre)», dos Textos do site, é o sítio da frase do
+   rodapé de todas as páginas («Stand em …, com oficina própria.»). Estava
+   escrito à mão e o campo não chegava a lado nenhum. Vazio, diz-se a
+   localidade e o distrito do stand. */
+const ONDE_ESTAMOS = temTexto(def.textos.locais) ? def.textos.locais.trim()
+  : [def.stand.localidade, def.stand.distrito].filter(temTexto).join(', ');
+/* As linhas do horário que o site mostra: uma linha toda vazia (sem dias nem
+   horas) não aparece — ficava uma linha em branco na lista. */
+const HORARIO = (Array.isArray(def.horario) ? def.horario : [])
+  .filter((h) => h && typeof h === 'object' && (temTexto(h.dias) || temTexto(h.horas)));
+/* O horário que o Google lê (o openingHoursSpecification do JSON-LD do stand). */
+const HORARIO_GOOGLE = lerHorario(def.horario).especificacao;
+/* «4730-251 Vila Verde, Braga», já escapado: sem o distrito, não fica uma
+   vírgula solta no fim. */
+const localidadeDoStand = () => [`${esc(def.stand.codigo_postal)} ${esc(def.stand.localidade)}`, temTexto(def.stand.distrito) ? esc(def.stand.distrito) : '']
+  .filter(Boolean).join(', ');
+
 const nEuro = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' €';
 /* Sem preço publicado não se inventa nem se escreve 0: diz-se que é sob
    consulta. Quando há preço, ele é final e com impostos incluídos — é o que
@@ -179,7 +281,8 @@ const nEuro = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' €';
 const temPreco = (v) => typeof v.preco === 'number' && v.preco > 0;
 const precoTexto = (v) => temPreco(v) ? nEuro(v.preco) : 'Sob consulta';
 
-const nKm = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' km';
+/* Só um número dá quilómetros: um texto num commit à mão saía «NaN km». */
+const nKm = (n) => (typeof n === 'number' && Number.isFinite(n) ? new Intl.NumberFormat('pt-PT').format(n) + ' km' : null);
 
 /* Texto que o cliente escreve num campo de várias linhas do backoffice.
    ---------------------------------------------------------------------------
@@ -416,6 +519,7 @@ const ic = {
   filtro: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 5h18l-7 8v6l-4 2v-8Z"/></svg>',
   fb: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M22 12.06C22 6.5 17.52 2 12 2S2 6.5 2 12.06C2 17.08 5.66 21.24 10.44 22v-7.02H7.9v-2.92h2.54V9.85c0-2.52 1.5-3.91 3.77-3.91 1.09 0 2.24.2 2.24.2v2.46h-1.26c-1.24 0-1.63.78-1.63 1.57v1.89h2.78l-.44 2.92h-2.34V22C18.34 21.24 22 17.08 22 12.06Z"/></svg>',
   ig: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M12 2.16c3.2 0 3.58.01 4.85.07 1.17.05 1.8.25 2.23.41.56.22.96.48 1.38.9.42.42.68.82.9 1.38.16.42.36 1.06.41 2.23.06 1.27.07 1.65.07 4.85s-.01 3.58-.07 4.85c-.05 1.17-.25 1.8-.41 2.23-.22.56-.48.96-.9 1.38-.42.42-.82.68-1.38.9-.42.16-1.06.36-2.23.41-1.27.06-1.65.07-4.85.07s-3.58-.01-4.85-.07c-1.17-.05-1.8-.25-2.23-.41-.56-.22-.96-.48-1.38-.9-.42-.42-.68-.82-.9-1.38-.16-.42-.36-1.06-.41-2.23C2.17 15.58 2.16 15.2 2.16 12s.01-3.58.07-4.85c.05-1.17.25-1.8.41-2.23.22-.56.48-.96.9-1.38.42-.42.82-.68 1.38-.9.42-.16 1.06-.36 2.23-.41C8.42 2.17 8.8 2.16 12 2.16Zm0 5.68a4.16 4.16 0 1 0 0 8.32 4.16 4.16 0 0 0 0-8.32Zm0 6.86a2.7 2.7 0 1 1 0-5.4 2.7 2.7 0 0 1 0 5.4Zm5.3-7.02a.97.97 0 1 1-1.94 0 .97.97 0 0 1 1.94 0Z"/></svg>',
+  email: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="5" width="18" height="14" rx="2"/><path d="m3 7 9 6 9-6"/></svg>',
   tiktok: '<svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M16.6 5.8a5 5 0 0 1-1.4-3.3h-3.2v13a2.6 2.6 0 1 1-2.6-2.6c.27 0 .53.04.78.12V9.7a5.9 5.9 0 0 0-.78-.05 5.85 5.85 0 1 0 5.85 5.85V8.9a8.2 8.2 0 0 0 4.75 1.52V7.2a4.9 4.9 0 0 1-3.4-1.4Z"/></svg>',
 };
 
@@ -540,7 +644,7 @@ function fitaMarcas(marcas) {
     const marca = logo
       ? `<span class="marca-cartao__logo"><svg viewBox="${logo.viewBox}" width="${md.w}" height="${md.h}" aria-hidden="true" focusable="false"><use href="#m-${chaveMarca(m)}"/></svg></span>`
       : `<span class="marca-cartao__logo marca-cartao__logo--sigla" aria-hidden="true">${esc(inicial(m))}</span>`;
-    return `<li class="fita__item${extra ? ' fita__item--extra' : ''}"${deco ? ' aria-hidden="true"' : ''}><a class="marca-cartao" href="${u('viaturas/?marca=' + encodeURIComponent(m))}"${deco ? ' tabindex="-1"' : ''}>
+    return `<li class="fita__item${extra ? ' fita__item--extra' : ''}"${deco ? ' aria-hidden="true"' : ''}><a class="marca-cartao" href="${esc(u('viaturas/?marca=' + encodeURIComponent(m)))}"${deco ? ' tabindex="-1"' : ''}>
         ${marca}
         <span class="marca-cartao__nome">${esc(m)}</span>
       </a></li>`;
@@ -582,7 +686,7 @@ function cabecalho(pag) {
     return `<a class="${cls}" href="${u(href)}"${activo}>${txt}${extra}</a>`;
   }).join('');
 
-  const c = def.contactos;
+  const t1 = TELEFONE_1;
   /* Barra flutuante e arredondada, destacada das margens: logótipo à esquerda,
      navegação a seguir e o contacto à direita.
 
@@ -600,9 +704,9 @@ function cabecalho(pag) {
     <nav class="topo__nav" aria-label="Principal">${nav('topo__link')}</nav>
     <div class="topo__dir">
       <span class="topo__tel">${ic.tel}
-        <span><a href="tel:+351${c.telefone_1}">${c.telefone_1_texto}</a>
-        <small>(Chamada para a rede móvel nacional)</small></span></span>
-      <a class="topo__zap" href="https://wa.me/${c.whatsapp}" rel="noopener" aria-label="WhatsApp">${ic.zap}</a>
+        <span><a href="${esc(t1.href)}">${esc(t1.texto)}</a>
+        <small>(${esc(t1.nota)})</small></span></span>
+      <a class="topo__zap" href="${esc(waMe())}" rel="noopener" aria-label="WhatsApp">${ic.zap}</a>
     </div>
     <button class="hamburger" type="button" id="btn-menu" aria-label="Abrir menu" aria-expanded="false" aria-controls="menu"><span></span></button>
   </div>
@@ -613,35 +717,44 @@ function cabecalho(pag) {
   <div class="menu__pe">
     <p class="menu__rotulo">Fale connosco</p>
     <div class="menu__contactos">
-      <a class="menu__acao" href="tel:+351${c.telefone_1}">${ic.tel}<span>Ligar</span></a>
-      <a class="menu__acao" href="https://wa.me/${c.whatsapp}" rel="noopener">${ic.zap}<span>WhatsApp</span></a>
+      <a class="menu__acao" href="${esc(t1.href)}">${ic.tel}<span>Ligar</span></a>
+      <a class="menu__acao" href="${esc(waMe())}" rel="noopener">${ic.zap}<span>WhatsApp</span></a>
       <a class="menu__acao" href="${u('contactos/')}">${ic.pin}<span>Onde estamos</span></a>
     </div>
-    <p class="nota-chamada">${c.telefone_1_texto} · (Chamada para a rede móvel nacional)</p>
+    <p class="nota-chamada">${esc(t1.texto)} · (${esc(t1.nota)})</p>
   </div>
 </div>`;
 }
 
 function rodape() {
-  const s = def.stand, e = def.empresa;
+  const e = def.empresa;
   const rede = (href, svg, nome) => href
     ? `<a class="rodape__rede" href="${esc(href)}" target="_blank" rel="noopener me" aria-label="${nome}">${svg}</a>` : '';
   /* O custo da chamada tem de aparecer junto de CADA número, com a mesma
-     visibilidade — art. 3.º do DL 59/2021. Vai entre parênteses. */
-  const numero = (tel, texto) => `<li class="rodape__contacto">${ic.tel}
-      <span><a href="tel:+351${tel}">${texto}</a>
-      <small>(Chamada para a rede móvel nacional)</small></span></li>`;
+     visibilidade — art. 3.º do DL 59/2021. Vai entre parênteses, e é o da rede
+     de cada número (ver TELEFONES). Sem o telefone 2, a linha dele não existe. */
+  const numero = (t) => `<li class="rodape__contacto">${ic.tel}
+      <span><a href="${esc(t.href)}">${esc(t.texto)}</a>
+      <small>(${esc(t.nota)})</small></span></li>`;
+  const email = EMAIL ? `
+          <li class="rodape__contacto">${ic.email}
+      <span><a href="${esc(`mailto:${EMAIL}`)}">${esc(EMAIL)}</a></span></li>` : '';
+  /* A frase da marca e onde é o stand. Sem a frase, não fica um ponto solto no
+     princípio («. Stand em…»); com pontuação no fim, não se lhe junta outra. */
+  const reclamo = temTexto(def.textos.reclamo) ? def.textos.reclamo.trim() : '';
+  const frase = [reclamo && esc(/[.!?…]$/.test(reclamo) ? reclamo : `${reclamo}.`),
+    `Stand em ${esc(ONDE_ESTAMOS)}, com oficina própria.`].filter(Boolean).join(' ');
   return `<footer class="rodape">
   <div class="envolve">
     <div class="rodape__grelha">
       <div>
         <div class="rodape__marca">${logoSVG}</div>
-        <p class="rodape__texto">${esc(def.textos.reclamo)}. Stand em Vila Verde, Braga, com oficina própria.</p>
+        <p class="rodape__texto">${frase}</p>
         <div class="rodape__redes">
-          ${rede(def.redes.instagram, ic.ig, 'Instagram')}
-          ${rede(def.redes.facebook, ic.fb, 'Facebook')}
-          ${rede(def.redes.tiktok, ic.tiktok, 'TikTok')}
-          <a class="rodape__rede" href="https://wa.me/${def.contactos.whatsapp}" target="_blank" rel="noopener" aria-label="WhatsApp">${ic.zap}</a>
+          ${rede(REDES.instagram, ic.ig, 'Instagram')}
+          ${rede(REDES.facebook, ic.fb, 'Facebook')}
+          ${rede(REDES.tiktok, ic.tiktok, 'TikTok')}
+          <a class="rodape__rede" href="${esc(waMe())}" target="_blank" rel="noopener" aria-label="WhatsApp">${ic.zap}</a>
         </div>
       </div>
       <div>
@@ -653,7 +766,7 @@ function rodape() {
                reais — onze carros e nenhum todo-o-terreno — o link de off-road
                passou a levar a uma lista vazia. Um link do rodapé que não
                devolve nada é pior do que não existir. -->
-          ${tiposEmStock.map((t) => `<li><a href="${u('viaturas/?tipo=' + encodeURIComponent(t.valor))}">${esc(t.rotulo)}</a></li>`).join('\n          ')}
+          ${tiposEmStock.map((t) => `<li><a href="${esc(u('viaturas/?tipo=' + encodeURIComponent(t.valor)))}">${esc(t.rotulo)}</a></li>`).join('\n          ')}
           <li><a href="${u('servicos/')}">Serviços</a></li>
           <li><a href="${u('sobre/')}">Sobre nós</a></li>
         </ul>
@@ -661,8 +774,7 @@ function rodape() {
       <div>
         <h3>Contactos</h3>
         <ul class="rodape__lista rodape__lista--icones">
-          ${numero(def.contactos.telefone_1, def.contactos.telefone_1_texto)}
-          ${numero(def.contactos.telefone_2, def.contactos.telefone_2_texto)}
+          ${TELEFONES.map(numero).join('\n          ')}${email}
           <!-- Sem a linha do «Enviar mensagem»: o WhatsApp já está no ícone das
                redes, logo abaixo, e a lista fica só com os números. -->
         </ul>
@@ -671,10 +783,10 @@ function rodape() {
         <h3>Onde estamos</h3>
         <ul class="rodape__lista rodape__lista--icones">
           <li class="rodape__contacto">${ic.pin}
-            <span><a href="${esc(s.mapa)}" target="_blank" rel="noopener">${esc(s.morada)}<br>${esc(s.codigo_postal)} ${esc(s.localidade)}, ${esc(s.distrito)}</a></span></li>
+            <span><a href="${esc(LINK_DO_MAPA)}" target="_blank" rel="noopener">${esc(def.stand.morada)}<br>${localidadeDoStand()}</a></span></li>
           <li class="rodape__contacto">${ic.relogio}
             <span><ul class="horario">
-              ${def.horario.map((h) => `<li><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
+              ${HORARIO.map((h) => `<li><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
             </ul></span></li>
         </ul>
       </div>
@@ -747,7 +859,7 @@ function pagina({ pag = '', titulo: t, descricao, corpo, jsonld = [], og, classe
 <link rel="icon" href="${u('assets/img/favicon.svg')}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="${u('assets/img/apple-touch-icon.png')}">
 <link rel="stylesheet" href="${versao('assets/css/estilo.css')}">
-${jsonld.map((j) => `<script type="application/ld+json">${JSON.stringify(j)}</script>`).join('\n')}
+${jsonld.map((j) => `<script type="application/ld+json">${jsonNoScript(j)}</script>`).join('\n')}
 </head>
 <body class="${classe}">
 ${cabecalho(pag)}
@@ -806,25 +918,28 @@ const standLD = {
   url: abs(''),
   image: abs('assets/img/stand-960.webp'),
   logo: abs('assets/img/logo.svg'),
-  telephone: '+351' + def.contactos.telefone_1,
+  telephone: TELEFONE_1.internacional,
+  ...(EMAIL ? { email: EMAIL } : {}),
   address: {
     '@type': 'PostalAddress',
     streetAddress: def.stand.morada,
     postalCode: def.stand.codigo_postal,
     addressLocality: def.stand.localidade,
-    addressRegion: def.stand.distrito,
+    ...(temTexto(def.stand.distrito) ? { addressRegion: def.stand.distrito } : {}),
     addressCountry: 'PT',
   },
-  geo: { '@type': 'GeoCoordinates', latitude: def.stand.latitude, longitude: def.stand.longitude },
-  openingHoursSpecification: [
-    { '@type': 'OpeningHoursSpecification', dayOfWeek: ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'], opens: '09:00', closes: '19:00' },
-    { '@type': 'OpeningHoursSpecification', dayOfWeek: 'Saturday', opens: '09:00', closes: '13:00' },
-  ],
-  sameAs: [def.redes.instagram, def.redes.facebook, def.redes.tiktok].filter(Boolean),
+  ...(TEM_COORDENADAS ? { geo: { '@type': 'GeoCoordinates', latitude: LATITUDE, longitude: LONGITUDE } } : {}),
+  /* O HORÁRIO SAI DOS DADOS (lerHorario, nas regras), e não daqui. Esteve
+     escrito à mão — segunda a sexta 9h-19h, sábado 9h-13h — e o dono mudava o
+     horário no backoffice e o Google ficava com o antigo. Uma linha que não se
+     perceba fica de fora (e o dono é lembrado de como a escrever); se nenhuma
+     se perceber, não vai horário nenhum, que é melhor do que um errado. */
+  ...(HORARIO_GOOGLE.length ? { openingHoursSpecification: HORARIO_GOOGLE } : {}),
+  sameAs: [REDES.instagram, REDES.facebook, REDES.tiktok].filter(Boolean),
   department: {
     '@type': 'AutoRepair',
     name: 'Oficina LR Motors',
-    telephone: '+351' + def.contactos.telefone_1,
+    telephone: TELEFONE_1.internacional,
     address: {
       '@type': 'PostalAddress',
       streetAddress: def.stand.morada, postalCode: def.stand.codigo_postal,
@@ -865,7 +980,7 @@ const migalhasLD = (itens) => {
 function cartao(v, { prioridade = false } = {}) {
   const f = fotos(v)[0];
   const img = f
-    ? `<img src="${f.srcCartao}" srcset="${f.srcsetCartao}"
+    ? `<img src="${esc(f.srcCartao)}" srcset="${esc(f.srcsetCartao)}"
          sizes="(max-width: 620px) 100vw, (max-width: 1000px) 46vw, 30vw"
          alt="${esc(tituloLongo(v))}" width="960" height="720"
          ${prioridade ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">`
@@ -934,12 +1049,14 @@ function cartao(v, { prioridade = false } = {}) {
      fragmento. Sem isso, quem chega por um link antigo com leitor de ecrã ou
      teclado aterra com o foco no princípio do documento, e a página parece não
      ter ido a lado nenhum. */
-  return `<article class="cartao cartao--${v.estado}"${estaVendida(v) ? ` id="v-${esc(v.slug)}" tabindex="-1"` : ''}
+  /* A classe leva um dos quatro estados (estadoDe), e não o valor tal e qual:
+     aspas num estado escrito à mão saíam do atributo. O resto vai escapado. */
+  return `<article class="cartao cartao--${estadoDe(v)}"${estaVendida(v) ? ` id="v-${esc(v.slug)}" tabindex="-1"` : ''}
     data-tipo="${esc(v.tipo)}" data-marca="${esc(v.marca)}" data-combustivel="${esc(v.combustivel)}"
-    data-caixa="${esc(v.caixa)}" data-preco="${v.preco ?? ''}" data-ano="${v.ano ?? ''}"
-    data-km="${v.km ?? ''}" data-estado="${esc(v.estado)}"
+    data-caixa="${esc(v.caixa)}" data-preco="${esc(v.preco ?? '')}" data-ano="${esc(v.ano ?? '')}"
+    data-km="${esc(v.km ?? '')}" data-estado="${esc(v.estado)}"
     data-procura="${esc([tituloLongo(v), v.carrocaria, v.combustivel].filter(Boolean).join(' ').toLowerCase())}">
-${estaVendida(v) ? corpo : `  <a href="${u('viaturas/' + v.slug + '/')}" style="display:contents" aria-label="Ver ${esc(tituloLongo(v))}">
+${estaVendida(v) ? corpo : `  <a href="${esc(u('viaturas/' + v.slug + '/'))}" style="display:contents" aria-label="Ver ${esc(tituloLongo(v))}">
 ${corpo}
   </a>`}
 </article>`;
@@ -1036,17 +1153,17 @@ function vitrine(lista) {
       `<div><dt>${esc(k)}</dt><dd>${esc(String(val))}</dd></div>`).join('');
 
     return `<li class="vit-item"><article class="vit-cartao">
-      <a class="vit-cartao__link" href="${u('viaturas/' + v.slug + '/')}">
+      <a class="vit-cartao__link" href="${esc(u('viaturas/' + v.slug + '/'))}">
         <div class="vit-cartao__cabeca">
           <h3 class="vit-cartao__linha">
             <span class="vit-cartao__nome">${esc([v.marca, v.modelo].filter(Boolean).join(' '))}</span>
-            <span class="vit-cartao__preco">${precoTexto(v)}</span>
+            <span class="vit-cartao__preco">${esc(precoTexto(v))}</span>
           </h3>
           <p class="vit-cartao__versao">${esc(v.versao || v.carrocaria || '')}</p>
           <p class="vit-cartao__selos">${selos.join('')}</p>
         </div>
         <div class="vit-cartao__foto">
-          ${f ? `<img src="${f.src}" srcset="${f.srcset}" sizes="(max-width: 700px) 78vw, 400px"
+          ${f ? `<img src="${esc(f.src)}" srcset="${esc(f.srcset)}" sizes="(max-width: 700px) 78vw, 400px"
                alt="${esc(tituloLongo(v))}" width="1600" height="1200"
                ${i < 3 ? 'fetchpriority="high"' : 'loading="lazy"'} decoding="async">`
             : '<div class="vit-cartao__semfoto">Sem fotografia</div>'}
@@ -1143,7 +1260,7 @@ function paginaInicial() {
          (Sem crases neste comentário. Ele vive dentro de um template literal, e
          uma crase aqui abre um literal aninhado — já parti o gerador três vezes
          com isto.) -->
-    <p class="sobretitulo sobretitulo--claro">${esc(def.empresa.nome_comercial)} · ${esc(def.stand.localidade)}</p>
+    <p class="sobretitulo sobretitulo--claro">${[def.empresa.nome_comercial, def.stand.localidade].filter(temTexto).map(esc).join(' · ')}</p>
     <h1 class="hero__titulo">${esc(def.textos.hero_titulo)}</h1>
     <p class="hero__texto">${esc(def.textos.hero_texto)}</p>
   </div>
@@ -1246,24 +1363,24 @@ ${vitrine(lista)}
     <div class="visita">
       <div class="visita__info">
         <p class="sobretitulo">Venha ver ao vivo</p>
-        <h2 class="h-secao">Estamos em Vila Verde</h2>
+        <h2 class="h-secao">Estamos em ${esc(def.stand.localidade)}</h2>
         <p class="visita__lead">Passe pelo stand sem marcação.</p>
         <ul class="visita__factos">
-          <li>${ic.pin}<span><b>${esc(def.stand.morada)}</b><br>${esc(def.stand.codigo_postal)} ${esc(def.stand.localidade)}, ${esc(def.stand.distrito)}</span></li>
-          <li>${ic.tel}<span><b><a href="tel:+351${def.contactos.telefone_1}">${def.contactos.telefone_1_texto}</a></b>
-            <small>(Chamada para a rede móvel nacional)</small></span></li>
+          <li>${ic.pin}<span><b>${esc(def.stand.morada)}</b><br>${localidadeDoStand()}</span></li>
+          <li>${ic.tel}<span><b><a href="${esc(TELEFONE_1.href)}">${esc(TELEFONE_1.texto)}</a></b>
+            <small>(${esc(TELEFONE_1.nota)})</small></span></li>
         </ul>
         <!-- O dia de hoje é marcado pelo JS, não pelo gerador: o site é
              estático e o HTML de segunda-feira ficaria a dizer «hoje» no
              sábado. Sem JS, a lista aparece inteira e certa na mesma. -->
         <ul class="horario horario--visita" id="horario-inicio">
-          ${def.horario.map((h) => `<li data-dias="${esc(h.dias)}"><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
+          ${HORARIO.map((h) => `<li data-dias="${esc(h.dias)}"><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
         </ul>
         ${notaVisita()}
         <div class="visita__acoes">
           <!-- Os mesmos dois botões da página de Contactos, pela mesma ordem. -->
-          <a class="btn btn--principal" href="tel:+351${def.contactos.telefone_1}">${ic.tel} Ligar agora</a>
-          <a class="btn btn--contorno" href="https://www.google.com/maps/dir/?api=1&amp;destination=${def.stand.latitude},${def.stand.longitude}"
+          <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} Ligar agora</a>
+          <a class="btn btn--contorno" href="${esc(COMO_CHEGAR)}"
              target="_blank" rel="noopener">${ic.pin} Como chegar</a>
         </div>
       </div>
@@ -1296,8 +1413,7 @@ ${vitrine(lista)}
    consentimento: o embed do Google instala cookies antes de qualquer
    interacção, e o consentimento tem de ser prévio (art. 5.º da Lei 41/2004). */
 function mapa() {
-  const s = def.stand;
-  const q = encodeURIComponent(`${s.morada}, ${s.codigo_postal} ${s.localidade}`);
+  const q = encodeURIComponent(MORADA_NUMA_LINHA);
   return `<div class="mapa" id="mapa" data-mapa="https://www.google.com/maps?q=${q}&output=embed">
     <!-- O texto diz agora que isto é o mapa E porque é que aparece. Motivo: com
          o aviso de cookies a falar só de cookies, quem carrega em «Apenas
@@ -1311,7 +1427,7 @@ function mapa() {
          instalar cookies. Se escolheu «Apenas necessários» no aviso de cookies, é por isso.</p>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center">
         <button class="btn btn--principal" type="button" id="btn-mapa">Carregar o mapa</button>
-        <a class="btn btn--contorno" href="${esc(s.mapa)}" target="_blank" rel="noopener">Abrir no Google Maps</a>
+        <a class="btn btn--contorno" href="${esc(LINK_DO_MAPA)}" target="_blank" rel="noopener">Abrir no Google Maps</a>
       </div>
     </div>
   </div>`;
@@ -1375,7 +1491,7 @@ function paginaViaturas() {
     <div class="vazio" id="vazio" hidden>
       <h3>Nenhuma viatura com estes filtros</h3>
       <p>Experimente alargar a pesquisa — ou diga-nos o que procura e nós encontramos.</p>
-      <a class="btn btn--principal" href="https://wa.me/${def.contactos.whatsapp}" rel="noopener">${ic.zap} Dizer o que procuro</a>
+      <a class="btn btn--principal" href="${esc(waMe())}" rel="noopener">${ic.zap} Dizer o que procuro</a>
     </div>
 
     ${vendidas.length && def.opcoes.mostrar_vendidos ? `
@@ -1469,7 +1585,7 @@ function paginaViatura(v) {
   const galeria = fs_.length ? `
 <div class="galeria">
   <div class="galeria__principal">
-    <img id="foto-principal" src="${fs_[0].src}" srcset="${fs_[0].srcset}"
+    <img id="foto-principal" src="${esc(fs_[0].src)}" srcset="${esc(fs_[0].srcset)}"
          sizes="(max-width: 980px) 100vw, 62vw" alt="${esc(nome)}"
          width="1600" height="1200" fetchpriority="high" decoding="async">
     ${fs_.length > 1 ? `
@@ -1479,7 +1595,7 @@ function paginaViatura(v) {
   </div>
   ${fs_.length > 1 ? `<div class="galeria__tiras" role="tablist" aria-label="Fotografias">
     ${fs_.map((f, i) => `<button class="tira" type="button" role="tab" data-i="${i}" aria-current="${i === 0}"
-      aria-label="Fotografia ${i + 1}"><img src="${f.srcCartao}" alt="" width="96" height="72" loading="lazy" decoding="async"></button>`).join('')}
+      aria-label="Fotografia ${i + 1}"><img src="${esc(f.srcCartao)}" alt="" width="96" height="72" loading="lazy" decoding="async"></button>`).join('')}
   </div>` : ''}
 </div>
 <dialog class="lightbox" id="lightbox">
@@ -1491,7 +1607,7 @@ function paginaViatura(v) {
     <span class="lightbox__contador"><span id="lb-n">1</span> de ${fs_.length}</span>` : ''}
   </div>
 </dialog>
-<script type="application/json" id="fotos-json">${JSON.stringify(fs_.map((f) => ({ src: f.src, srcset: f.srcset })))}</script>`
+<script type="application/json" id="fotos-json">${jsonNoScript(fs_.map((f) => ({ src: f.src, srcset: f.srcset })))}</script>`
     : '<div class="galeria__principal" style="display:grid;place-items:center;color:var(--tinta-3)">Sem fotografias</div>';
 
   /* Linhas vazias e espaços em volta fora: o campo é uma lista escrita à mão
@@ -1562,9 +1678,9 @@ function paginaViatura(v) {
           ${aviso}
           ${notaVisita('nota-visita--painel')}
           <div class="painel__acoes">
-            <a class="btn btn--principal" href="tel:+351${def.contactos.telefone_1}">${ic.tel} ${def.contactos.telefone_1_texto}</a>
-            <p class="nota-chamada">(Chamada para a rede móvel nacional)</p>
-            <a class="btn btn--zap" href="https://wa.me/${def.contactos.whatsapp}?text=${encodeURIComponent('Olá! Tenho interesse no ' + nome + ' — ' + abs('viaturas/' + v.slug + '/'))}" rel="noopener">${ic.zap} Perguntar no WhatsApp</a>
+            <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} ${esc(TELEFONE_1.texto)}</a>
+            <p class="nota-chamada">(${esc(TELEFONE_1.nota)})</p>
+            <a class="btn btn--zap" href="${esc(waMe('Olá! Tenho interesse no ' + nome + ' — ' + abs('viaturas/' + v.slug + '/')))}" rel="noopener">${ic.zap} Perguntar no WhatsApp</a>
             <a class="btn btn--contorno" href="${u('contactos/')}">${ic.pin} Como chegar ao stand</a>
           </div>
           <!-- Sem «Ref.»: o que lá estava era o slug do endereço, um
@@ -1629,8 +1745,8 @@ function paginaViatura(v) {
 </section>
 
 <div class="barra-contacto">
-  <a class="btn btn--principal" href="tel:+351${def.contactos.telefone_1}">${ic.tel} Ligar</a>
-  <a class="btn btn--zap" href="https://wa.me/${def.contactos.whatsapp}" rel="noopener">${ic.zap} WhatsApp</a>
+  <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} Ligar</a>
+  <a class="btn btn--zap" href="${esc(waMe())}" rel="noopener">${ic.zap} WhatsApp</a>
 </div>`;
 
   /* Product + Offer: é o tipo que ainda produz resultado enriquecido no Google.
@@ -1644,10 +1760,14 @@ function paginaViatura(v) {
     image: fs_.slice(0, 6).map((f) => abs(f.src.replace(BASE + '/', ''))),
     brand: { '@type': 'Brand', name: v.marca },
     ...(v.cor ? { color: v.cor } : {}),
-    ...(v.km != null ? { mileageFromOdometer: { '@type': 'QuantitativeValue', value: v.km, unitCode: 'KMT' } } : {}),
+    ...(nKm(v.km) ? { mileageFromOdometer: { '@type': 'QuantitativeValue', value: v.km, unitCode: 'KMT' } } : {}),
     ...(v.caixa ? { vehicleTransmission: v.caixa } : {}),
     ...(v.combustivel ? { fuelType: v.combustivel } : {}),
-    ...(v.ano ? { productionDate: String(v.ano) } : {}),
+    /* O ano de produção é o «Ano de construção» quando o dono o põe (o DL 74/93
+       pede-o quando difere do da matrícula, e a ficha mostra-o); sem ele, é o
+       da primeira matrícula. Antes ia sempre o da matrícula, e o Google ficava a
+       dizer outra coisa que a ficha. */
+    ...(Number.isInteger(v.ano_construcao) || v.ano ? { productionDate: String(Number.isInteger(v.ano_construcao) ? v.ano_construcao : v.ano) } : {}),
     /* Sem preço publicado, o Offer vai sem `price`: marcar um preço que não
        está visível na página é expressamente proibido pelo Google. */
     offers: {
@@ -1678,6 +1798,15 @@ function paginaViatura(v) {
 
 function paginaContactos() {
   const s = def.stand;
+  /* Uma linha por rede: os números do mesmo tipo juntos, com a nota uma vez
+     (hoje, os dois telemóveis numa linha, como sempre); um fixo e um telemóvel,
+     cada um na sua linha, com a sua nota. Sem o telefone 2, só o 1 — antes
+     ficava «961 053 363 · » com uma ligação vazia. */
+  const telefones = GRUPOS_DE_TELEFONES.map((g) => `<li>${ic.tel}<span><b>${g.telefones
+    .map((t) => `<a href="${esc(t.href)}">${esc(t.texto)}</a>`).join('\n            · ')}</b>
+            <small>(${esc(g.nota)})</small></span></li>`).join('\n          ');
+  const email = EMAIL ? `
+          <li>${ic.email}<span><b><a href="${esc(`mailto:${EMAIL}`)}">${esc(EMAIL)}</a></b></span></li>` : '';
   const corpo = `
 <section class="secao">
   <div class="envolve">
@@ -1692,25 +1821,23 @@ function paginaContactos() {
         <p class="visita__lead">Passe pelo stand, ligue-nos ou mande mensagem. Respondemos no próprio dia.</p>
 
         <ul class="visita__factos">
-          <li>${ic.pin}<span><b>${esc(s.morada)}</b><br>${esc(s.codigo_postal)} ${esc(s.localidade)}, ${esc(s.distrito)}</span></li>
-          <li>${ic.tel}<span><b><a href="tel:+351${def.contactos.telefone_1}">${def.contactos.telefone_1_texto}</a>
-            · <a href="tel:+351${def.contactos.telefone_2}">${def.contactos.telefone_2_texto}</a></b>
-            <small>(Chamada para a rede móvel nacional)</small></span></li>
-          <li>${ic.zap}<span><b><a href="https://wa.me/${def.contactos.whatsapp}" rel="noopener">WhatsApp</a></b>
-            <small>Mande a matrícula ou o modelo que procura</small></span></li>
+          <li>${ic.pin}<span><b>${esc(s.morada)}</b><br>${localidadeDoStand()}</span></li>
+          ${telefones}
+          <li>${ic.zap}<span><b><a href="${esc(waMe())}" rel="noopener">WhatsApp</a></b>
+            <small>Mande a matrícula ou o modelo que procura</small></span></li>${email}
         </ul>
 
         <ul class="horario horario--visita" id="horario-contactos">
-          ${def.horario.map((h) => `<li data-dias="${esc(h.dias)}"><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
+          ${HORARIO.map((h) => `<li data-dias="${esc(h.dias)}"><span>${esc(h.dias)}</span><span>${esc(h.horas)}</span></li>`).join('')}
         </ul>
 
         ${notaVisita()}
         <div class="visita__acoes">
-          <a class="btn btn--principal" href="tel:+351${def.contactos.telefone_1}">${ic.tel} Ligar agora</a>
-          <a class="btn btn--contorno" href="https://www.google.com/maps/dir/?api=1&amp;destination=${s.latitude},${s.longitude}"
+          <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} Ligar agora</a>
+          <a class="btn btn--contorno" href="${esc(COMO_CHEGAR)}"
              target="_blank" rel="noopener">${ic.pin} Como chegar</a>
         </div>
-        <p class="nota-chamada">(Chamada para a rede móvel nacional)</p>
+        <p class="nota-chamada">(${esc(TELEFONE_1.nota)})</p>
       </div>
       <div class="visita__mapa">${mapa()}</div>
     </div>
@@ -1719,7 +1846,7 @@ function paginaContactos() {
   return pagina({
     pag: 'contactos/',
     titulo: 'Contactos — LR Motors, Vila Verde (Braga)',
-    descricao: `Stand LR Motors em ${s.morada}, ${s.codigo_postal} ${s.localidade}. Telefones ${def.contactos.telefone_1_texto} e ${def.contactos.telefone_2_texto}. Horário e mapa.`,
+    descricao: `Stand LR Motors em ${s.morada}, ${s.codigo_postal} ${s.localidade}. ${TELEFONES.length > 1 ? 'Telefones' : 'Telefone'} ${TELEFONES.map((t) => t.texto).join(' e ')}. Horário e mapa.`,
     corpo,
     jsonld: [standLD, migalhasLD([{ nome: 'Início', href: '' }, { nome: 'Contactos' }])],
   });
@@ -1775,7 +1902,7 @@ function paginaServicos() {
       </div>
       <div class="faixa-cta__acoes">
         <a class="btn btn--principal" href="${u('viaturas/')}">Ver as viaturas ${ic.seta}</a>
-        <a class="btn btn--zap" href="https://wa.me/${def.contactos.whatsapp}" rel="noopener">${ic.zap} Dizer o que procuro</a>
+        <a class="btn btn--zap" href="${esc(waMe())}" rel="noopener">${ic.zap} Dizer o que procuro</a>
       </div>
     </div>
   </div>
@@ -2018,41 +2145,31 @@ function main() {
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>${esc(tituloLongo(v))} — vendido | LR Motors</title>
 <meta name="description" content="${esc(legenda)}">
-<meta http-equiv="refresh" content="0; url=${comAncora}">
+<meta http-equiv="refresh" content="0; url=${esc(comAncora)}">
 <meta property="og:type" content="website">
 <meta property="og:title" content="${esc(tituloLongo(v))} — vendido">
 <meta property="og:description" content="${esc(legenda)}">
-<meta property="og:image" content="${cartao}">
-<meta property="og:url" content="${destino}">
+<meta property="og:image" content="${esc(cartao)}">
+<meta property="og:url" content="${esc(destino)}">
 <meta name="twitter:card" content="summary_large_image">
 </head>
 <body style="font-family:system-ui,sans-serif;padding:2rem;text-align:center;color:#0E1726">
 <p><strong>${esc(tituloLongo(v))}</strong></p>
 <p>Esta viatura já foi vendida.</p>
-<p><a href="${comAncora}">Ver as viaturas em stock</a></p>
+<p><a href="${esc(comAncora)}">Ver as viaturas em stock</a></p>
 </body>
 </html>
 `);
   }
 
-  /* páginas legais: markdown simples convertido no build */
-  for (const [ficheiro, destino] of Object.entries({
-    'privacidade.md': 'privacidade/index.html',
-    'termos.md': 'termos/index.html',
-    'garantia.md': 'garantia/index.html',
-    'resolucao-de-litigios.md': 'resolucao-de-litigios/index.html',
-  })) {
-    const caminho = join(RAIZ, 'conteudo', ficheiro);
-    if (!existsSync(caminho)) continue;
-    const bruto = readFileSync(caminho, 'utf8');
-    const [, cab, md] = bruto.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/) ?? [null, '', bruto];
-    const meta = Object.fromEntries(cab.split('\n').filter(Boolean)
-      .map((l) => [l.slice(0, l.indexOf(':')).trim(), l.slice(l.indexOf(':') + 1).trim()]));
+  /* páginas legais: markdown simples convertido no build, com os dados do
+     stand nos marcadores (ver PAGINAS_LEGAIS, mais abaixo) */
+  for (const { destino, meta, md } of PAGINAS_LEGAIS) {
     escrever(destino, pagina({
       pag: destino.replace('index.html', ''),
       titulo: `${meta.titulo} | LR Motors`,
       descricao: meta.descricao ?? meta.titulo,
-      corpo: `<div class="envolve"><article class="texto">${marcarDown(md)}</article></div>`,
+      corpo: `<div class="envolve"><article class="texto">${preencherMarcadores(marcarDown(md))}</article></div>`,
     }));
   }
 
@@ -2066,7 +2183,7 @@ function main() {
   const hoje = new Date().toISOString().slice(0, 10);
   escrever('sitemap.xml', `<?xml version="1.0" encoding="UTF-8"?>
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
-${urls.map((p) => `  <url><loc>${abs(p)}</loc><lastmod>${hoje}</lastmod></url>`).join('\n')}
+${urls.map((p) => `  <url><loc>${esc(abs(p))}</loc><lastmod>${hoje}</lastmod></url>`).join('\n')}
 </urlset>
 `);
   /* /fotos/ é a ferramenta interna de reduzir fotografias — não é conteúdo do
@@ -2095,6 +2212,93 @@ ${urls.map((p) => `  <url><loc>${abs(p)}</loc><lastmod>${hoje}</lastmod></url>`)
     for (const f of naoPublicados) console.log(`    - ${f}`);
   }
 }
+
+/* ------------------------------------------- os dados nas páginas legais */
+/* OS DADOS DO STAND NAS PÁGINAS LEGAIS.
+   ---------------------------------------------------------------------------
+   Os Termos, a Política de privacidade e a Garantia tinham a denominação, a
+   forma jurídica, o capital, o NIF, o CAE, a sede e os telefones ESCRITOS À MÃO
+   nos ficheiros de conteudo/, e o gerador não os via: o dono mudava o telefone
+   no backoffice e as páginas onde a lei manda estar um contacto (DL 7/2004,
+   art. 10.º) ficavam com o antigo — e um fixo lá ficava a dizer «rede móvel».
+   A «Sede social» e o capital, o CAE e a forma jurídica nem chegavam ao site.
+   Agora os ficheiros escrevem {{marcadores}}, que se preenchem daqui:
+
+   · um marcador que não existe PÁRA a construção, com o ficheiro e a lista dos
+     que existem (é uma gralha no conteúdo, e um «{{telefone_l}}» publicado
+     numa página legal é pior do que não publicar);
+   · um obrigatório vazio também pára (os dados legais: as regras já não os
+     deixam chegar aqui vazios; isto é para quem corra o gerador à mão);
+   · numa linha de lista («- CAE {{empresa.cae}}»), um marcador vazio tira a
+     linha inteira — sem CAE não fica «CAE » sozinho, e sem email não há linha
+     do email;
+   · os valores entram DEPOIS do markdown, escapados: um asterisco ou um
+     «[x](…)» num dado do stand é texto, nunca formatação nem uma ligação.
+
+   A SEDE é a «Sede social» dos Dados do stand quando está preenchida (e é
+   outra morada); sem ela, é a do stand — os Termos dizem então «Sede e stand»,
+   como sempre disseram. */
+const sedeSocial = def.sede_social && typeof def.sede_social === 'object' && !Array.isArray(def.sede_social) ? def.sede_social : {};
+const enderecoDe = (m) => [m.morada, [m.codigo_postal, m.localidade].filter(temTexto).map((x) => x.trim()).join(' '), m.distrito]
+  .filter(temTexto).map((x) => x.trim()).join(', ');
+const SEDE_A_PARTE = ['morada', 'codigo_postal', 'localidade'].some((k) => temTexto(sedeSocial[k]))
+  && enderecoDe(sedeSocial) !== enderecoDe(def.stand);
+const SEDE = SEDE_A_PARTE ? sedeSocial : def.stand;
+/* nome → [valor, o campo do backoffice quando é obrigatório] */
+const MARCADORES = new Map(Object.entries({
+  'empresa.denominacao_social': [def.empresa.denominacao_social, 'Dados legais da empresa › Denominação social'],
+  'empresa.nome_comercial': [def.empresa.nome_comercial],
+  'empresa.forma_juridica': [def.empresa.forma_juridica, 'Dados legais da empresa › Forma jurídica'],
+  'empresa.capital_social': [def.empresa.capital_social, 'Dados legais da empresa › Capital social'],
+  'empresa.nif': [def.empresa.nif, 'Dados legais da empresa › NIF'],
+  'empresa.cae': [def.empresa.cae],
+  'sede.rotulo': [SEDE_A_PARTE ? 'Sede' : 'Sede e stand'],
+  'sede.endereco': [enderecoDe(SEDE), 'Morada do stand (ou Sede social)'],
+  'sede.morada': [SEDE.morada],
+  'sede.codigo_postal': [SEDE.codigo_postal],
+  'sede.localidade': [SEDE.localidade],
+  'stand.endereco_se_a_sede_e_outra': [SEDE_A_PARTE ? enderecoDe(def.stand) : ''],
+  'telefones': [TELEFONES_EM_TEXTO],
+  'telefone_1.texto': [TELEFONE_1.texto],
+  'telefone_1.nota': [TELEFONE_1.nota],
+  'contactos.email': [EMAIL],
+}).map(([nome, [valor, obrigatorio]]) => [nome, { valor: valor === undefined || valor === null ? '' : String(valor).trim(), obrigatorio }]));
+const RE_MARCADOR = /\{\{\s*([^{}\s]+)\s*\}\}/g;
+function semMarcadoresPartidos(md, ficheiro) {
+  const parar = (porque) => {
+    console.error(`\nERRO: conteudo/${ficheiro}: ${porque}\n`);
+    process.exit(1);
+  };
+  return md.split('\n').filter((linha) => {
+    const nomes = [...linha.matchAll(RE_MARCADOR)].map((m) => m[1]);
+    for (const nome of nomes) {
+      const m = MARCADORES.get(nome);
+      if (!m) parar(`o marcador «{{${nome}}}» não existe. Os que existem: ${[...MARCADORES.keys()].join(', ')}.`);
+      if (!m.valor && m.obrigatorio) parar(`«{{${nome}}}» está vazio — preencha «${m.obrigatorio}» nos Dados do stand (é obrigatório por lei).`);
+    }
+    return !(/^\s*- /.test(linha) && nomes.some((n) => !MARCADORES.get(n).valor));
+  }).join('\n');
+}
+/* Depois do markdown: o valor escapado, por função (um «$» num dado não é um
+   padrão de substituição) e numa passagem só (um valor com «{{…}}» lá dentro
+   não se volta a ler). */
+const preencherMarcadores = (html) => html.replace(RE_MARCADOR, (_, nome) => esc(MARCADORES.get(nome).valor));
+/* Lidas e conferidas antes de main() apagar o _site: um marcador partido pára
+   a construção sem ter escrito nada. */
+const PAGINAS_LEGAIS = Object.entries({
+  'privacidade.md': 'privacidade/index.html',
+  'termos.md': 'termos/index.html',
+  'garantia.md': 'garantia/index.html',
+  'resolucao-de-litigios.md': 'resolucao-de-litigios/index.html',
+}).flatMap(([ficheiro, destino]) => {
+  const caminho = join(RAIZ, 'conteudo', ficheiro);
+  if (!existsSync(caminho)) return [];
+  const bruto = readFileSync(caminho, 'utf8');
+  const [, cab, md] = bruto.match(/^---\n([\s\S]*?)\n---\n([\s\S]*)$/) ?? [null, '', bruto];
+  const meta = Object.fromEntries(cab.split('\n').filter(Boolean)
+    .map((l) => [l.slice(0, l.indexOf(':')).trim(), l.slice(l.indexOf(':') + 1).trim()]));
+  return [{ destino, meta, md: semMarcadoresPartidos(md, ficheiro) }];
+});
 
 /* Markdown mínimo: só o que as páginas legais usam. Não vale a pena uma
    dependência para converter títulos, listas e ligações. */

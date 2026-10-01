@@ -9,13 +9,15 @@ _Última actualização: 4 de agosto de 2026_
 
 ## Identificação
 
-Este sítio é propriedade da **Luís & Ricardo Motors, Lda**, que usa comercialmente a designação **LR Motors**.
+Este sítio é propriedade da **{{empresa.denominacao_social}}**, que usa comercialmente a designação **{{empresa.nome_comercial}}**.
 
-- Sociedade por quotas, capital social de 20.000,00 €
-- Sede e stand: Rua 1, Lugar de Febros 52, 4730-251 Vila Verde, Braga
-- Pessoa colectiva e matrícula n.º 517541904
-- CAE 45110 — comércio de automóveis ligeiros
-- Telefones: 961 053 363 e 916 228 513 (Chamada para a rede móvel nacional)
+- {{empresa.forma_juridica}}, capital social de {{empresa.capital_social}}
+- {{sede.rotulo}}: {{sede.endereco}}
+- Stand: {{stand.endereco_se_a_sede_e_outra}}
+- Pessoa colectiva e matrícula n.º {{empresa.nif}}
+- CAE {{empresa.cae}}
+- {{telefones}}
+- Email: {{contactos.email}}
 
 ## O que este site é
 

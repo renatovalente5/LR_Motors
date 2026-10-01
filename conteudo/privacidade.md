@@ -9,9 +9,9 @@ _Última actualização: 4 de agosto de 2026_
 
 ## Quem trata os seus dados
 
-O responsável pelo tratamento é a **Luís & Ricardo Motors, Lda** (LR Motors), sociedade por quotas com sede na Rua 1, Lugar de Febros 52, 4730-251 Vila Verde, pessoa colectiva n.º 517541904.
+O responsável pelo tratamento é a **{{empresa.denominacao_social}}** ({{empresa.nome_comercial}}), {{empresa.forma_juridica}} com sede na {{sede.morada}}, {{sede.codigo_postal}} {{sede.localidade}}, pessoa colectiva n.º {{empresa.nif}}.
 
-Pode contactar-nos pelo telefone 961 053 363 (Chamada para a rede móvel nacional) ou presencialmente no stand.
+Pode contactar-nos pelo telefone {{telefone_1.texto}} ({{telefone_1.nota}}) ou presencialmente no stand.
 
 Não temos encarregado de protecção de dados, por não estarmos abrangidos por essa obrigação.
 
