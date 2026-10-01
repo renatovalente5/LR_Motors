@@ -23,6 +23,11 @@
  *   · o varrimento: apagar cada chave de cada viatura e do definicoes.json dá
  *     o problema certo, com o ecrã nomeado, ou nada se o campo é opcional;
  *   · 30 problemas → 9 anotações + «e mais 21», e os 30 no resumo;
+ *   · na consola, nenhum dado abre um comando do runner (uma mudança de linha
+ *     a começar por «::», ou um «##[» em qualquer sítio — .github/consola.mjs);
+ *   · no resumo da corrida (público, em Markdown), nenhum dado fica fora do
+ *     código: nem ligações, nem imagens, nem HTML; e um resumo grande de mais
+ *     corta-se em linhas inteiras;
  *   · a cópia que o gerador lê muda só o que tem de mudar, e nada sem nada;
  *   · a guarda e o gerador verdadeiro contam as fotografias em falta da mesma
  *     maneira;
@@ -30,7 +35,10 @@
  *     nunca reescritos — memória correr-a-guarda-verdadeira): a guarda, o job
  *     «avisar» com um gh de faz-de-conta, e o job «construir» de ponta a ponta
  *     num repositório de ensaio com uma origem própria — o commit de volta leva
- *     as vendidas e as fotografias preparadas e NUNCA a cópia neutralizada. */
+ *     as vendidas e as fotografias preparadas e NUNCA a cópia neutralizada;
+ *   · o publicar.yml: permissões por job, o checkout sem o token gravado, as
+ *     actions fixadas pelo commit, o Pillow numa versão, e o token do push
+ *     só no «Guardar…» e só para o github.com. */
 import { readFileSync, writeFileSync, mkdirSync, mkdtempSync, rmSync, readdirSync, existsSync, statSync, copyFileSync, symlinkSync } from 'node:fs';
 import { join, dirname, resolve } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -39,6 +47,7 @@ import { spawnSync, execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import * as R from './regras.mjs';
 import * as G from './guardas.mjs';
+import { umaLinha } from './consola.mjs';
 
 const RAIZ = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const PY = process.env.PYTHON || 'python3';
@@ -148,10 +157,11 @@ function jobDoYaml(nome) {
   return linhas.slice(i0, fim).join('\n');
 }
 /* Os nomes dos passos do job «construir», pela ordem (os `uses:` sem nome
-   ficam com o nome da action). */
+   ficam com o nome da action, sem a versão: vão fixados pelo commit, com a
+   etiqueta num comentário). */
 function passosDoConstruir() {
   return jobDoYaml('construir').split('\n')
-    .map((l) => l.match(/^      - (?:name: (.+)|uses: (\S+))$/)).filter(Boolean).map((m) => m[1] || m[2]);
+    .map((l) => l.match(/^      - (?:name: (.+)|uses: ([^@\s]+)@\S+(?: +#.*)?)$/)).filter(Boolean).map((m) => m[1] || m[2]);
 }
 /* O mesmo, sem rebentar quando o passo não existe (as verificações de estrutura
    têm de falhar como afirmações, e a bateria seguir até ao fim). */
@@ -646,6 +656,109 @@ try {
     rmSync(dir, { recursive: true, force: true });
   }
   certo(G.anotacoes([{ classe: 'avisa', ficheiro: 'data/x.json', ecra: 'A, b: c', mensagem: '50% feito\nlinha 2' }])[0] === '::warning file=data/x.json,title=A%2C b%3A c::50%25 feito%0Alinha 2', 'as anotações escapam %, mudanças de linha, : e ,');
+  {
+    /* A CONSOLA. O runner lê comandos no que a guarda escreve: «::x::» no
+       princípio de uma linha, e «##[x]» em QUALQUER sítio de uma linha (ver
+       .github/consola.mjs). A listagem leva os dados tal e qual — o nome da
+       viatura, o caminho de uma fotografia, o texto da garantia — e nenhum pode
+       abrir um comando: as únicas linhas de comando são as anotações da própria
+       guarda. As linhas partem-se como o runner as parte: \n, \r e \r\n. */
+    const d = dadosDeHoje();
+    d.viaturas[P].fotos.push('LINHA-A\n::error title=Injectado::pela fotografia.jpg');   // a mensagem da foto-invalida leva o nome
+    d.viaturas[P].modelo = 'Puma ##[warning]Injectado pelo modelo';                      // o ecrã e o «MUDA NO SITE» levam o nome
+    d.viaturas[J].garantia = '36 meses\r##[error]Injectado pela garantia';               // o lembrete dos 3 anos leva o texto
+    const dir = repoDeEnsaio(d);
+    const r = guardaEm(dir);
+    const n = correr('node', [GUARDA, '--neutralizar', dir]);
+    const daGuarda = new Set(G.anotacoes(r.relatorio ? r.relatorio.problemas : []));
+    const comandos = (out) => out.split(/\r\n|\r|\n/).filter((l) => !daGuarda.has(l) && (l.trimStart().startsWith('::') || l.includes('##[')));
+    const maus = [...comandos(r.out), ...comandos(n.out)];
+    certo(r.status === 0 && n.status === 0 && daGuarda.size > 0 && maus.length === 0,
+      'na consola, um dado com uma mudança de linha ou um «##[» não abre comando nenhum do runner (as únicas linhas de comando são as anotações da guarda)', maus.slice(0, 4).join(' ‖ '));
+    certo(/NO SITE {2}Viaturas › Ford Puma ## \[warning\]Injectado pelo modelo/.test(r.out) && /«LINHA-A ::error title=Injectado::pela fotografia\.jpg»/.test(r.out) && /no site: Ford Puma ## \[warning\]Injectado/.test(n.out),
+      '   e o texto continua lá, numa linha só, para quem lê a corrida', [...r.out.split('\n'), ...n.out.split('\n')].filter((l) => /Injectado/.test(l)).slice(0, 4).join(' ‖ '));
+    rmSync(dir, { recursive: true, force: true });
+  }
+  {
+    /* A arrumação das vendidas é outro passo do CI, na mesma consola, e
+       escreve a marca e o modelo de cada viatura que muda de pasta. */
+    const dir = mkdtempSync(join(TMP, 'arrumar-'));
+    for (const rel of ['scripts/arrumar-vendidas.mjs', '.github/consola.mjs']) { mkdirSync(dirname(join(dir, rel)), { recursive: true }); copyFileSync(join(RAIZ, rel), join(dir, rel)); }
+    mkdirSync(join(dir, 'data', 'viaturas', 'vendidas'), { recursive: true });
+    writeFileSync(join(dir, R.ficheiroDaViatura('viaturas', 'vendida-hostil')), R.serializar({ ...clonar(HOJE.viaturas[J]), marca: 'Jaguar\n::error title=Injectado::pela marca', modelo: 'XF ##[warning]Injectado pelo modelo', estado: 'vendido' }, ''));
+    const r = correr('node', ['scripts/arrumar-vendidas.mjs'], { cwd: dir });
+    const linhas = `${r.out}\n${r.err}`.split(/\r\n|\r|\n/);
+    const comandos = linhas.filter((l) => l.trimStart().startsWith('::') || l.includes('##['));
+    certo(r.status === 0 && existsSync(join(dir, R.ficheiroDaViatura('vendidas', 'vendida-hostil'))) && comandos.length === 0
+      && linhas.some((l) => /vendida → Jaguar ::error title=Injectado::pela marca XF ## \[warning\]Injectado pelo modelo$/.test(l)),
+    'a arrumação das vendidas escreve a marca e o modelo numa linha só, sem abrir comandos do runner', comandos.join(' ‖ ') || r.out + r.err);
+    rmSync(dir, { recursive: true, force: true });
+  }
+  {
+    const LS = String.fromCharCode(0x2028); const PS = String.fromCharCode(0x2029); const NEL = String.fromCharCode(0x85);
+    certo(umaLinha(`a\nb\r\nc${LS}d${NEL}e\u0000f${PS}g ##[error]x ###[y]`) === 'a b c d e f g ## [error]x ### [y]', 'umaLinha: o controlo (C0, DEL, C1) e os separadores de linha passam a espaço, e o «##[» leva um espaço');
+  }
+
+  /* ================================================================== */
+  secao('o resumo da corrida (público, e lido em Markdown)');
+  {
+    /* Um valor dos dados não pode virar ligação, imagem, HTML, ênfase ou
+       menção no resumo, nem partir a tabela. Lê-se como o GFM o lê: uma linha
+       da tabela parte-se nas barras que não são «\|»; o código abre numa fila de
+       N crases e fecha na fila seguinte de EXACTAMENTE N (CommonMark 6.1), e lá
+       dentro nada se interpreta; o que sobra fora do código tem de ser só o
+       texto da própria guarda. (Conferido também no renderizador do GitHub,
+       POST /markdown: zero <a>, zero <img>, zero <em>, três células por linha.) */
+    const codigosDe = (texto) => {
+      let fora = ''; const codigos = []; let i = 0;
+      const fila = (k) => { let m = 0; while (texto[k + m] === '`') m++; return m; };
+      while (i < texto.length) {
+        if (texto[i] !== '`') { fora += texto[i]; i++; continue; }
+        const n = fila(i); let j = i + n; let fecho = -1;
+        while (j < texto.length) { if (texto[j] !== '`') { j++; continue; } const m = fila(j); if (m === n) { fecho = j; break; } j += m; }
+        if (fecho < 0) { fora += texto.slice(i, i + n); i += n; continue; }
+        let c = texto.slice(i + n, fecho);
+        if (c.startsWith(' ') && c.endsWith(' ') && c.trim()) c = c.slice(1, -1);
+        codigos.push(c); fora += ' '; i = fecho + n;
+      }
+      return { fora, codigos };
+    };
+    const lerComoGfm = (md) => {
+      let fora = ''; const codigos = []; const partidas = [];
+      for (const linha of md.split('\n')) {
+        const celulas = linha.startsWith('|') ? linha.split(/(?<!\\)\|/).slice(1, -1) : null;
+        if (celulas && celulas.length !== 3) partidas.push(linha);
+        for (const parte of celulas ? celulas.map((c) => c.replace(/\\\|/g, '|')) : [linha]) {
+          const x = codigosDe(parte); fora += `${x.fora}\n`; codigos.push(...x.codigos);
+        }
+      }
+      return { fora, codigos, partidas };
+    };
+    const HOSTIS = ['[Ver os detalhes](https://exemplo.pt/x)', '![](https://exemplo.pt/p.png)', '<img src=x onerror=alert(1)>', 'https://exemplo.pt/solto', 'www.exemplo.pt',
+      '@renatovalente5', '**negrito** _itálico_', 'a | b', '``` cerca ` crase'];
+    const DADOS = /Ver os detalhes|exemplo\.pt|<img|renatovalente5|negrito|itálico|cerca|crase|Puma/;
+    const d = dadosDeHoje();
+    d.viaturas[J].marca = HOSTIS[0];                             // o ecrã (Viaturas › …)
+    d.viaturas[J].garantia = `36 meses ${HOSTIS.join(' ')}`;     // o lembrete dos 3 anos cita a garantia inteira
+    d.viaturas[P].modelo = 'Puma | ``` |';                      // o ecrã, e o nome em «mudam no site»
+    d.viaturas[P].fotos.push(HOSTIS[2]);                         // a foto-invalida cita o nome, nos motivos e na tabela
+    const dir = repoDeEnsaio(d);
+    const resumoF = join(TMP, 'resumo-hostil.md'); writeFileSync(resumoF, '');
+    const r = guardaEm(dir, { GITHUB_STEP_SUMMARY: resumoF });
+    const n = correr('node', [GUARDA, '--neutralizar', dir], { env: { GITHUB_STEP_SUMMARY: resumoF } });
+    const md = readFileSync(resumoF, 'utf8');
+    const lido = lerComoGfm(md);
+    certo(r.status === 0 && n.status === 0 && /^\| no site \|/m.test(md) && /### A cópia que o gerador lê/.test(md) && lido.partidas.length === 0 && !DADOS.test(lido.fora),
+      'no resumo, nenhum valor dos dados fica fora do código: nem ligação, nem imagem, nem HTML, nem ênfase, nem menção — e a tabela fica com três colunas', [...lido.partidas, ...lido.fora.split('\n').filter((l) => DADOS.test(l))].slice(0, 3).join(' ‖ '));
+    certo(lido.codigos.some((c) => c.includes(`A garantia diz «36 meses ${HOSTIS.join(' ')}»`)) && lido.codigos.some((c) => c === 'Viaturas › Ford Puma | ``` | 1.0 EcoBoost Titanium'),
+      '   e o que lá está diz exactamente o que os dados dizem (as barras e as crases inteiras)', lido.codigos.filter((c) => /Puma|garantia/.test(c)).slice(0, 2).join(' ‖ '));
+    rmSync(dir, { recursive: true, force: true });
+    const muitos = Array.from({ length: 6000 }, (_, i) => ({ classe: 'avisa', ecra: `Viaturas › ${HOSTIS[i % HOSTIS.length]}`, mensagem: `${'x'.repeat(150)} ${HOSTIS[(i + 4) % HOSTIS.length]}` }));
+    const grande = G.resumo(muitos, []);
+    const lg = lerComoGfm(grande);
+    certo(new TextEncoder().encode(grande).length < 1024 * 1024 && /o resto está no relatório desta corrida/.test(grande) && lg.partidas.length === 0 && !DADOS.test(lg.fora),
+      'um resumo grande de mais corta-se em linhas inteiras: cabe no limite do GitHub, e nenhum valor fica com a cerca aberta', [...lg.partidas, ...lg.fora.split('\n').filter((l) => DADOS.test(l))].slice(0, 2).join(' ‖ '));
+  }
 
   /* ================================================================== */
   secao('a cópia que o gerador lê');
@@ -840,7 +953,7 @@ try {
   const construir = jobDoYaml('construir'); const publicar = jobDoYaml('publicar'); const avisar = jobDoYaml('avisar');
   const passos = passosDoConstruir();
   const pos = (n) => passos.indexOf(n);
-  certo(pos('actions/setup-node@v4') >= 0 && pos('Conferir o conteúdo') === pos('actions/setup-node@v4') + 1 && pos('Conferir o conteúdo') < pos('Arrumar as viaturas vendidas'),
+  certo(pos('actions/setup-node') >= 0 && pos('Conferir o conteúdo') === pos('actions/setup-node') + 1 && pos('Conferir o conteúdo') < pos('Arrumar as viaturas vendidas'),
     'a guarda corre logo a seguir ao Node, antes de mexer em seja o que for', passos.join(' → '));
   certo(passoOuNada('Conferir o conteúdo').trim() === 'node .github/guardas.mjs --relatorio-em "$RUNNER_TEMP/relatorio.json"', '   e é a guarda verdadeira, com o relatório fora do repositório');
   const guardar = 'Guardar as mudanças de pasta e as fotografias preparadas';
@@ -850,14 +963,57 @@ try {
   certo(passoOuNada(copia).trim() === 'node .github/guardas.mjs --neutralizar . --relatorio-em "$RUNNER_TEMP/relatorio.json"', '   e é a guarda verdadeira, em modo --neutralizar');
   const depoisDaCopia = pos(copia) < 0 ? 'git commit (sem o passo da cópia)' : passos.slice(pos(copia) + 1).filter((n) => !/^actions\//.test(n)).map((n) => passoOuNada(n)).join('\n');
   certo(!/\bgit\s+(add|commit|push|stash)\b/.test(depoisDaCopia), 'nenhum passo depois da cópia grava no repositório');
-  certo(/actions\/upload-artifact@v4\n\s+if: \$\{\{ !cancelled\(\) \}\}\n\s+with:\n\s+name: relatorio\n\s+path: \$\{\{ runner\.temp \}\}\/relatorio\.json/.test(construir), 'o relatório vai como artefacto, também quando a guarda parou');
+  certo(/actions\/upload-artifact@[0-9a-f]{40} # v4\.[0-9.]+\n\s+if: \$\{\{ !cancelled\(\) \}\}\n\s+with:\n\s+name: relatorio\n\s+path: \$\{\{ runner\.temp \}\}\/relatorio\.json/.test(construir), 'o relatório vai como artefacto, também quando a guarda parou');
   certo(!/secrets\./.test(construir) && !/secrets\./.test(avisar), 'construir e avisar: sem segredos');
   certo(/^\s+needs: \[construir, publicar\]\n\s+if: \$\{\{ !cancelled\(\) \}\}\n\s+runs-on: ubuntu-latest\n\s+permissions:\n\s+issues: write\n\s+steps:/m.test(avisar) && !/actions\/checkout/.test(avisar), 'avisar: depois dos outros dois, nunca numa corrida cancelada, sem checkout, só issues');
   certo(!passoDoYaml('Abrir, comentar ou fechar a issue «Publicação parada»').includes('${{'), 'nenhum ${{ }} dentro do run: do avisar (os valores entram por env:)');
   certo(/name: Abrir, comentar ou fechar a issue «Publicação parada»\n\s+continue-on-error: true/.test(YAML), 'o passo do gh tem continue-on-error (um aviso que não sai não é uma publicação falhada)');
   certo(/workflow_dispatch:\n\s+inputs:\n\s+payload:/.test(YAML) && /ensaiar_aviso:\n\s+description: .+\n\s+type: boolean\n\s+default: false/.test(YAML), 'o botão do Pages CMS (o input payload) continua, e há o ensaiar_aviso');
-  certo(/concurrency:\n\s+group: pages\n\s+cancel-in-progress: true/.test(YAML) && /uses: actions\/deploy-pages@v4/.test(publicar) && /uses: actions\/upload-pages-artifact@v3/.test(construir), 'a publicação continua no GitHub Pages, uma de cada vez');
+  certo(/concurrency:\n\s+group: pages\n\s+cancel-in-progress: true/.test(YAML) && /uses: actions\/deploy-pages@[0-9a-f]{40} # v4\./.test(publicar) && /uses: actions\/upload-pages-artifact@[0-9a-f]{40} # v3\./.test(construir), 'a publicação continua no GitHub Pages, uma de cada vez');
   certo(JSON.stringify(envDoPasso('Gerar o site')) === '{"BASE":"","SITE":"https://lrmotorsautomoveis.pt"}', 'o «Gerar o site» continua com BASE vazio e o domínio');
+  {
+    /* O que cada job pode, e de onde vem o que corre (B6 da revisão R3). */
+    const permissoesDo = (job) => {
+      const linhas = jobDoYaml(job).split('\n');
+      const i = linhas.indexOf('    permissions:');
+      if (i < 0) return null;
+      const out = {};
+      for (const l of linhas.slice(i + 1)) {
+        if (!l.trim() || /^\s*#/.test(l)) continue;
+        const m = l.match(/^ {6}([a-z-]+): ([a-z]+)$/);
+        if (!m) break;
+        out[m[1]] = m[2];
+      }
+      return out;
+    };
+    const perm = { construir: permissoesDo('construir'), publicar: permissoesDo('publicar'), avisar: permissoesDo('avisar') };
+    certo(/^permissions: \{\}$/m.test(YAML) && JSON.stringify(perm) === JSON.stringify({ construir: { contents: 'write' }, publicar: { pages: 'write', 'id-token': 'write' }, avisar: { issues: 'write' } }),
+      'permissões por job, e nada por omissão: o construir só com contents: write (o commit de volta), pages e id-token só no publicar, issues só no avisar', JSON.stringify(perm));
+    certo(/- uses: actions\/checkout@[0-9a-f]{40} # v[\d.]+\n\s+with:\n\s+persist-credentials: false\n/.test(construir), 'o checkout não deixa o token no .git/config (persist-credentials: false): os scripts e o Pillow, que correm depois, não o encontram');
+    const usos = [...YAML.matchAll(/^\s*(?:- )?uses: (.*)$/gm)].map((m) => m[1]);
+    const soltas = usos.filter((u) => !/^actions\/[a-z-]+@[0-9a-f]{40} # v\d+\.\d+\.\d+$/.test(u));
+    certo(usos.length === 7 && soltas.length === 0, `as ${usos.length} actions vão fixadas pelo commit (40 hexadecimais), com a etiqueta num comentário`, soltas.join(' | '));
+    certo(/^pip install --quiet --only-binary=:all: Pillow==\d+\.\d+\.\d+$/.test(passoOuNada('Instalar o Pillow').trim()), 'o Pillow numa versão fixa, e só em roda compilada (nunca o pacote fonte, que corre código ao instalar)', passoOuNada('Instalar o Pillow'));
+    const comToken = YAML.split('\n').filter((l) => /github\.token/.test(l)).map((l) => l.trim());
+    certo(JSON.stringify(envDoPasso(guardar)) === JSON.stringify({ TOKEN_DO_PUSH: '${{ github.token }}' }) && JSON.stringify(comToken) === JSON.stringify(['TOKEN_DO_PUSH: ${{ github.token }}', 'GH_TOKEN: ${{ github.token }}']) && !passoOuNada(guardar).includes('${{'),
+      '   o token chega a dois passos só, e pelo env: — o «Guardar…» (o push) e o do aviso (as issues)', comToken.join(' | '));
+    /* A credencial do «Guardar…», como está escrita: as linhas «export
+       GIT_CONFIG_…» do próprio passo, num git sem configuração nenhuma (HOME
+       vazia, sem a do sistema, fora de qualquer repositório — nunca toca nas
+       credenciais desta máquina). O github.com recebe o token; outro endereço
+       não. */
+    const exportes = passoOuNada(guardar).split('\n').filter((l) => /^export GIT_CONFIG_/.test(l));
+    const casa = mkdtempSync(join(TMP, 'casa-'));
+    const pedir = (host) => {
+      const f = join(TMP, `credencial-${host}.sh`);
+      writeFileSync(f, `${exportes.join('\n')}\nprintf 'protocol=https\\nhost=%s\\n\\n' '${host}' | git credential fill\n`);
+      return correr('bash', [f], { cwd: casa, env: { HOME: casa, XDG_CONFIG_HOME: casa, GIT_CONFIG_NOSYSTEM: '1', GIT_TERMINAL_PROMPT: '0', GIT_ASKPASS: '', SSH_ASKPASS: '', TOKEN_DO_PUSH: 'segredo-de-ensaio' } });
+    };
+    const gh = pedir('github.com'); const outro = pedir('exemplo.pt');
+    certo(exportes.length >= 3 && gh.status === 0 && /^username=x-access-token$/m.test(gh.out) && /^password=segredo-de-ensaio$/m.test(gh.out) && outro.status !== 0 && !/segredo-de-ensaio/.test(outro.out + outro.err),
+      '   e o git só o dá ao github.com (as linhas do próprio passo, num git sem configuração): outro endereço não o recebe', `${gh.status} ${gh.out.trim()} ${gh.err.trim()} | ${outro.status} ${outro.out.trim()}`);
+    rmSync(casa, { recursive: true, force: true });
+  }
 
   /* ================================================================== */
   secao('o publicar.yml: o job «avisar», com um gh de faz-de-conta');
@@ -985,8 +1141,9 @@ for i in range(1, len(sys.argv), 2):
       const envCI = { RUNNER_TEMP: rt, PATH: `${bin}:${process.env.PATH}`, GITHUB_ACTIONS: 'true', GITHUB_STEP_SUMMARY: resumoF };
       const correrNoCI = passos.filter((n) => !/^actions\/|^Instalar o Pillow$/.test(n));
       const saidas = [];
+      const SEGREDO = `segredo-do-push-${Date.now()}`;   // o que o GitHub dá ao «Guardar…» por env:
       for (const nome of correrNoCI) {
-        const r = correrPasso(nome, ws, { ...envCI, ...envDoPasso(nome) });
+        const r = correrPasso(nome, ws, { ...envCI, ...envDoPasso(nome), ...(nome === guardar ? { TOKEN_DO_PUSH: SEGREDO } : {}) });
         saidas.push([nome, r]);
         if (r.status !== 0) break;
       }
@@ -997,6 +1154,8 @@ for i in range(1, len(sys.argv), 2):
       const ultimo = execFileSync('git', ['-C', origem, 'log', '-1', '--format=%an|%s', 'main'], { encoding: 'utf8' }).trim();
       const mudados = execFileSync('git', ['-C', origem, 'show', '--name-status', '--format=', 'main'], { encoding: 'utf8' }).trim().split('\n');
       certo(/^github-actions\[bot\]\|Arrumar vendidas e guardar fotografias preparadas \(\d+ ficheiros\) \[skip ci\]$/.test(ultimo), 'o «Guardar…» fez o commit de volta para a origem', ultimo);
+      const comSegredo = spawnSync('grep', ['-rl', SEGREDO, join(ws, '.git')], { encoding: 'utf8' });
+      certo(comSegredo.status === 1, '   e o token que lhe foi dado não ficou gravado em lado nenhum do .git (nem na config, nem num hook)', `${comSegredo.status} ${comSegredo.stdout}`);
       certo(naOrigem('data/viaturas/vendidas/vendida-sem-marca.json') === textoDoDono('data/viaturas/vendida-sem-marca.json') && naOrigem('data/viaturas/vendida-sem-marca.json') === null,
         'a vendida mudou de pasta no commit, TAL COMO O DONO A ESCREVEU (sem a cópia neutralizada: continua sem «Publicado: não»)');
       certo([480, 960, 1600].every((w) => mudados.includes(`A\tassets/fotos/carro-bom/02-${w}.webp`)), 'e levou as variantes da fotografia nova', mudados.join(' '));

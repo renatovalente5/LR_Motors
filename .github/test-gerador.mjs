@@ -423,6 +423,88 @@ try {
   }
 
   /* ================================================================== */
+  secao('das pastas das fotografias só saem imagens');
+  {
+    /* Quem grava conteúdo escreve na biblioteca (o Pages CMS aceita qualquer
+       ficheiro no Media), e o site publicava tudo o que lá estivesse, na origem
+       do site: um .html ou um .svg numa pasta de viatura corria JavaScript em
+       lrmotorsautomoveis.pt. Só jpg, jpeg, png e webp (sem ligar a maiúsculas);
+       o resto fica de fora e avisa — também numa subpasta, também nas geradas,
+       e também uma «fotografia» solta na raiz que uma viatura diga usar. */
+    const B = `assets/veiculos/${J}`;
+    const fora = [`${B}/teste.html`, `${B}/teste.svg`, `${B}/teste.txt`, `${B}/.htaccess`, `${B}/sem-extensao`, `${B}/IMG_1.HEIC`, `${B}/fundo/teste.html`,
+      `assets/fotos/${J}/intruso.html`, 'assets/veiculos/solta.svg'];
+    const dentro = [`${B}/IMG_2.JPG`, `${B}/IMG_3.jpeg`, `${B}/IMG_4.png`, `${B}/IMG_5.webp`];
+    const ficheiros = Object.fromEntries([...fora, ...dentro].map((f) => [f, f.endsWith('.svg') ? '<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>' : '<script>alert(1)</script>']));
+    const vs = clonar(VIATURAS); vs[J].fotos = [...vs[J].fotos, 'assets/veiculos/solta.svg', ...dentro];
+    const g = gerar({ viaturas: vs, ficheiros });
+    const publicado = (rel) => existsSync(join(g.dir, '_site', rel));
+    certo(g.status === 0 && fora.every((f) => !publicado(f)) && dentro.every(publicado),
+      `das ${fora.length} que não são imagens (.html, .svg, .txt, .htaccess, sem extensão, .HEIC, numa subpasta, nas geradas, solta na raiz e «em uso») nenhuma vai para o _site; as 4 imagens vão (JPG, jpeg, png, webp)`,
+      JSON.stringify({ publicadas: fora.filter(publicado), faltam: dentro.filter((f) => !publicado(f)), err: g.err.slice(-300) }));
+    const avisadas = fora.filter((f) => g.err.includes(`!! ${f}: não é uma fotografia`));
+    certo(avisadas.length === fora.length, '   e cada uma avisa no registo da publicação, com o caminho', fora.filter((f) => !avisadas.includes(f)).join(', '));
+    const pagina = g.ler(`viaturas/${J}/index.html`) || '';
+    certo(!pagina.includes('solta.svg') && dentro.every((f) => pagina.includes(f.split('/').pop())) && g.err.includes(`!! ${J}: a foto assets/veiculos/solta.svg não é uma imagem que o site publique — ignorada`),
+      '   e a galeria não aponta para o que não foi publicado (a «solta.svg» da lista sai da galeria, com aviso; as imagens ficam)');
+    g.apagar();
+  }
+
+  /* ================================================================== */
+  secao('marcas, estados e tipos com nomes que um objecto herda');
+  {
+    /* A marca é texto livre, e o estado e o tipo também, para quem escreve o
+       ficheiro à mão: as regras só avisam destes valores (não param nem
+       escondem). As tabelas do gerador eram objectos normais, e «Constructor»,
+       «__proto__», «toString» ou «hasOwnProperty» encontravam o que o objecto
+       herda: um logótipo partido (viewBox="undefined"), uma marca a menos na
+       faixa, a ordem das marcas baralhada, «undefined» no selo e no schema.org
+       — e um tipo «__proto__» rebentava a ordenação do rodapé, o que parava a
+       publicação inteira. (Memória «in aceita o protótipo».) */
+    const NOMES = ['Constructor', '__proto__', 'toString', 'hasOwnProperty'];
+    const vs = clonar(VIATURAS);
+    NOMES.forEach((m, i) => { const k = m === 'Constructor' ? 'constructor' : m; vs[`proto-${i}`] = { ...clonar(VIATURAS[J]), marca: m, estado: k, tipo: k, fotos: [] }; });
+    const aVendaV = [...Object.values(vs), ...Object.values(VENDIDAS)].filter((v) => v.publicado !== false && String(v.estado ?? '').trim() !== 'vendido' && typeof v.marca === 'string' && v.marca.trim());
+    const conta = new Map(); for (const v of aVendaV) conta.set(v.marca.trim(), (conta.get(v.marca.trim()) || 0) + 1);
+    const esperadas = [...conta.keys()].sort((a, b) => conta.get(b) - conta.get(a) || a.localeCompare(b, 'pt'));
+    const g = gerar({ viaturas: vs });
+    const inicio = g.ler('index.html') || '';
+    const naFaixa = [...inicio.matchAll(/<li class="fita__item[^"]*"( aria-hidden="true")?><a class="marca-cartao"[\s\S]*?<span class="marca-cartao__nome">([^<]*)<\/span>/g)].filter((m) => !m[1]).map((m) => desc(m[2]));
+    certo(g.status === 0, `o gerador corre com marcas, estados e tipos ${NOMES.map((m) => `«${m}»`).join(', ')}`, g.err.slice(-400));
+    certo(JSON.stringify(naFaixa) === JSON.stringify(esperadas), `a faixa das marcas tem as ${esperadas.length} marcas à venda, cada uma uma vez, pela contagem e depois pelo nome — «__proto__» incluída`, `${JSON.stringify(naFaixa)} ≠ ${JSON.stringify(esperadas)}`);
+    certo(inicio && !/viewBox="undefined"/.test(inicio) && lixoEm(g).length === 0, '   e nenhuma página tem um logótipo partido (viewBox="undefined") nem «undefined»', lixoEm(g).slice(0, 3).join(' | '));
+    const fichas = NOMES.map((_, i) => g.ler(`viaturas/proto-${i}/index.html`) || '');
+    const lista = g.ler('viaturas/index.html') || '';
+    const classeDo = (m) => (lista.match(new RegExp(`<article class="cartao cartao--([a-z]+)"\\s+data-tipo="[^"]*" data-marca="${m}"`)) || [])[1];
+    certo(fichas.every((h) => h.includes('"availability":"https://schema.org/InStock"')) && NOMES.every((m) => classeDo(m) === 'disponivel'),
+      'um estado com um desses nomes vale «à venda» (InStock, cartão disponível), como qualquer estado que não existe');
+    const rodape = (inicio.match(/<h3>Navegar<\/h3>[\s\S]*?<\/ul>/) || [''])[0];
+    certo(['constructor', '__proto__', 'toString', 'hasOwnProperty'].every((t) => rodape.includes(`?tipo=${t}">${t}</a>`)), '   e um tipo com um desses nomes aparece no rodapé com o nome que tem', rodape.replace(/\s+/g, ' ').slice(0, 600));
+    g.apagar();
+  }
+
+  /* ================================================================== */
+  secao('a consola do CI: os dados não abrem comandos do runner');
+  {
+    /* O runner lê comandos no que o gerador escreve (.github/consola.mjs): uma
+       linha a começar por «::» — basta uma mudança de linha num dado —, ou um
+       «##[» em qualquer sítio de uma linha. Os avisos do gerador levam dados: o
+       estado que não existe (com a marca e o modelo), a fotografia que falta.
+       As linhas partem-se como o runner as parte: \n, \r e \r\n. */
+    const vs = clonar(VIATURAS);
+    vs[J].estado = 'disponivel\n::error title=Injectado::pelo estado';
+    vs[J].marca = 'Jaguar ##[warning]Injectado pela marca';
+    vs[P].fotos = [...(vs[P].fotos || []), `assets/veiculos/${P}/falta\r##[error]Injectado pela fotografia.jpg`];
+    const g = gerar({ viaturas: vs });
+    const linhas = `${g.out}\n${g.err}`.split(/\r\n|\r|\n/);
+    const comandos = linhas.filter((l) => l.trimStart().startsWith('::') || l.includes('##['));
+    certo(g.status === 0 && comandos.length === 0 && linhas.some((l) => /Jaguar ## \[warning\]Injectado pela marca XF" tem estado "disponivel ::error title=Injectado::pelo estado", que não existe/.test(l))
+      && linhas.some((l) => /a foto assets\/veiculos\/ford-puma-titanium\/falta ## \[error\]Injectado pela fotografia\.jpg está na lista mas não existe/.test(l)),
+    'um estado que não existe e uma fotografia que falta, com mudanças de linha e «##[»: os avisos saem numa linha só, e nenhum vira um comando do runner', comandos.slice(0, 3).join(' ‖ ') || g.err.slice(-400));
+    g.apagar();
+  }
+
+  /* ================================================================== */
   secao('o caminho do backoffice: apagar cada chave, uma a uma');
   {
     const caminhos = (o, pre = '') => Object.entries(o).flatMap(([k, v]) => { const c = pre ? `${pre}.${k}` : k; return v && typeof v === 'object' ? [c, ...caminhos(v, c)] : [c]; });

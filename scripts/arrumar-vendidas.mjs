@@ -24,6 +24,9 @@
 import { readFileSync, readdirSync, existsSync, mkdirSync, renameSync } from 'node:fs';
 import { join, dirname, relative } from 'node:path';
 import { fileURLToPath } from 'node:url';
+/* O que se escreve na consola leva a marca e o modelo, e o runner do CI lê
+   comandos no que lá se escreve — ver .github/consola.mjs. */
+import { umaLinha } from '../.github/consola.mjs';
 
 const RAIZ = join(dirname(fileURLToPath(import.meta.url)), '..');
 const STOCK = join(RAIZ, 'data/viaturas');
@@ -44,7 +47,7 @@ const planear = (deOnde, paraOnde, querVendido) => {
     } catch (e) {
       /* Um JSON partido não é problema desta arrumação — quem se queixa dele é
          o gerador, a seguir, com uma mensagem melhor. Aqui deixa-se estar. */
-      console.warn(`  (ignorado, não é JSON válido: ${relative(RAIZ, origem)})`);
+      console.warn(umaLinha(`  (ignorado, não é JSON válido: ${relative(RAIZ, origem)})`));
       continue;
     }
     const vendido = dados.estado === 'vendido';
@@ -68,7 +71,7 @@ planear(VENDIDAS, STOCK, false);
 
 if (erros.length) {
   console.error('\nERRO ao arrumar as vendidas:');
-  for (const e of erros) console.error(`  ${e}`);
+  for (const e of erros) console.error(umaLinha(`  ${e}`));
   console.error('');
   process.exit(1);
 }
@@ -82,6 +85,6 @@ mkdirSync(VENDIDAS, { recursive: true });
 for (const { origem, destino, modelo } of mudancas) {
   renameSync(origem, destino);
   const sentido = destino.startsWith(VENDIDAS) ? 'vendida →' : 'de volta ao stock ←';
-  console.log(`  ${sentido} ${modelo || relative(RAIZ, destino)}`);
+  console.log(umaLinha(`  ${sentido} ${modelo || relative(RAIZ, destino)}`));
 }
 console.log(`Vendidas: ${mudancas.length} ficheiro(s) arrumado(s).`);

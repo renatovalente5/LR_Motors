@@ -25,6 +25,11 @@ import { fileURLToPath } from 'node:url';
    e o que é um email ou um endereço que se possa pôr num link. Um sítio só —
    o que as regras dizem que não se percebe é exactamente o que aqui fica de fora. */
 import { lerHorario, notaDaChamada, emailValido, urlHttps } from '../.github/regras.mjs';
+/* O que este script escreve na consola do CI leva dados (marcas, estados,
+   caminhos de fotografias, nomes de ficheiros), e o runner lê comandos no que
+   lá se escreve: cada aviso com dados passa pelo umaLinha() — ver
+   .github/consola.mjs. */
+import { umaLinha } from '../.github/consola.mjs';
 
 const RAIZ = dirname(dirname(fileURLToPath(import.meta.url)));
 const SAIDA = join(RAIZ, '_site');
@@ -110,9 +115,9 @@ const porSlug = new Map();
 for (const { ficheiro, v } of ficheiros) {
   const anterior = porSlug.get(v.slug);
   if (anterior) {
-    console.error(`\nERRO: duas viaturas com o mesmo endereço "${v.slug}":`);
-    console.error(`  ${relative(RAIZ, anterior)}`);
-    console.error(`  ${relative(RAIZ, ficheiro)}`);
+    console.error(`\nERRO: duas viaturas com o mesmo endereço "${umaLinha(v.slug)}":`);
+    console.error(umaLinha(`  ${relative(RAIZ, anterior)}`));
+    console.error(umaLinha(`  ${relative(RAIZ, ficheiro)}`));
     console.error('Apague uma delas — provavelmente a que está fora da pasta certa.\n');
     process.exit(1);
   }
@@ -205,7 +210,7 @@ const TELEFONES = [1, 2].flatMap((n) => {
   if (n > 1 && !temTexto(numero) && !temTexto(texto)) return [];
   const nota = typeof numero === 'string' ? notaDaChamada(numero.trim()) : null;
   if (!nota || !temTexto(texto)) {
-    console.error(`\nERRO: o telefone ${n} (Dados do stand › Contactos) não se pode publicar: ${JSON.stringify(numero ?? null)} / ${JSON.stringify(texto ?? null)}.`);
+    console.error(`\nERRO: o telefone ${n} (Dados do stand › Contactos) não se pode publicar: ${umaLinha(`${JSON.stringify(numero ?? null)} / ${JSON.stringify(texto ?? null)}`)}.`);
     console.error('«Só dígitos» tem de ser um telemóvel (91, 92, 93, 96…) ou um fixo (2…) português, de 9 algarismos, e «como aparece» tem de estar');
     console.error('preenchido: o site escreve junto de cada número o custo da chamada para a rede dele, e assim não sabe qual é.\n');
     process.exit(1);
@@ -333,10 +338,14 @@ const ESTADOS = {
    acontece se alguém editar o JSON à mão ou se um estado for renomeado aqui e
    os dados ficarem para trás; nesse caso o site continuaria a publicar como
    disponível uma viatura vendida, e ninguém dava por ela. */
-const estadoDe = (v) => (ESTADOS[v.estado] ? v.estado : 'disponivel');
+/* Object.hasOwn e não ESTADOS[v.estado]: um estado «constructor» ou «toString»
+   encontrava o que o objecto herda, passava por estado conhecido, e a ficha
+   saía com «undefined» no selo e no schema.org. */
+const estadoConhecido = (e) => typeof e === 'string' && Object.hasOwn(ESTADOS, e);
+const estadoDe = (v) => (estadoConhecido(v.estado) ? v.estado : 'disponivel');
 for (const v of todas) {
-  if (v.estado != null && v.estado !== '' && !ESTADOS[v.estado]) {
-    console.warn(`  !! "${v.marca} ${v.modelo}" tem estado "${v.estado}", que não existe — fica à venda`);
+  if (v.estado != null && v.estado !== '' && !estadoConhecido(v.estado)) {
+    console.warn(umaLinha(`  !! "${v.marca} ${v.modelo}" tem estado "${v.estado}", que não existe — fica à venda`));
   }
 }
 const estaVendida = (v) => estadoDe(v) === 'vendido';
@@ -365,7 +374,9 @@ const notaVisita = (classe = '') => avisoVisita
 
 const ROTULO_TIPO = { carro: 'Carros', mota: 'Motos', 'off-road': 'Off-road' };
 const tiposEmStock = [...new Set(aVenda.map((v) => v.tipo).filter(Boolean))]
-  .map((t) => ({ valor: t, rotulo: ROTULO_TIPO[t] || t }))
+  /* Object.hasOwn: com um tipo «__proto__» o rótulo era o protótipo, e a
+     ordenação a seguir rebentava (o gerador parava a publicação inteira). */
+  .map((t) => ({ valor: t, rotulo: Object.hasOwn(ROTULO_TIPO, t) ? ROTULO_TIPO[t] : String(t) }))
   .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt'));
 const vendidas = publicadas.filter((v) => estaVendida(v));
 
@@ -393,6 +404,9 @@ const tituloLongo = (v) => [v.marca, v.modelo, v.versao].filter(Boolean).join(' 
    resultado é o mesmo. */
 const BIBLIOTECA = 'assets/veiculos';
 const DERIVADAS = 'assets/fotos';
+/* O que pode sair destas duas pastas para o site: só imagens — ver
+   publicavel(), mais abaixo. */
+const IMAGEM_PUBLICAVEL = /\.(?:jpe?g|png|webp)$/i;
 const pastaDerivada = (rel) =>
   rel === BIBLIOTECA || rel.startsWith(BIBLIOTECA + '/') ? DERIVADAS + rel.slice(BIBLIOTECA.length) : rel;
 const ficheirosDe = (rel) => (existsSync(join(RAIZ, rel)) ? readdirSync(join(RAIZ, rel)) : []);
@@ -469,7 +483,17 @@ function fotos(v) {
   caminhos = caminhos.filter((c) => {
     const { limpo, larguras, naBiblioteca } = resolver(c);
     const ha = larguras.length > 0 || Boolean(naBiblioteca);
-    if (!ha) console.warn(`  !! ${v.slug}: a foto ${limpo} está na lista mas não existe — ignorada`);
+    if (!ha) console.warn(umaLinha(`  !! ${v.slug}: a foto ${limpo} está na lista mas não existe — ignorada`));
+    /* Sem variantes, a galeria serviria o ficheiro da biblioteca — e se ele
+       não for uma imagem que o site publica (um .heic, que o Pillow da
+       publicação não lê; ou outra coisa com o mesmo nome), o publicavel()
+       deixa-o fora do _site e a página ficava com uma imagem partida, a
+       capa incluída. Salta-se, como a que não existe: o cartão de partilha
+       já saltava (é a mesma fotografia, a capa e o cartão). */
+    else if (!larguras.length && !IMAGEM_PUBLICAVEL.test(naBiblioteca)) {
+      console.warn(umaLinha(`  !! ${v.slug}: a foto ${limpo} não é uma imagem que o site publique — ignorada`));
+      return false;
+    }
     return ha;
   });
 
@@ -544,22 +568,25 @@ const chaveMarca = (nome) => String(nome)
    logótipos irem uma única vez para a página, dentro de um sprite de
    <symbol>, e os cartões só os referenciarem com <use>. Sem isto o desenho do
    leão da Peugeot sozinho tem 10 KB e a faixa repete cada marca quatro vezes. */
+/* Um Map, e não um objecto: a marca é texto livre, e «Constructor» (a chave
+   fica «constructor») encontrava num objecto a função que ele herda — o
+   logótipo saía partido, com viewBox="undefined". */
 const logosMarcas = (() => {
   const dir = join(RAIZ, 'assets/img/marcas');
-  const mapa = {};
+  const mapa = new Map();
   if (!existsSync(dir)) return mapa;
   readdirSync(dir).filter((f) => f.endsWith('.svg')).forEach((f) => {
     const cru = readFileSync(join(dir, f), 'utf8').replace(/<\?xml[^>]*\?>\s*/, '').trim();
     const vb = /viewBox="([^"]+)"/.exec(cru);
     const dentro = cru.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '').trim();
     if (!vb || !dentro) return;
-    mapa[chaveMarca(f.replace(/\.svg$/, ''))] = { viewBox: vb[1], dentro };
+    mapa.set(chaveMarca(f.replace(/\.svg$/, '')), { viewBox: vb[1], dentro });
   });
   return mapa;
 })();
 
 function logoMarca(nome) {
-  return logosMarcas[chaveMarca(nome)] || null;
+  return logosMarcas.get(chaveMarca(nome)) || null;
 }
 
 /* O sprite só leva as marcas que estão de facto em stock. */
@@ -963,7 +990,7 @@ const standLD = {
 const migalhasLD = (itens) => {
   itens.forEach((it, i) => {
     if (i < itens.length - 1 && it.href == null) {
-      console.warn(`  !! migalha "${it.nome}" sem href e não é a última — o Google recusa`);
+      console.warn(umaLinha(`  !! migalha "${it.nome}" sem href e não é a última — o Google recusa`));
     }
   });
   return {
@@ -1236,10 +1263,12 @@ function paginaInicial() {
 
   /* Uma marca por cartão, com a contagem — dá para escolher pela marca sem
      abrir os filtros, que é como muita gente começa a procurar carro. */
-  const contaMarcas = {};
-  aVenda.forEach((v) => { contaMarcas[v.marca] = (contaMarcas[v.marca] || 0) + 1; });
-  const marcasOrdenadas = Object.keys(contaMarcas).sort((a, b) =>
-    contaMarcas[b] - contaMarcas[a] || a.localeCompare(b, 'pt'));
+  /* Num Map, e só as marcas escritas: num objecto, «__proto__» desaparecia
+     da faixa e «toString» contava a partir de uma função (a ordem partia). */
+  const contaMarcas = new Map();
+  aVenda.forEach((v) => { if (temTexto(v.marca)) contaMarcas.set(v.marca, (contaMarcas.get(v.marca) || 0) + 1); });
+  const marcasOrdenadas = [...contaMarcas.keys()].sort((a, b) =>
+    contaMarcas.get(b) - contaMarcas.get(a) || a.localeCompare(b, 'pt'));
 
   const corpo = `
 <section class="hero hero--curto">
@@ -2008,6 +2037,20 @@ function publicavel(origem) {
   const nome = resto.split('/').pop();
   const base = semSufixo(nome);
 
+  /* Caso 0: só imagens. Quem grava conteúdo escreve nestas pastas — o Pages
+     CMS aceita qualquer ficheiro no Media — e o site servia tudo o que lá
+     estivesse, e na ORIGEM DO SITE: um .html ou um .svg na pasta de uma viatura
+     corria JavaScript em nome de lrmotorsautomoveis.pt. Daqui só saem jpg,
+     jpeg, png e webp, o que o scripts/otimizar-imagens.py prepara e os browsers
+     mostram. (O .heic que ele aceita, o Pillow da publicação não o lê: sairia
+     o ficheiro do telemóvel em bruto, com as coordenadas.) O resto fica de fora
+     e avisa no registo da publicação. */
+  if (!IMAGEM_PUBLICAVEL.test(nome)) {
+    console.warn(umaLinha(`  !! ${rel}: não é uma fotografia (só vão para o site jpg, jpeg, png e webp) — fica de fora`));
+    naoPublicados.push(`${rel} (não é uma fotografia)`);
+    return false;
+  }
+
   /* Caso 1: solto na raiz, que é onde o backoffice grava quando não se abre
      primeiro a pasta de uma viatura. Vale para a fotografia e para as variantes
      que ela deu — a regra é a mesma nas duas pastas, e é por isso que `base`
@@ -2209,7 +2252,7 @@ ${urls.map((p) => `  <url><loc>${esc(abs(p))}</loc><lastmod>${hoje}</lastmod></u
     const n = naoPublicados.length;
     console.log(`\n  ${n} ficheiro${n === 1 ? '' : 's'} ficou fora do site:`
       .replace('ficou', n === 1 ? 'ficou' : 'ficaram'));
-    for (const f of naoPublicados) console.log(`    - ${f}`);
+    for (const f of naoPublicados) console.log(umaLinha(`    - ${f}`));
   }
 }
 
