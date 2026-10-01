@@ -3,6 +3,11 @@
 Stand online para a **Luís & Ricardo Motors, Lda** (LR Motors), Vila Verde, Braga.
 Alojado em GitHub Pages, orçamento zero, cliente autónomo a gerir o stock.
 
+> **Out 2026:** o backoffice deixou de ser o Pages CMS. É um painel próprio,
+> https://backoffice.lrmotorsautomoveis.pt (ver o README); o `.pages.yml` e a
+> ferramenta da página `/fotos/` saíram. O resto deste ficheiro é o plano de
+> construção, tal como foi escrito.
+
 ---
 
 ## Decisões de arquitectura

@@ -164,9 +164,10 @@ const ACTUALIZADO = new Intl.DateTimeFormat('pt-PT', {
 }).format(new Date());
 const abs = (p = '') => codificar(SITE.replace(/\/$/, '') + '/' + String(p).replace(/^\//, ''));
 
-/* O backoffice (Pages CMS) vive fora do site, e o endereço leva o nome do
-   repositório em minúsculas — é assim que o Pages CMS o escreve. */
-const GH_REPO = process.env.GH_REPO ?? 'renatovalente5/lr_motors';
+/* O PAINEL (backoffice), desde out 2026: onde o stand grava as viaturas, os
+   dados do stand e as fotografias. Um endereço só, para a ligação «Gestão»
+   do rodapé e para o /fotos/ que lá leva. Até à troca era o Pages CMS. */
+const PAINEL = 'https://backoffice.lrmotorsautomoveis.pt/';
 
 /* Sufixo de versão nos ficheiros que mudam. Sem isto, o browser de quem já
    visitou fica com o CSS antigo depois de o cliente publicar uma alteração —
@@ -833,11 +834,11 @@ function rodape() {
              mudar de ideias. É um <button> e não um <a> porque não navega para
              lado nenhum — abre o painel aqui mesmo. -->
         <li><button class="rodape__botao" type="button" data-cc-abrir>Preferências</button></li>
-        <!-- Entrada do backoffice. Fica à vista porque é onde o pessoal do stand
-             a vai procurar; quem não tiver acesso não passa da autenticação do
-             Pages CMS. Leva rel=nofollow para os motores de busca não a
-             indexarem como se fosse conteúdo do site. -->
-        <li><a class="rodape__gestao" href="https://app.pagescms.org/${GH_REPO}/main/collection/viaturas"
+        <!-- Entrada do painel (o backoffice). Fica à vista porque é onde o
+             pessoal do stand a vai procurar; quem não tiver acesso não passa da
+             entrada do painel. Leva rel=nofollow para os motores de busca não a
+             seguirem como se fosse conteúdo do site. -->
+        <li><a class="rodape__gestao" href="${esc(PAINEL)}"
                target="_blank" rel="noopener nofollow">Gestão</a></li>
       </ul>
     </div>
@@ -2086,23 +2087,30 @@ function main() {
 
   cpSync(join(RAIZ, 'assets'), join(SAIDA, 'assets'), { recursive: true, filter: publicavel });
 
-  /* A ferramenta de reduzir fotografias, em lrmotorsautomoveis.pt/fotos/.
-     É para o cliente usar antes de carregar fotos no backoffice; não está
-     ligada a partir de lado nenhum do site nem entra no sitemap, e traz o seu
-     próprio `noindex`. Ver o cabeçalho do ficheiro para o porquê. */
-  const ferramenta = join(RAIZ, 'ferramentas/fotos.html');
-  if (existsSync(ferramenta)) {
-    /* O endereço do Worker que recebe as fotografias entra aqui, e não está no
-       ficheiro-fonte, para haver um sítio só onde se muda. Vazio é um estado
-       válido: a página esconde o envio e serve só para preparar as fotografias.
-       Não é segredo nenhum — quem valida a senha é o Worker —, mas também não
-       tem que andar escrito em dois sítios. */
-    const worker = String((def.tecnico && def.tecnico.worker_fotos) || '').trim();
-    mkdirSync(join(SAIDA, 'fotos'), { recursive: true });
-    writeFileSync(join(SAIDA, 'fotos/index.html'),
-      readFileSync(ferramenta, 'utf8').replaceAll('__WORKER_FOTOS__', worker), 'utf8');
-    if (!worker) console.log('  /fotos/ sem Worker configurado — só prepara, não envia');
-  }
+  /* /fotos/ ERA A FERRAMENTA DAS FOTOGRAFIAS: reduzia-as no telemóvel e
+     mandava-as para a biblioteca por um Worker, com uma chave pessoal do
+     GitHub e uma senha guardada no browser. Desde a troca para o painel (out
+     2026) as fotografias carregam-se lá, e o endereço antigo — que o stand
+     tem guardado no telemóvel — leva ao painel. O GitHub Pages não faz
+     reencaminhamentos: é uma página mínima, com refresh a zero segundos (com
+     atraso ficava uma entrada a mais no histórico, e o Voltar prendia), a
+     ligação à vista para quem tenha o refresh desligado, sem JavaScript, e
+     fora dos motores de busca (noindex aqui; Disallow no robots.txt). */
+  escrever('fotos/index.html', `<!doctype html>
+<html lang="pt-PT">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Fotografias — painel da LR Motors</title>
+<meta http-equiv="refresh" content="0; url=${esc(PAINEL)}">
+</head>
+<body style="font-family:system-ui,sans-serif;padding:2rem;text-align:center;color:#0E1726">
+<p><strong>As fotografias das viaturas carregam-se agora no painel.</strong></p>
+<p><a href="${esc(PAINEL)}" rel="nofollow">Abrir o painel da LR Motors</a></p>
+</body>
+</html>
+`);
 
   /* O CNAME tem de ir DENTRO do que é publicado. Com o deploy por Actions, o
      que segue para o Pages é só este directório: o domínio configurado nas
@@ -2229,8 +2237,9 @@ function main() {
 ${urls.map((p) => `  <url><loc>${esc(abs(p))}</loc><lastmod>${hoje}</lastmod></url>`).join('\n')}
 </urlset>
 `);
-  /* /fotos/ é a ferramenta interna de reduzir fotografias — não é conteúdo do
-     stand e não tem nada que aparecer numa pesquisa pela LR Motors. */
+  /* /fotos/ é só o caminho para o painel (o endereço da ferramenta antiga das
+     fotografias) — não é conteúdo do stand e não tem nada que aparecer numa
+     pesquisa pela LR Motors. */
   escrever('robots.txt',
     `User-agent: *\nAllow: /\nDisallow: /fotos/\n\nSitemap: ${abs('sitemap.xml')}\n`);
   escrever('404.html', pagina({
