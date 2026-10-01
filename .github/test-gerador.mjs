@@ -423,6 +423,27 @@ try {
   }
 
   /* ================================================================== */
+  secao('a consola do CI: os dados não abrem comandos do runner');
+  {
+    /* O runner lê comandos no que o gerador escreve (.github/consola.mjs): uma
+       linha a começar por «::» — basta uma mudança de linha num dado —, ou um
+       «##[» em qualquer sítio de uma linha. Os avisos do gerador levam dados: o
+       estado que não existe (com a marca e o modelo), a fotografia que falta.
+       As linhas partem-se como o runner as parte: \n, \r e \r\n. */
+    const vs = clonar(VIATURAS);
+    vs[J].estado = 'disponivel\n::error title=Injectado::pelo estado';
+    vs[J].marca = 'Jaguar ##[warning]Injectado pela marca';
+    vs[P].fotos = [...(vs[P].fotos || []), `assets/veiculos/${P}/falta\r##[error]Injectado pela fotografia.jpg`];
+    const g = gerar({ viaturas: vs });
+    const linhas = `${g.out}\n${g.err}`.split(/\r\n|\r|\n/);
+    const comandos = linhas.filter((l) => l.trimStart().startsWith('::') || l.includes('##['));
+    certo(g.status === 0 && comandos.length === 0 && linhas.some((l) => /Jaguar ## \[warning\]Injectado pela marca XF" tem estado "disponivel ::error title=Injectado::pelo estado", que não existe/.test(l))
+      && linhas.some((l) => /a foto assets\/veiculos\/ford-puma-titanium\/falta ## \[error\]Injectado pela fotografia\.jpg está na lista mas não existe/.test(l)),
+    'um estado que não existe e uma fotografia que falta, com mudanças de linha e «##[»: os avisos saem numa linha só, e nenhum vira um comando do runner', comandos.slice(0, 3).join(' ‖ ') || g.err.slice(-400));
+    g.apagar();
+  }
+
+  /* ================================================================== */
   secao('o caminho do backoffice: apagar cada chave, uma a uma');
   {
     const caminhos = (o, pre = '') => Object.entries(o).flatMap(([k, v]) => { const c = pre ? `${pre}.${k}` : k; return v && typeof v === 'object' ? [c, ...caminhos(v, c)] : [c]; });

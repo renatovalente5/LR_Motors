@@ -25,6 +25,11 @@ import { fileURLToPath } from 'node:url';
    e o que é um email ou um endereço que se possa pôr num link. Um sítio só —
    o que as regras dizem que não se percebe é exactamente o que aqui fica de fora. */
 import { lerHorario, notaDaChamada, emailValido, urlHttps } from '../.github/regras.mjs';
+/* O que este script escreve na consola do CI leva dados (marcas, estados,
+   caminhos de fotografias, nomes de ficheiros), e o runner lê comandos no que
+   lá se escreve: cada aviso com dados passa pelo umaLinha() — ver
+   .github/consola.mjs. */
+import { umaLinha } from '../.github/consola.mjs';
 
 const RAIZ = dirname(dirname(fileURLToPath(import.meta.url)));
 const SAIDA = join(RAIZ, '_site');
@@ -110,9 +115,9 @@ const porSlug = new Map();
 for (const { ficheiro, v } of ficheiros) {
   const anterior = porSlug.get(v.slug);
   if (anterior) {
-    console.error(`\nERRO: duas viaturas com o mesmo endereço "${v.slug}":`);
-    console.error(`  ${relative(RAIZ, anterior)}`);
-    console.error(`  ${relative(RAIZ, ficheiro)}`);
+    console.error(`\nERRO: duas viaturas com o mesmo endereço "${umaLinha(v.slug)}":`);
+    console.error(umaLinha(`  ${relative(RAIZ, anterior)}`));
+    console.error(umaLinha(`  ${relative(RAIZ, ficheiro)}`));
     console.error('Apague uma delas — provavelmente a que está fora da pasta certa.\n');
     process.exit(1);
   }
@@ -205,7 +210,7 @@ const TELEFONES = [1, 2].flatMap((n) => {
   if (n > 1 && !temTexto(numero) && !temTexto(texto)) return [];
   const nota = typeof numero === 'string' ? notaDaChamada(numero.trim()) : null;
   if (!nota || !temTexto(texto)) {
-    console.error(`\nERRO: o telefone ${n} (Dados do stand › Contactos) não se pode publicar: ${JSON.stringify(numero ?? null)} / ${JSON.stringify(texto ?? null)}.`);
+    console.error(`\nERRO: o telefone ${n} (Dados do stand › Contactos) não se pode publicar: ${umaLinha(`${JSON.stringify(numero ?? null)} / ${JSON.stringify(texto ?? null)}`)}.`);
     console.error('«Só dígitos» tem de ser um telemóvel (91, 92, 93, 96…) ou um fixo (2…) português, de 9 algarismos, e «como aparece» tem de estar');
     console.error('preenchido: o site escreve junto de cada número o custo da chamada para a rede dele, e assim não sabe qual é.\n');
     process.exit(1);
@@ -336,7 +341,7 @@ const ESTADOS = {
 const estadoDe = (v) => (ESTADOS[v.estado] ? v.estado : 'disponivel');
 for (const v of todas) {
   if (v.estado != null && v.estado !== '' && !ESTADOS[v.estado]) {
-    console.warn(`  !! "${v.marca} ${v.modelo}" tem estado "${v.estado}", que não existe — fica à venda`);
+    console.warn(umaLinha(`  !! "${v.marca} ${v.modelo}" tem estado "${v.estado}", que não existe — fica à venda`));
   }
 }
 const estaVendida = (v) => estadoDe(v) === 'vendido';
@@ -469,7 +474,7 @@ function fotos(v) {
   caminhos = caminhos.filter((c) => {
     const { limpo, larguras, naBiblioteca } = resolver(c);
     const ha = larguras.length > 0 || Boolean(naBiblioteca);
-    if (!ha) console.warn(`  !! ${v.slug}: a foto ${limpo} está na lista mas não existe — ignorada`);
+    if (!ha) console.warn(umaLinha(`  !! ${v.slug}: a foto ${limpo} está na lista mas não existe — ignorada`));
     return ha;
   });
 
@@ -963,7 +968,7 @@ const standLD = {
 const migalhasLD = (itens) => {
   itens.forEach((it, i) => {
     if (i < itens.length - 1 && it.href == null) {
-      console.warn(`  !! migalha "${it.nome}" sem href e não é a última — o Google recusa`);
+      console.warn(umaLinha(`  !! migalha "${it.nome}" sem href e não é a última — o Google recusa`));
     }
   });
   return {
@@ -2209,7 +2214,7 @@ ${urls.map((p) => `  <url><loc>${esc(abs(p))}</loc><lastmod>${hoje}</lastmod></u
     const n = naoPublicados.length;
     console.log(`\n  ${n} ficheiro${n === 1 ? '' : 's'} ficou fora do site:`
       .replace('ficou', n === 1 ? 'ficou' : 'ficaram'));
-    for (const f of naoPublicados) console.log(`    - ${f}`);
+    for (const f of naoPublicados) console.log(umaLinha(`    - ${f}`));
   }
 }
 

@@ -55,8 +55,10 @@ def montar(pasta_fotos='carro', fotos=None):
     for f in ('otimizar-imagens.py', 'gerar.mjs'):
         shutil.copy(RAIZ / 'scripts' / f, arvore / 'scripts' / f)
     # O gerador lê as regras dos dados (o horário que dá ao Google, a nota do
-    # custo da chamada de cada telefone): sem elas nem arranca.
-    shutil.copy(RAIZ / '.github' / 'regras.mjs', arvore / '.github' / 'regras.mjs')
+    # custo da chamada de cada telefone) e escreve os avisos pelo consola.mjs:
+    # sem eles nem arranca.
+    for f in ('regras.mjs', 'consola.mjs'):
+        shutil.copy(RAIZ / '.github' / f, arvore / '.github' / f)
     shutil.copy(RAIZ / 'data/definicoes.json', arvore / 'data/definicoes.json')
     for pasta in ('conteudo', 'assets/css', 'assets/js', 'assets/img'):
         shutil.copytree(RAIZ / pasta, arvore / pasta, dirs_exist_ok=True)

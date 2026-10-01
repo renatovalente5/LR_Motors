@@ -673,6 +673,21 @@ try {
     rmSync(dir, { recursive: true, force: true });
   }
   {
+    /* A arrumação das vendidas é outro passo do CI, na mesma consola, e
+       escreve a marca e o modelo de cada viatura que muda de pasta. */
+    const dir = mkdtempSync(join(TMP, 'arrumar-'));
+    for (const rel of ['scripts/arrumar-vendidas.mjs', '.github/consola.mjs']) { mkdirSync(dirname(join(dir, rel)), { recursive: true }); copyFileSync(join(RAIZ, rel), join(dir, rel)); }
+    mkdirSync(join(dir, 'data', 'viaturas', 'vendidas'), { recursive: true });
+    writeFileSync(join(dir, R.ficheiroDaViatura('viaturas', 'vendida-hostil')), R.serializar({ ...clonar(HOJE.viaturas[J]), marca: 'Jaguar\n::error title=Injectado::pela marca', modelo: 'XF ##[warning]Injectado pelo modelo', estado: 'vendido' }, ''));
+    const r = correr('node', ['scripts/arrumar-vendidas.mjs'], { cwd: dir });
+    const linhas = `${r.out}\n${r.err}`.split(/\r\n|\r|\n/);
+    const comandos = linhas.filter((l) => l.trimStart().startsWith('::') || l.includes('##['));
+    certo(r.status === 0 && existsSync(join(dir, R.ficheiroDaViatura('vendidas', 'vendida-hostil'))) && comandos.length === 0
+      && linhas.some((l) => /vendida → Jaguar ::error title=Injectado::pela marca XF ## \[warning\]Injectado pelo modelo$/.test(l)),
+    'a arrumação das vendidas escreve a marca e o modelo numa linha só, sem abrir comandos do runner', comandos.join(' ‖ ') || r.out + r.err);
+    rmSync(dir, { recursive: true, force: true });
+  }
+  {
     const LS = String.fromCharCode(0x2028); const PS = String.fromCharCode(0x2029); const NEL = String.fromCharCode(0x85);
     certo(umaLinha(`a\nb\r\nc${LS}d${NEL}e\u0000f${PS}g ##[error]x ###[y]`) === 'a b c d e f g ## [error]x ### [y]', 'umaLinha: o controlo (C0, DEL, C1) e os separadores de linha passam a espaço, e o «##[» leva um espaço');
   }
