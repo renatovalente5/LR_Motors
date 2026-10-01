@@ -451,6 +451,39 @@ try {
   }
 
   /* ================================================================== */
+  secao('marcas, estados e tipos com nomes que um objecto herda');
+  {
+    /* A marca é texto livre, e o estado e o tipo também, para quem escreve o
+       ficheiro à mão: as regras só avisam destes valores (não param nem
+       escondem). As tabelas do gerador eram objectos normais, e «Constructor»,
+       «__proto__», «toString» ou «hasOwnProperty» encontravam o que o objecto
+       herda: um logótipo partido (viewBox="undefined"), uma marca a menos na
+       faixa, a ordem das marcas baralhada, «undefined» no selo e no schema.org
+       — e um tipo «__proto__» rebentava a ordenação do rodapé, o que parava a
+       publicação inteira. (Memória «in aceita o protótipo».) */
+    const NOMES = ['Constructor', '__proto__', 'toString', 'hasOwnProperty'];
+    const vs = clonar(VIATURAS);
+    NOMES.forEach((m, i) => { const k = m === 'Constructor' ? 'constructor' : m; vs[`proto-${i}`] = { ...clonar(VIATURAS[J]), marca: m, estado: k, tipo: k, fotos: [] }; });
+    const aVendaV = [...Object.values(vs), ...Object.values(VENDIDAS)].filter((v) => v.publicado !== false && String(v.estado ?? '').trim() !== 'vendido' && typeof v.marca === 'string' && v.marca.trim());
+    const conta = new Map(); for (const v of aVendaV) conta.set(v.marca.trim(), (conta.get(v.marca.trim()) || 0) + 1);
+    const esperadas = [...conta.keys()].sort((a, b) => conta.get(b) - conta.get(a) || a.localeCompare(b, 'pt'));
+    const g = gerar({ viaturas: vs });
+    const inicio = g.ler('index.html') || '';
+    const naFaixa = [...inicio.matchAll(/<li class="fita__item[^"]*"( aria-hidden="true")?><a class="marca-cartao"[\s\S]*?<span class="marca-cartao__nome">([^<]*)<\/span>/g)].filter((m) => !m[1]).map((m) => desc(m[2]));
+    certo(g.status === 0, `o gerador corre com marcas, estados e tipos ${NOMES.map((m) => `«${m}»`).join(', ')}`, g.err.slice(-400));
+    certo(JSON.stringify(naFaixa) === JSON.stringify(esperadas), `a faixa das marcas tem as ${esperadas.length} marcas à venda, cada uma uma vez, pela contagem e depois pelo nome — «__proto__» incluída`, `${JSON.stringify(naFaixa)} ≠ ${JSON.stringify(esperadas)}`);
+    certo(inicio && !/viewBox="undefined"/.test(inicio) && lixoEm(g).length === 0, '   e nenhuma página tem um logótipo partido (viewBox="undefined") nem «undefined»', lixoEm(g).slice(0, 3).join(' | '));
+    const fichas = NOMES.map((_, i) => g.ler(`viaturas/proto-${i}/index.html`) || '');
+    const lista = g.ler('viaturas/index.html') || '';
+    const classeDo = (m) => (lista.match(new RegExp(`<article class="cartao cartao--([a-z]+)"\\s+data-tipo="[^"]*" data-marca="${m}"`)) || [])[1];
+    certo(fichas.every((h) => h.includes('"availability":"https://schema.org/InStock"')) && NOMES.every((m) => classeDo(m) === 'disponivel'),
+      'um estado com um desses nomes vale «à venda» (InStock, cartão disponível), como qualquer estado que não existe');
+    const rodape = (inicio.match(/<h3>Navegar<\/h3>[\s\S]*?<\/ul>/) || [''])[0];
+    certo(['constructor', '__proto__', 'toString', 'hasOwnProperty'].every((t) => rodape.includes(`?tipo=${t}">${t}</a>`)), '   e um tipo com um desses nomes aparece no rodapé com o nome que tem', rodape.replace(/\s+/g, ' ').slice(0, 600));
+    g.apagar();
+  }
+
+  /* ================================================================== */
   secao('a consola do CI: os dados não abrem comandos do runner');
   {
     /* O runner lê comandos no que o gerador escreve (.github/consola.mjs): uma

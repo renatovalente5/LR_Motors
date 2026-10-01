@@ -338,9 +338,13 @@ const ESTADOS = {
    acontece se alguém editar o JSON à mão ou se um estado for renomeado aqui e
    os dados ficarem para trás; nesse caso o site continuaria a publicar como
    disponível uma viatura vendida, e ninguém dava por ela. */
-const estadoDe = (v) => (ESTADOS[v.estado] ? v.estado : 'disponivel');
+/* Object.hasOwn e não ESTADOS[v.estado]: um estado «constructor» ou «toString»
+   encontrava o que o objecto herda, passava por estado conhecido, e a ficha
+   saía com «undefined» no selo e no schema.org. */
+const estadoConhecido = (e) => typeof e === 'string' && Object.hasOwn(ESTADOS, e);
+const estadoDe = (v) => (estadoConhecido(v.estado) ? v.estado : 'disponivel');
 for (const v of todas) {
-  if (v.estado != null && v.estado !== '' && !ESTADOS[v.estado]) {
+  if (v.estado != null && v.estado !== '' && !estadoConhecido(v.estado)) {
     console.warn(umaLinha(`  !! "${v.marca} ${v.modelo}" tem estado "${v.estado}", que não existe — fica à venda`));
   }
 }
@@ -370,7 +374,9 @@ const notaVisita = (classe = '') => avisoVisita
 
 const ROTULO_TIPO = { carro: 'Carros', mota: 'Motos', 'off-road': 'Off-road' };
 const tiposEmStock = [...new Set(aVenda.map((v) => v.tipo).filter(Boolean))]
-  .map((t) => ({ valor: t, rotulo: ROTULO_TIPO[t] || t }))
+  /* Object.hasOwn: com um tipo «__proto__» o rótulo era o protótipo, e a
+     ordenação a seguir rebentava (o gerador parava a publicação inteira). */
+  .map((t) => ({ valor: t, rotulo: Object.hasOwn(ROTULO_TIPO, t) ? ROTULO_TIPO[t] : String(t) }))
   .sort((a, b) => a.rotulo.localeCompare(b.rotulo, 'pt'));
 const vendidas = publicadas.filter((v) => estaVendida(v));
 
@@ -562,22 +568,25 @@ const chaveMarca = (nome) => String(nome)
    logótipos irem uma única vez para a página, dentro de um sprite de
    <symbol>, e os cartões só os referenciarem com <use>. Sem isto o desenho do
    leão da Peugeot sozinho tem 10 KB e a faixa repete cada marca quatro vezes. */
+/* Um Map, e não um objecto: a marca é texto livre, e «Constructor» (a chave
+   fica «constructor») encontrava num objecto a função que ele herda — o
+   logótipo saía partido, com viewBox="undefined". */
 const logosMarcas = (() => {
   const dir = join(RAIZ, 'assets/img/marcas');
-  const mapa = {};
+  const mapa = new Map();
   if (!existsSync(dir)) return mapa;
   readdirSync(dir).filter((f) => f.endsWith('.svg')).forEach((f) => {
     const cru = readFileSync(join(dir, f), 'utf8').replace(/<\?xml[^>]*\?>\s*/, '').trim();
     const vb = /viewBox="([^"]+)"/.exec(cru);
     const dentro = cru.replace(/^<svg[^>]*>/, '').replace(/<\/svg>\s*$/, '').trim();
     if (!vb || !dentro) return;
-    mapa[chaveMarca(f.replace(/\.svg$/, ''))] = { viewBox: vb[1], dentro };
+    mapa.set(chaveMarca(f.replace(/\.svg$/, '')), { viewBox: vb[1], dentro });
   });
   return mapa;
 })();
 
 function logoMarca(nome) {
-  return logosMarcas[chaveMarca(nome)] || null;
+  return logosMarcas.get(chaveMarca(nome)) || null;
 }
 
 /* O sprite só leva as marcas que estão de facto em stock. */
@@ -1254,10 +1263,12 @@ function paginaInicial() {
 
   /* Uma marca por cartão, com a contagem — dá para escolher pela marca sem
      abrir os filtros, que é como muita gente começa a procurar carro. */
-  const contaMarcas = {};
-  aVenda.forEach((v) => { contaMarcas[v.marca] = (contaMarcas[v.marca] || 0) + 1; });
-  const marcasOrdenadas = Object.keys(contaMarcas).sort((a, b) =>
-    contaMarcas[b] - contaMarcas[a] || a.localeCompare(b, 'pt'));
+  /* Num Map, e só as marcas escritas: num objecto, «__proto__» desaparecia
+     da faixa e «toString» contava a partir de uma função (a ordem partia). */
+  const contaMarcas = new Map();
+  aVenda.forEach((v) => { if (temTexto(v.marca)) contaMarcas.set(v.marca, (contaMarcas.get(v.marca) || 0) + 1); });
+  const marcasOrdenadas = [...contaMarcas.keys()].sort((a, b) =>
+    contaMarcas.get(b) - contaMarcas.get(a) || a.localeCompare(b, 'pt'));
 
   const corpo = `
 <section class="hero hero--curto">
