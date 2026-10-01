@@ -7,6 +7,16 @@
 # Nota: em Settings → Pages, a origem tem de estar em "GitHub Actions".
 # Se ficar na opção antiga, o GitHub tenta processar o repositório com Jekyll
 # e publica o código-fonte em vez do site gerado.
+#
+# A GUARDA DO CONTEÚDO (.github/guardas.mjs, com as regras de
+# .github/regras.mjs — as mesmas do painel) corre duas vezes: logo ao início,
+# para parar cedo e dizer porquê; e outra vez antes de gerar, a preparar a
+# cópia dos dados que o gerador lê (as viaturas com problemas escondidas, as
+# fotografias que não são da biblioteca fora). Essa cópia nunca entra no
+# commit de volta: é feita DEPOIS dele. O job «avisar» abre a issue
+# «Publicação parada» quando a publicação pára ou quando uma viatura muda no
+# site por causa de um problema nos dados — o GitHub só avisa quem disparou a
+# corrida, e as gravações do backoffice não avisam ninguém.
 # ============================================================================
 name: Publicar site
 
@@ -25,6 +35,10 @@ on:
         description: 'Contexto do Pages CMS — deixar vazio se disparar à mão'
         required: false
         default: ''
+      ensaiar_aviso:
+        description: 'Abrir e fechar uma issue de ensaio, para confirmar que o aviso chega por email'
+        type: boolean
+        default: false
 
 permissions:
   # `write` e não `read` por causa do passo que arruma as vendidas: ele grava no
@@ -48,6 +62,19 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
+
+      # As regras de .github/regras.mjs, as mesmas do painel. Pára SÓ no que não
+      # se pode publicar sem partir o site ou a lei: um JSON que não se lê, a
+      # forma que o gerador precisa, os telefones e o WhatsApp, a morada do stand
+      # e os dados legais da empresa. Uma viatura com problemas nunca pára a
+      # publicação das outras: muda só na cópia que o gerador lê (passo
+      # «Preparar a cópia…», mais abaixo). Corre ANTES de mexer em seja o que
+      # for, para uma publicação que vai parar não deixar commits pelo caminho e
+      # para dizer porquê — a arrumação das vendidas também pára com duas
+      # viaturas no mesmo endereço, mas sem explicar. O relatório fica fora da
+      # pasta do repositório, para não ser publicado.
+      - name: Conferir o conteúdo
+        run: node .github/guardas.mjs --relatorio-em "$RUNNER_TEMP/relatorio.json"
 
       # As viaturas marcadas como vendidas mudam-se para data/viaturas/vendidas/,
       # e as que deixarem de estar vendidas voltam para trás. Corre ANTES de
@@ -142,6 +169,20 @@ jobs:
           git pull --rebase --quiet origin main || true
           git push origin HEAD:main || echo "AVISO: não deu para gravar; o site vai na mesma e a próxima publicação repete"
 
+      # A CÓPIA DOS DADOS QUE O GERADOR LÊ: as regras outra vez (o «Guardar…»
+      # pode ter trazido commits novos), e as viaturas com problemas mudadas SÓ
+      # nesta máquina — sem marca ou sem modelo ficam escondidas, uma fotografia
+      # que não é da biblioteca sai da lista. Sem nada a neutralizar, os
+      # ficheiros nem se tocam.
+      #
+      # TEM DE FICAR DEPOIS DO «Guardar…»: esse passo faz `git add -A
+      # data/viaturas` e commit de volta para o repositório, e a cópia
+      # neutralizada não pode ir lá parar — o dono deixava de ver a viatura no
+      # backoffice como a escreveu. Nenhum passo depois deste grava no
+      # repositório (o .github/test-guardas.mjs confere as duas coisas).
+      - name: Preparar a cópia que o gerador lê
+        run: node .github/guardas.mjs --neutralizar . --relatorio-em "$RUNNER_TEMP/relatorio.json"
+
       # O site tem domínio próprio, lrmotorsautomoveis.pt, e um domínio próprio
       # serve na RAIZ. Enquanto isto esteve em `/LR_Motors`, tudo o que o HTML
       # pedia — folha de estilo, JavaScript, fotografias, ligações entre páginas
@@ -219,6 +260,15 @@ jobs:
         with:
           path: _site
 
+      # Também quando a guarda parou: é o que o job «avisar» põe na issue.
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: relatorio
+          path: ${{ runner.temp }}/relatorio.json
+          if-no-files-found: ignore
+          retention-days: 7
+
   publicar:
     needs: construir
     runs-on: ubuntu-latest
@@ -228,3 +278,108 @@ jobs:
     steps:
       - id: deploy
         uses: actions/deploy-pages@v4
+
+  # ---------------------------------------------------------------------------
+  # Quem fica a saber. Sem checkout; só pode mexer em issues.
+  #
+  # Uma corrida CANCELADA não avisa ninguém: com cancel-in-progress foi
+  # substituída por outra, mais recente (o dono gravou outra vez), e é essa que
+  # diz como correu. `always()` correria também nas canceladas, e abria a issue
+  # a cada gravação seguida.
+  # ---------------------------------------------------------------------------
+  avisar:
+    needs: [construir, publicar]
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    permissions:
+      issues: write
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: relatorio
+          path: relatorio
+
+      # Os valores do GitHub entram por env:, nunca por ${{ }} dentro do run:.
+      # O texto da issue vai por ficheiro, e as mensagens da guarda dentro de um
+      # bloco ~~~~ (sem formatação nem menções @): o repositório é público.
+      # continue-on-error: um aviso que não sai não é uma publicação falhada.
+      - name: Abrir, comentar ou fechar a issue «Publicação parada»
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          CONSTRUIR: ${{ needs.construir.result }}
+          PUBLICAR: ${{ needs.publicar.result }}
+          ENSAIO: ${{ inputs.ensaiar_aviso }}
+          CORRIDA: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          COMMIT: ${{ github.sha }}
+          QUEM: ${{ github.actor }}
+        run: |
+          TITULO='Publicação parada'
+          REL=relatorio/relatorio.json
+          # Rede para o `if:` do job: cancelada, não se diz nada.
+          case " $CONSTRUIR $PUBLICAR " in
+            *" cancelled "*) echo "corrida cancelada (outra mais recente tomou o lugar): não se avisa ninguém"; exit 0 ;;
+          esac
+          FALHOU=false
+          if [ "$CONSTRUIR" != success ] || [ "$PUBLICAR" != success ]; then FALHOU=true; fi
+          MUDARAM=0
+          if [ -f "$REL" ]; then MUDARAM=$(jq '(.neutralizados // []) | length' "$REL" 2>/dev/null || echo 0); fi
+
+          {
+            if [ "$FALHOU" = true ]; then
+              echo "A publicação do site **parou**: o site continua como estava antes deste commit."
+            else
+              echo "O site foi publicado, mas **$MUDARAM viatura(s) mudaram no site** (escondidas, ou com fotografias que não aparecem) por terem dados com problemas. O ficheiro do repositório não mudou: basta corrigir e gravar outra vez."
+            fi
+            echo
+            echo "- Corrida: $CORRIDA"
+            echo "- Commit: $COMMIT (de $QUEM)"
+            echo "- Construir: $CONSTRUIR · Publicar: $PUBLICAR"
+            GUARDA=''
+            if [ -f "$REL" ]; then
+              GUARDA=$(jq -r '
+                def linha: gsub("[[:cntrl:]]+"; " ") | .[0:600];
+                ((.problemas // []) | map(select(.classe == "bloqueia")) | .[] | ("- PÁRA · " + (.ecra // "") + " — " + (.mensagem // "")) | linha),
+                ((.neutralizados // []) | .[] | ("- NO SITE · " + (.nome // .slug // "?") + ": " + (.descricao // "") + " — " + ((.motivos // []) | join(" "))) | linha)
+              ' "$REL" | sed -n '1,80p')
+            fi
+            if [ -n "$GUARDA" ]; then
+              echo
+              echo "O que a guarda encontrou (a lista inteira está no resumo da corrida):"
+              echo
+              echo '~~~~'
+              printf '%s\n' "$GUARDA"
+              echo '~~~~'
+            fi
+          } > aviso.md
+
+          # A issue do bot encontra-se pelo título E pelo autor: o repositório é
+          # público, e qualquer pessoa pode abrir uma com o mesmo título — o bot
+          # comentava-a (o autor recebia o aviso) ou fechava-a. A que o bot abre
+          # fica trancada (só quem tem acesso ao repositório comenta).
+          ABERTA=$(gh issue list --state open --limit 100 --json number,title,author \
+            | jq -r --arg t "$TITULO" '[.[] | select(.title == $t and ((.author.login // "") as $l | $l == "app/github-actions" or $l == "github-actions" or $l == "github-actions[bot]")) | .number] | first // empty')
+
+          # Um erro do gh (um 502, o limite da API) não pára este passo: fica um
+          # aviso na corrida, e a publicação continua a contar como feita.
+          sem_gh() { echo "::warning title=Aviso da publicação::Não consegui $1 a issue «$TITULO» (o site não muda com isto)."; }
+
+          if [ "$FALHOU" = true ] || [ "$MUDARAM" -gt 0 ]; then
+            if [ -n "$ABERTA" ]; then gh issue comment "$ABERTA" --body-file aviso.md || sem_gh comentar
+            elif URL=$(gh issue create --title "$TITULO" --body-file aviso.md); then
+              gh issue lock "${URL##*/}" || sem_gh trancar
+            else sem_gh abrir; fi
+          elif [ -n "$ABERTA" ]; then
+            gh issue close "$ABERTA" --comment "Voltou a publicar sem problemas (commit $COMMIT). $CORRIDA" || sem_gh fechar
+          fi
+
+          # Ensaio (workflow_dispatch com ensaiar_aviso): abre e fecha uma issue
+          # à parte, para o Renato confirmar que os DOIS emails chegam.
+          if [ "${ENSAIO:-}" = true ]; then
+            printf 'Ensaio do aviso «%s»: se este email chegou, os avisos das publicações paradas também chegam.\n\n- Corrida: %s\n' "$TITULO" "$CORRIDA" > ensaio.md
+            if URL=$(gh issue create --title "$TITULO — ensaio do aviso" --body-file ensaio.md); then
+              gh issue close "${URL##*/}" --comment "Ensaio terminado: esta issue fecha-se sozinha. Chegaram os dois emails (abrir e fechar)? Se não, Watch → Custom → Issues no repositório, e repetir." || sem_gh fechar
+            else sem_gh abrir; fi
+          fi
