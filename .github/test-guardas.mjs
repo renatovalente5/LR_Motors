@@ -174,7 +174,7 @@ try {
   certo(!/^\s*import\s/m.test(fonte) && !/\bimport\s*\(/.test(fonte), 'não importa nada');
   const codigo = fonte.replace(/\/\*[\s\S]*?\*\//g, '').replace(/^\s*\/\/.*$/gm, '');
   certo(codigo.length > 10000 && !/\brequire\s*\(|\bprocess\.|node:|\bfs\b|Buffer\b|__dirname/.test(codigo), 'nada de require, process, node:, fs ou Buffer (no código, fora dos comentários)');
-  certo(!/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u2028\u2029]/.test(fonte), 'sem caracteres de controlo nem separadores de linha literais no código');
+  certo(!/[\u0000-\u0008\u000B\u000C\u000E-\u001F\u00AD\u0300-\u036F\u200B-\u200F\u2028-\u202E\u2060-\u206F\uFEFF]/.test(fonte), 'sem caracteres de controlo, invisíveis nem marcas combinantes literais no código (escrevem-se por escape)');
   const soltinho = await import(`data:text/javascript;base64,${Buffer.from(fonte).toString('base64')}`);
   certo(typeof soltinho.problemas === 'function' && typeof soltinho.neutralizar === 'function' && typeof soltinho.gerarSlug === 'function', 'importa-se sozinho, sem a pasta à volta (como a cópia do painel)');
   console.log(`    SHA-256 do regras.mjs: ${createHash('sha256').update(fonte).digest('hex')}`);

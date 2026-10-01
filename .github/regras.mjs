@@ -205,7 +205,7 @@ export function nifValido(nif) {
 export function gerarSlug(marca, modelo, versao, existentes = []) {
   const ja = existentes instanceof Set ? existentes : new Set(existentes);
   let base = [marca, modelo, versao].map((x) => (x === null || x === undefined ? '' : String(x))).join(' ')
-    .normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase()
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
     .replace(/[^a-z0-9]+/g, '-').replace(/^-+/, '').slice(0, 80).replace(/-+$/, '');
   if (!base) base = 'viatura';
   let slug = base;
@@ -240,7 +240,7 @@ export function fotografiaExiste(caminho, slug, listarPasta) {
 const NUMEROS_ESCRITOS = { um: 1, uma: 1, dois: 2, duas: 2, tres: 3, quatro: 4, cinco: 5, seis: 6, doze: 12, dezoito: 18, 'vinte e quatro': 24, 'trinta e seis': 36 };
 export function mesesDeGarantia(texto) {
   if (typeof texto !== 'string') return null;
-  const s = texto.normalize('NFD').replace(/[̀-ͯ]/g, '').toLowerCase().trim();
+  const s = texto.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().trim();
   if (/^[0-9]{1,3}$/.test(s)) return Number(s);
   const palavras = Object.keys(NUMEROS_ESCRITOS).join('|');
   const m = s.match(new RegExp(`(?:^|[^0-9a-z])([0-9]{1,3}|${palavras})\\s*(mes|meses|ano|anos)(?![a-z])`));
@@ -276,6 +276,8 @@ const aparado = (v) => (typeof v === 'string' ? v.trim() : v);
 const inteiroEntre = (v, a, b) => typeof v === 'number' && Number.isInteger(v) && v >= a && v <= b;
 const duasCasas = (x) => typeof x === 'number' && Number.isFinite(x) && Math.abs(x * 100 - Math.round(x * 100)) < 1e-6;
 const bytesDe = (s) => new TextEncoder().encode(s).length;
+/* 1000000 → «1 000 000», igual em todo o lado (o toLocaleString depende do ICU de quem corre). */
+const milhares = (n) => String(n).replace(/\B(?=(\d{3})+(?!\d))/g, ' ');
 
 /* Caracteres de controlo, por escape e nunca literais no código. Os
    separadores de linha U+2028/U+2029 ficam de fora: o gerador troca-os por
@@ -470,7 +472,7 @@ export function problemasDaViatura(v, ctx = {}) {
     const ok = typeof x === 'number' && Number.isFinite(x) && x >= min && x <= max && (casas ? duasCasas(x) : Number.isInteger(x));
     if (!ok) avisa(campo, campo, mensagem);
   };
-  numero('preco', LIMITES.preco, `O preço é só o número, sem € nem pontos (ex.: 18990), de 0 a ${LIMITES.preco[1].toLocaleString('pt-PT')} €.`, { casas: 2 });
+  numero('preco', LIMITES.preco, `O preço é só o número, sem € nem pontos (ex.: 18990), de 0 a ${milhares(LIMITES.preco[1])} €.`, { casas: 2 });
   numero('km', LIMITES.km, 'Os quilómetros são só o número, sem pontos (ex.: 94000).');
   numero('potencia', LIMITES.potencia, `A potência é um número inteiro de cavalos, de 1 a ${LIMITES.potencia[1]}.`);
   numero('cilindrada', LIMITES.cilindrada, `A cilindrada é um número inteiro de cm³, de 1 a ${LIMITES.cilindrada[1]} (vazia nos eléctricos).`);
@@ -784,7 +786,7 @@ export function problemas(dados = {}, opcoes = {}) {
   for (const [slug, ficheiros] of porSlug) {
     if (ficheiros.length < 2) continue;
     lista.push({
-      classe: 'bloqueia', chave: `viatura:${slug}:repetida`, ficheiro: ficheiros[0], ficheiros, slug, ecra: `Viaturas › ${slug}`,
+      classe: 'bloqueia', chave: `viatura:${slug}:repetida`, ficheiro: ficheiros[0], ficheiros, slug, ecra: `${ficheiros[0].includes('/vendidas/') ? 'Vendidas' : 'Viaturas'} › ${slug}`,
       mensagem: `Há ${ficheiros.length} viaturas com o mesmo endereço («${slug}»)${ficheiros.some((f) => f.includes('/vendidas/')) && ficheiros.some((f) => !f.includes('/vendidas/')) ? ', uma nas Viaturas e outra nas Vendidas' : ''}: o site não sabe qual mostrar. Apague a que está a mais.`,
     });
   }
