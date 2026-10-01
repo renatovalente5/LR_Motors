@@ -442,6 +442,19 @@ try {
   }
 
   /* ================================================================== */
+  secao('a ligação «Gestão» do rodapé leva ao painel');
+  {
+    const g = gerar();
+    const comRodape = g.paginas().filter((p) => g.ler(p).includes('<footer class="rodape">'));
+    const mal = comRodape.map((p) => [p, (g.ler(p).match(/<a class="rodape__gestao"[^>]*>Gestão<\/a>/) || [''])[0]])
+      .filter(([, a]) => !(a.includes('href="https://backoffice.lrmotorsautomoveis.pt/"') && /\srel="[^"]*\bnofollow\b[^"]*"/.test(a)));
+    const comPagesCms = g.paginas().filter((p) => /pagescms/i.test(g.ler(p)));
+    certo(g.status === 0 && comRodape.length >= 20 && mal.length === 0 && comPagesCms.length === 0,
+      `nas ${comRodape.length} páginas com rodapé, «Gestão» leva ao painel, com rel="nofollow"; nenhuma página fala do Pages CMS`, [...mal.map(([p, a]) => `${p}: ${a || '(sem a ligação)'}`), ...comPagesCms].slice(0, 3).join(' | '));
+    g.apagar();
+  }
+
+  /* ================================================================== */
   secao('das pastas das fotografias só saem imagens');
   {
     /* Quem grava conteúdo escreve na biblioteca (o Pages CMS aceita qualquer

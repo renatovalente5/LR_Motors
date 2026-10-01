@@ -164,11 +164,9 @@ const ACTUALIZADO = new Intl.DateTimeFormat('pt-PT', {
 }).format(new Date());
 const abs = (p = '') => codificar(SITE.replace(/\/$/, '') + '/' + String(p).replace(/^\//, ''));
 
-/* O backoffice (Pages CMS) vive fora do site, e o endereço leva o nome do
-   repositório em minúsculas — é assim que o Pages CMS o escreve. */
-const GH_REPO = process.env.GH_REPO ?? 'renatovalente5/lr_motors';
 /* O PAINEL (backoffice), desde out 2026: onde o stand grava as viaturas, os
-   dados do stand e as fotografias. Um endereço só, para o /fotos/ que lá leva. */
+   dados do stand e as fotografias. Um endereço só, para a ligação «Gestão»
+   do rodapé e para o /fotos/ que lá leva. Até à troca era o Pages CMS. */
 const PAINEL = 'https://backoffice.lrmotorsautomoveis.pt/';
 
 /* Sufixo de versão nos ficheiros que mudam. Sem isto, o browser de quem já
@@ -836,11 +834,11 @@ function rodape() {
              mudar de ideias. É um <button> e não um <a> porque não navega para
              lado nenhum — abre o painel aqui mesmo. -->
         <li><button class="rodape__botao" type="button" data-cc-abrir>Preferências</button></li>
-        <!-- Entrada do backoffice. Fica à vista porque é onde o pessoal do stand
-             a vai procurar; quem não tiver acesso não passa da autenticação do
-             Pages CMS. Leva rel=nofollow para os motores de busca não a
-             indexarem como se fosse conteúdo do site. -->
-        <li><a class="rodape__gestao" href="https://app.pagescms.org/${GH_REPO}/main/collection/viaturas"
+        <!-- Entrada do painel (o backoffice). Fica à vista porque é onde o
+             pessoal do stand a vai procurar; quem não tiver acesso não passa da
+             entrada do painel. Leva rel=nofollow para os motores de busca não a
+             seguirem como se fosse conteúdo do site. -->
+        <li><a class="rodape__gestao" href="${esc(PAINEL)}"
                target="_blank" rel="noopener nofollow">Gestão</a></li>
       </ul>
     </div>
