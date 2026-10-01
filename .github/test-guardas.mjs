@@ -25,6 +25,9 @@
  *   · 30 problemas → 9 anotações + «e mais 21», e os 30 no resumo;
  *   · na consola, nenhum dado abre um comando do runner (uma mudança de linha
  *     a começar por «::», ou um «##[» em qualquer sítio — .github/consola.mjs);
+ *   · no resumo da corrida (público, em Markdown), nenhum dado fica fora do
+ *     código: nem ligações, nem imagens, nem HTML; e um resumo grande de mais
+ *     corta-se em linhas inteiras;
  *   · a cópia que o gerador lê muda só o que tem de mudar, e nada sem nada;
  *   · a guarda e o gerador verdadeiro contam as fotografias em falta da mesma
  *     maneira;
@@ -690,6 +693,67 @@ try {
   {
     const LS = String.fromCharCode(0x2028); const PS = String.fromCharCode(0x2029); const NEL = String.fromCharCode(0x85);
     certo(umaLinha(`a\nb\r\nc${LS}d${NEL}e\u0000f${PS}g ##[error]x ###[y]`) === 'a b c d e f g ## [error]x ### [y]', 'umaLinha: o controlo (C0, DEL, C1) e os separadores de linha passam a espaço, e o «##[» leva um espaço');
+  }
+
+  /* ================================================================== */
+  secao('o resumo da corrida (público, e lido em Markdown)');
+  {
+    /* Um valor dos dados não pode virar ligação, imagem, HTML, ênfase ou
+       menção no resumo, nem partir a tabela. Lê-se como o GFM o lê: uma linha
+       da tabela parte-se nas barras que não são «\|»; o código abre numa fila de
+       N crases e fecha na fila seguinte de EXACTAMENTE N (CommonMark 6.1), e lá
+       dentro nada se interpreta; o que sobra fora do código tem de ser só o
+       texto da própria guarda. (Conferido também no renderizador do GitHub,
+       POST /markdown: zero <a>, zero <img>, zero <em>, três células por linha.) */
+    const codigosDe = (texto) => {
+      let fora = ''; const codigos = []; let i = 0;
+      const fila = (k) => { let m = 0; while (texto[k + m] === '`') m++; return m; };
+      while (i < texto.length) {
+        if (texto[i] !== '`') { fora += texto[i]; i++; continue; }
+        const n = fila(i); let j = i + n; let fecho = -1;
+        while (j < texto.length) { if (texto[j] !== '`') { j++; continue; } const m = fila(j); if (m === n) { fecho = j; break; } j += m; }
+        if (fecho < 0) { fora += texto.slice(i, i + n); i += n; continue; }
+        let c = texto.slice(i + n, fecho);
+        if (c.startsWith(' ') && c.endsWith(' ') && c.trim()) c = c.slice(1, -1);
+        codigos.push(c); fora += ' '; i = fecho + n;
+      }
+      return { fora, codigos };
+    };
+    const lerComoGfm = (md) => {
+      let fora = ''; const codigos = []; const partidas = [];
+      for (const linha of md.split('\n')) {
+        const celulas = linha.startsWith('|') ? linha.split(/(?<!\\)\|/).slice(1, -1) : null;
+        if (celulas && celulas.length !== 3) partidas.push(linha);
+        for (const parte of celulas ? celulas.map((c) => c.replace(/\\\|/g, '|')) : [linha]) {
+          const x = codigosDe(parte); fora += `${x.fora}\n`; codigos.push(...x.codigos);
+        }
+      }
+      return { fora, codigos, partidas };
+    };
+    const HOSTIS = ['[Ver os detalhes](https://exemplo.pt/x)', '![](https://exemplo.pt/p.png)', '<img src=x onerror=alert(1)>', 'https://exemplo.pt/solto', 'www.exemplo.pt',
+      '@renatovalente5', '**negrito** _itálico_', 'a | b', '``` cerca ` crase'];
+    const DADOS = /Ver os detalhes|exemplo\.pt|<img|renatovalente5|negrito|itálico|cerca|crase|Puma/;
+    const d = dadosDeHoje();
+    d.viaturas[J].marca = HOSTIS[0];                             // o ecrã (Viaturas › …)
+    d.viaturas[J].garantia = `36 meses ${HOSTIS.join(' ')}`;     // o lembrete dos 3 anos cita a garantia inteira
+    d.viaturas[P].modelo = 'Puma | ``` |';                      // o ecrã, e o nome em «mudam no site»
+    d.viaturas[P].fotos.push(HOSTIS[2]);                         // a foto-invalida cita o nome, nos motivos e na tabela
+    const dir = repoDeEnsaio(d);
+    const resumoF = join(TMP, 'resumo-hostil.md'); writeFileSync(resumoF, '');
+    const r = guardaEm(dir, { GITHUB_STEP_SUMMARY: resumoF });
+    const n = correr('node', [GUARDA, '--neutralizar', dir], { env: { GITHUB_STEP_SUMMARY: resumoF } });
+    const md = readFileSync(resumoF, 'utf8');
+    const lido = lerComoGfm(md);
+    certo(r.status === 0 && n.status === 0 && /^\| no site \|/m.test(md) && /### A cópia que o gerador lê/.test(md) && lido.partidas.length === 0 && !DADOS.test(lido.fora),
+      'no resumo, nenhum valor dos dados fica fora do código: nem ligação, nem imagem, nem HTML, nem ênfase, nem menção — e a tabela fica com três colunas', [...lido.partidas, ...lido.fora.split('\n').filter((l) => DADOS.test(l))].slice(0, 3).join(' ‖ '));
+    certo(lido.codigos.some((c) => c.includes(`A garantia diz «36 meses ${HOSTIS.join(' ')}»`)) && lido.codigos.some((c) => c === 'Viaturas › Ford Puma | ``` | 1.0 EcoBoost Titanium'),
+      '   e o que lá está diz exactamente o que os dados dizem (as barras e as crases inteiras)', lido.codigos.filter((c) => /Puma|garantia/.test(c)).slice(0, 2).join(' ‖ '));
+    rmSync(dir, { recursive: true, force: true });
+    const muitos = Array.from({ length: 6000 }, (_, i) => ({ classe: 'avisa', ecra: `Viaturas › ${HOSTIS[i % HOSTIS.length]}`, mensagem: `${'x'.repeat(150)} ${HOSTIS[(i + 4) % HOSTIS.length]}` }));
+    const grande = G.resumo(muitos, []);
+    const lg = lerComoGfm(grande);
+    certo(new TextEncoder().encode(grande).length < 1024 * 1024 && /o resto está no relatório desta corrida/.test(grande) && lg.partidas.length === 0 && !DADOS.test(lg.fora),
+      'um resumo grande de mais corta-se em linhas inteiras: cabe no limite do GitHub, e nenhum valor fica com a cerca aberta', [...lg.partidas, ...lg.fora.split('\n').filter((l) => DADOS.test(l))].slice(0, 2).join(' ‖ '));
   }
 
   /* ================================================================== */

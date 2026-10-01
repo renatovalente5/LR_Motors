@@ -132,7 +132,24 @@ export function anotacoes(lista) {
   return linhas;
 }
 
-const escMd = (s) => String(s ?? '').replace(/[\r\n]+/g, ' ').replace(/\|/g, '\\|').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+/* UM VALOR DOS DADOS NO RESUMO DA CORRIDA, que é público e que o GitHub lê em
+   Markdown. Vai entre crases, e dentro de um código o GitHub não interpreta
+   nada: nem uma ligação («[Ver os detalhes](https://…)», que passava nas regras
+   e saía clicável), nem uma imagem, nem HTML, nem ênfase, nem os endereços
+   soltos que ele transforma sozinho em ligação — este último caso não se
+   resolvia a escapar a pontuação um a um.
+   · a cerca é mais comprida do que a maior fila de crases do texto (assim o
+     texto não a fecha) e leva um espaço de cada lado, que o Markdown tira;
+   · numa tabela, a barra vai como «\|»: o GitHub parte a linha nas barras
+     antes de ler as crases, e mostra «|» dentro do código;
+   · o controlo e as mudanças de linha passam a espaço (uma mudança de linha
+     acabava a linha da tabela a meio). */
+const emCodigo = (s, { tabela = false } = {}) => {
+  let t = String(s ?? '').replace(/[\p{Cc}\p{Zl}\p{Zp}]+/gu, ' ');
+  if (tabela) t = t.replace(/\|/g, '\\|');
+  const cerca = '`'.repeat((t.match(/`+/g) || []).reduce((m, x) => Math.max(m, x.length), 0) + 1);
+  return `${cerca} ${t} ${cerca}`;
+};
 const MAX_RESUMO = 900 * 1024;   // o GitHub aceita até 1 MiB por passo
 const contas = (lista) => ({
   bloqueia: lista.filter((p) => p.classe === 'bloqueia').length,
@@ -148,17 +165,22 @@ export function resumo(lista, efeitos) {
   else l.push('A publicação segue.');
   if (efeitos.length) {
     l.push('', `**${efeitos.length} viatura(s) mudam no site** por terem dados com problemas (o ficheiro do repositório não muda; corrige-se no backoffice):`, '',
-      ...efeitos.map((e) => `- ${escMd(e.nome)}: **${escMd(e.descricao)}** — ${escMd(e.motivos.join(' '))}`));
+      ...efeitos.map((e) => `- ${emCodigo(e.nome)}: **${emCodigo(e.descricao)}** — ${emCodigo(e.motivos.join(' '))}`));
   }
   l.push('', `Problemas: ${n.bloqueia} que param · ${n.neutraliza} que mudam o site · ${n.avisa} avisos · ${n.lembretes} lembretes.`);
   if (lista.length) {
     l.push('', '| | Onde se corrige | O quê |', '|---|---|---|');
     const nome = (p) => (p.classe === 'bloqueia' ? 'PÁRA' : p.classe === 'neutraliza' ? 'no site' : p.lembrete ? 'lembrete' : 'aviso');
-    for (const p of lista) l.push(`| ${nome(p)} | ${escMd(p.ecra)} | ${escMd(p.mensagem)} |`);
+    for (const p of lista) l.push(`| ${nome(p)} | ${emCodigo(p.ecra, { tabela: true })} | ${emCodigo(p.mensagem, { tabela: true })} |`);
   }
-  let texto = l.join('\n') + '\n';
-  if (new TextEncoder().encode(texto).length > MAX_RESUMO) texto = texto.slice(0, MAX_RESUMO / 2) + '\n\n… (o resto está no relatório desta corrida)\n';
-  return texto;
+  const bytes = (s) => new TextEncoder().encode(s).length;
+  if (bytes(`${l.join('\n')}\n`) <= MAX_RESUMO) return `${l.join('\n')}\n`;
+  /* Grande de mais: corta-se em LINHAS INTEIRAS. Cada valor dos dados abre e
+     fecha o seu código na mesma linha, e um corte a meio de uma linha deixava
+     a cerca aberta — o resto do valor voltava a ler-se como Markdown. */
+  const cabem = []; let n2 = 0;
+  for (const linha of l) { n2 += bytes(`${linha}\n`); if (n2 > MAX_RESUMO / 2) break; cabem.push(linha); }
+  return `${cabem.join('\n')}\n\n… (o resto está no relatório desta corrida)\n`;
 }
 
 export function relatorio(lista, efeitos) {
@@ -218,7 +240,7 @@ function modoNeutralizar(raiz, relatorioEm) {
   if (relatorioEm) writeFileSync(relatorioEm, JSON.stringify(relatorio(lista, efeitos), null, 2) + '\n');
   if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(process.env.GITHUB_STEP_SUMMARY, `\n### A cópia que o gerador lê\n\n${mudou
-      ? `${Object.keys(ficheiros).length} ficheiro(s) de viaturas mudados SÓ nesta cópia (o repositório não muda): ${Object.keys(ficheiros).map((f) => `\`${f}\``).join(', ')}.`
+      ? `${Object.keys(ficheiros).length} ficheiro(s) de viaturas mudados SÓ nesta cópia (o repositório não muda): ${Object.keys(ficheiros).map((f) => emCodigo(f)).join(', ')}.`
       : 'Nada a neutralizar: o gerador lê os ficheiros do repositório tal e qual.'}\n`);
   }
   return 0;
