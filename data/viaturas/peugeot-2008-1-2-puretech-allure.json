@@ -4,7 +4,8 @@
   "versao": "1.2 PureTech Allure",
   "tipo": "carro",
   "carrocaria": "SUV",
-  "preco": 18990,
+  "preco": 18490,
+  "iva_dedutivel": false,
   "publicado": true,
   "estado": "disponivel",
   "fotos": [
