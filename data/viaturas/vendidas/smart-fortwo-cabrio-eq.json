@@ -5,8 +5,9 @@
   "tipo": "carro",
   "carrocaria": "Cabrio",
   "preco": 11749,
+  "iva_dedutivel": false,
   "publicado": true,
-  "estado": "disponivel",
+  "estado": "vendido",
   "fotos": [
     "assets/veiculos/smarteq/IMG_2256.jpg",
     "assets/veiculos/smarteq/IMG_2261.jpg",
