@@ -5,8 +5,9 @@
   "tipo": "carro",
   "carrocaria": "Citadino",
   "preco": 13750,
+  "iva_dedutivel": false,
   "publicado": true,
-  "estado": "disponivel",
+  "estado": "reservado",
   "fotos": [
     "assets/veiculos/renault-clio-blue-dci-85-business-edition/01.webp",
     "assets/veiculos/renault-clio-blue-dci-85-business-edition/02.webp",
