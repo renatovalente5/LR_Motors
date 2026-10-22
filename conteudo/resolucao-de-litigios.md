@@ -5,7 +5,7 @@ descricao: Entidade de resolução alternativa de litígios de consumo competent
 
 # Resolução alternativa de litígios
 
-_Última actualização: 4 de agosto de 2026_
+_Última actualização: 22 de outubro de 2026_
 
 ## Livro de Reclamações
 
@@ -17,14 +17,9 @@ Existe também Livro de Reclamações em formato físico no stand, que pode pedi
 
 ## Entidade de arbitragem competente
 
-Em caso de litígio de consumo, o consumidor pode recorrer ao:
+O stand fica no **concelho de Vila Verde**, e o centro de arbitragem territorialmente competente para esse concelho é o **CIAB — Centro de Informação, Mediação e Arbitragem de Consumo (Tribunal Arbitral de Consumo)**, nos termos da Lei n.º 144/2015. O centro competente pode também ser o do seu domicílio, como se explica a seguir.
 
-**CIAB — Centro de Informação, Mediação e Arbitragem de Consumo (Tribunal Arbitral de Consumo)**
-
-- Sítio: [www.ciab.pt](https://ciab.pt)
-- Área abrangida: distrito de Braga, incluindo o concelho de Vila Verde
-
-O CIAB é a entidade territorialmente competente para os conflitos de consumo relativos à actividade da LR Motors, nos termos da Lei n.º 144/2015.
+{{ral.html}}
 
 Nos litígios de consumo de valor **até 5.000 €**, a arbitragem é **necessária** quando o consumidor opte por submeter o caso ao tribunal arbitral — ou seja, a LR Motors fica vinculada à decisão, por imposição legal e não por adesão voluntária.
 

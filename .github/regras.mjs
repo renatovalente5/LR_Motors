@@ -115,8 +115,19 @@ export const CAMPOS_VIATURA = [
   'marca', 'modelo', 'versao', 'tipo', 'carrocaria', 'preco', 'iva_dedutivel', 'publicado', 'estado',
   'destaque', 'ordem', 'fotos', 'ano', 'mes', 'km', 'combustivel', 'caixa', 'potencia', 'cilindrada',
   'cor', 'lugares', 'portas', 'origem', 'matricula', 'ano_construcao', 'registos_anteriores',
-  'garantia', 'equipamento', 'descricao',
+  'garantia', 'garantia_legal', 'garantia_fabrica', 'equipamento', 'descricao',
 ];
+/* A GARANTIA LEGAL É UMA ESCOLHA ENTRE DUAS FRASES (auditoria legal de out 2026,
+   grupo 1): o que o anúncio diz vincula o stand (DL 84/2021, art. 43.º), e o
+   campo livre «garantia» trazia «3 anos», «36 meses» e «18 meses incluída no
+   preço» ao mesmo tempo. Quando está escolhida, o site mostra esta frase em vez
+   do texto livre (que fica como o dono o escreveu). A garantia do fabricante é
+   outra coisa — acresce à legal — e tem campo próprio: o mês e o ano em que acaba. */
+export const GARANTIAS_LEGAIS = [
+  'Garantia legal de conformidade de 3 anos (DL 84/2021)',
+  'Garantia legal de conformidade reduzida a 18 meses, por acordo escrito (DL 84/2021)',
+];
+export const RE_GARANTIA_FABRICA = /^(0[1-9]|1[0-2])\/(20[0-9]{2})$/;
 /* Sempre escritos pelo painel, com o valor explícito. Ausentes valem o valor por
    omissão do .pages.yml (é o que o gerador faz). */
 export const BOOLEANOS_VIATURA = ['iva_dedutivel', 'publicado', 'destaque'];
@@ -129,7 +140,8 @@ export const NOMES_CAMPOS = {
   km: 'Quilómetros', combustivel: 'Combustível', caixa: 'Caixa', potencia: 'Potência (cv)',
   cilindrada: 'Cilindrada (cm³)', cor: 'Cor', lugares: 'Lugares', portas: 'Portas', origem: 'Origem',
   matricula: 'Matrícula', ano_construcao: 'Ano de construção', registos_anteriores: 'Donos anteriores',
-  garantia: 'Garantia', equipamento: 'Equipamento', descricao: 'Descrição',
+  garantia: 'Garantia', garantia_legal: 'Garantia legal', garantia_fabrica: 'Garantia de fábrica (até mm/aaaa)',
+  equipamento: 'Equipamento', descricao: 'Descrição',
 };
 
 /* As secções do data/definicoes.json, com o nome do ecrã (os rótulos do
@@ -161,7 +173,7 @@ export const LIMITES = {
 /* Tamanhos máximos dos textos, em caracteres. Folgados: o maior de hoje é a
    descrição do Mercedes E 300 de, com 1428. */
 export const TAMANHOS = {
-  marca: 40, modelo: 60, versao: 120, cor: 40, garantia: 60, matricula: 15,
+  marca: 40, modelo: 60, versao: 120, cor: 40, garantia: 60, garantiaFabrica: 7, matricula: 15,
   equipamento: 120, equipamentoItens: 60, descricao: 6000, fotos: 50, caminhoFoto: 300,
   telefoneTexto: 20, email: 160, url: 500,
   morada: 120, localidade: 60, distrito: 40, pais: 40,
@@ -666,8 +678,16 @@ export function problemasDaViatura(v, ctx = {}) {
   texto('versao', TAMANHOS.versao);
   texto('cor', TAMANHOS.cor);
   texto('garantia', TAMANHOS.garantia);
+  texto('garantia_fabrica', TAMANHOS.garantiaFabrica);
   texto('matricula', TAMANHOS.matricula);
   texto('descricao', TAMANHOS.descricao, { linha: false });
+  /* Os dois campos fechados da garantia (GARANTIAS_LEGAIS): uma frase fora da
+     lista não se publica como garantia, e o fim da garantia de fábrica é um mês
+     e um ano — «até 03/2027» — e não um texto qualquer. */
+  deLista('garantia_legal', GARANTIAS_LEGAIS, false, 'A garantia legal tem de ser uma das duas da lista: 3 anos (a garantia legal), ou reduzida a 18 meses por acordo escrito (ou nenhuma).');
+  if (temTexto(v.garantia_fabrica) && !RE_GARANTIA_FABRICA.test(v.garantia_fabrica.trim())) {
+    avisa('garantia_fabrica:formato', 'garantia_fabrica', 'A garantia de fábrica é o mês e o ano em que acaba, assim: 03/2027 (vazio se já não tem).');
+  }
   if (temTexto(v.matricula) && !(RE_MATRICULA.test(v.matricula.trim()) && /[0-9]/.test(v.matricula) && v.matricula.trim().length >= 4)) {
     avisa('matricula:formato', 'matricula', 'A matrícula escreve-se como no livrete, só letras, algarismos e hífens (ex.: AA-00-BB).');
   }
@@ -700,7 +720,10 @@ export function problemasDaViatura(v, ctx = {}) {
     }
     if (vazio(v.km)) lembra('sem-km', 'km', 'Faltam os quilómetros: aparecem no cartão e na ficha da viatura.');
     if (!lista.some((c) => typeof c === 'string' && c.trim() !== '')) lembra('sem-fotos', 'fotos', 'O anúncio não tem fotografias escolhidas. A primeira é a capa e a imagem das partilhas no WhatsApp.');
-    const meses = mesesDeGarantia(v.garantia);
+    /* O texto livre só conta no site enquanto a garantia legal (o campo
+       fechado) não está escolhida: escolhida, é ela que se mostra, e lembrar o
+       texto livre era ruído — e, com «3 anos» escolhido, contraditório. */
+    const meses = temTexto(v.garantia_legal) ? null : mesesDeGarantia(v.garantia);
     if (meses !== null && meses < GARANTIA_MINIMA_USADOS) {
       lembra('garantia-curta', 'garantia', `A garantia anunciada («${v.garantia.trim()}») é menor do que ${GARANTIA_MINIMA_USADOS} meses: num usado, a lei só deixa reduzir a garantia até ${GARANTIA_MINIMA_USADOS} meses, e por acordo escrito com o comprador (DL 84/2021, art. 12.º).`);
     }

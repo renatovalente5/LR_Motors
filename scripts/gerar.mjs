@@ -24,12 +24,26 @@ import { fileURLToPath } from 'node:url';
    o site diz ao Google do horário, a nota do custo da chamada de cada telefone,
    e o que é um email ou um endereço que se possa pôr num link. Um sítio só —
    o que as regras dizem que não se percebe é exactamente o que aqui fica de fora. */
-import { lerHorario, notaDaChamada, emailValido, urlHttps } from '../.github/regras.mjs';
+import { lerHorario, notaDaChamada, emailValido, urlHttps, GARANTIAS_LEGAIS, RE_GARANTIA_FABRICA } from '../.github/regras.mjs';
 /* O que este script escreve na consola do CI leva dados (marcas, estados,
    caminhos de fotografias, nomes de ficheiros), e o runner lê comandos no que
    lá se escreve: cada aviso com dados passa pelo umaLinha() — ver
    .github/consola.mjs. */
 import { umaLinha } from '../.github/consola.mjs';
+/* AS PEÇAS LEGAIS COMUNS AOS SITES DO RENATO (legal-comum, instalada em
+   ./legal-comum pelo instalar.mjs da biblioteca — não se edita aqui): o botão
+   do Livro de Reclamações, os centros de arbitragem, a nota do custo da
+   chamada, as frases da garantia, os destinatários da privacidade e as guardas
+   que só avisam. Vieram com o grupo 1 da auditoria legal de out 2026. */
+import {
+  VERSAO as VERSAO_LEGAL, livroReclamacoes, livroCss, ralHtml, telefoneHtml,
+  GARANTIA_BENS, GARANTIA_USADOS_18, procurarFrasesProibidas,
+  destinatariosHtml, frasesPrivacidade, verificarIdentificacao, verificarProduto,
+} from '../legal-comum/index.mjs';
+
+/* Cada peça da biblioteca sai entre marcadores, como o CLI dela faz: é por eles
+   que o verificar-versoes.mjs vê que versão está no ar. */
+const legal = (peca, html) => `<!-- legal-comum:${peca} v${VERSAO_LEGAL} -->${html}<!-- /legal-comum:${peca} -->`;
 
 const RAIZ = dirname(dirname(fileURLToPath(import.meta.url)));
 const SAIDA = join(RAIZ, '_site');
@@ -216,7 +230,7 @@ const TELEFONES = [1, 2].flatMap((n) => {
     console.error('preenchido: o site escreve junto de cada número o custo da chamada para a rede dele, e assim não sabe qual é.\n');
     process.exit(1);
   }
-  return [{ texto: texto.trim(), internacional: `+351${numero.trim()}`, href: `tel:+351${numero.trim()}`, nota }];
+  return [{ numero: numero.trim(), texto: texto.trim(), internacional: `+351${numero.trim()}`, href: `tel:+351${numero.trim()}`, nota }];
 });
 const TELEFONE_1 = TELEFONES[0];
 /* Agrupados pela rede, pela ordem em que estão: dois do mesmo tipo partilham a
@@ -286,6 +300,28 @@ const nEuro = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' €';
    o DL 138/90 exige a quem anuncia preços. */
 const temPreco = (v) => typeof v.preco === 'number' && v.preco > 0;
 const precoTexto = (v) => temPreco(v) ? nEuro(v.preco) : 'Sob consulta';
+
+/* A GARANTIA DE UMA VIATURA, como o site a diz (auditoria legal de out 2026).
+   ---------------------------------------------------------------------------
+   Três campos no painel. O «garantia» é texto livre e é do dono — trazia «3
+   anos», «36 meses» e «18 meses» ao mesmo tempo que a descrição dizia «Garantia
+   de 18 meses incluída no preço!». Agora há dois campos fechados: a garantia
+   LEGAL (uma de duas frases, GARANTIAS_LEGAIS) e a garantia de FÁBRICA (o mês e
+   o ano em que acaba). Quando a legal está escolhida, é ela que o site mostra
+   — no selo e na nota do painel —, e o texto livre fica de lado; sem ela, o
+   site mostra o texto livre como sempre mostrou. Os valores existentes não se
+   tocam: são do cliente, e a escolha certa é dele, viatura a viatura. */
+const SELO_GARANTIA_LEGAL = { [GARANTIAS_LEGAIS[0]]: 'Garantia legal de 3 anos', [GARANTIAS_LEGAIS[1]]: 'Garantia de 18 meses, por acordo' };
+function garantiaDe(v) {
+  const legal = GARANTIAS_LEGAIS.includes(String(v.garantia_legal ?? '').trim()) ? String(v.garantia_legal).trim() : '';
+  const fabrica = RE_GARANTIA_FABRICA.test(String(v.garantia_fabrica ?? '').trim()) ? String(v.garantia_fabrica).trim() : '';
+  const g = String(v.garantia || '').trim();
+  const livre = !g ? '' : /^\d+$/.test(g) ? `Garantia ${g} meses` : (/garantia/i.test(g) ? g : `Garantia ${g}`);
+  const selo = legal ? SELO_GARANTIA_LEGAL[legal] : livre;
+  const nota = [legal || livre || 'Garantia legal de conformidade nos termos do DL 84/2021.', fabrica ? `Garantia de fábrica até ${fabrica}.` : '']
+    .filter(Boolean).map((t) => (/[.!?]$/.test(t) ? t : `${t}.`)).join(' ');
+  return { legal, fabrica, livre, selo, nota };
+}
 
 /* Só um número dá quilómetros: um texto num commit à mão saía «NaN km». */
 const nKm = (n) => (typeof n === 'number' && Number.isFinite(n) ? new Intl.NumberFormat('pt-PT').format(n) + ' km' : null);
@@ -754,6 +790,18 @@ function cabecalho(pag) {
 </div>`;
 }
 
+/* O Livro de Reclamações, da biblioteca legal-comum, na variante DISCRETA (a
+   que o Renato escolheu, 22 out 2026): o ícone pequeno de livro e o texto, com
+   a letra, o tamanho e a cor das outras ligações legais do rodapé — sem caixa,
+   sem fundo — e na mesma linha delas. Nunca mais pequeno nem mais apagado do
+   que as vizinhas. O ícone é o genérico da biblioteca; se a DGC publicar o
+   oficial, muda-se lá. */
+const LIVRO_RODAPE = legal('livro', livroReclamacoes());
+const LIVRO_PAGINA = legal('livro', livroReclamacoes());
+/* O CSS da biblioteca (.lr-discreto e o texto só para leitores de ecrã). Vai
+   inline na cabeça de cada página: é pequeno e não depende da cache da folha. */
+const CSS_LIVRO = livroCss();
+
 function rodape() {
   const e = def.empresa;
   const rede = (href, svg, nome) => href
@@ -827,7 +875,11 @@ function rodape() {
         <li><a href="${u('privacidade/')}">Política de privacidade</a></li>
         <li><a href="${u('termos/')}">Termos e condições</a></li>
         <li><a href="${u('garantia/')}">Garantia</a></li>
-        <li><a href="https://www.livroreclamacoes.pt/inicio" target="_blank" rel="noopener">Livro de Reclamações</a></li>
+        <!-- O Livro de Reclamações (legal-comum, variante discreta): a lei pede-o
+             «em local visível e de forma destacada» na página de entrada (DL
+             156/2005, art. 5.º-B) — o ícone do livro marca-o entre as ligações
+             legais, com a mesma letra e a mesma cor delas, e nada o tapa. -->
+        <li>${LIVRO_RODAPE}</li>
         <li><a href="${u('resolucao-de-litigios/')}">Resolução de litígios</a></li>
         <!-- A barra só aparece uma vez. Sem isto, quem recusasse o mapa não tinha
              por onde voltar atrás, e a política de privacidade promete que se pode
@@ -887,6 +939,7 @@ function pagina({ pag = '', titulo: t, descricao, corpo, jsonld = [], og, classe
 <link rel="icon" href="${u('assets/img/favicon.svg')}" type="image/svg+xml">
 <link rel="apple-touch-icon" href="${u('assets/img/apple-touch-icon.png')}">
 <link rel="stylesheet" href="${versao('assets/css/estilo.css')}">
+<style>${CSS_LIVRO}</style>
 ${jsonld.map((j) => `<script type="application/ld+json">${jsonNoScript(j)}</script>`).join('\n')}
 </head>
 <body class="${classe}">
@@ -912,16 +965,22 @@ ${rodape()}
 
      Ficaram dois botões e nada mais. Quem quiser mudar de ideias carrega em
      «Preferências» no rodapé, que faz reaparecer esta mesma barra — em vez de
-     abrir um segundo sítio, com outro desenho, para dizer a mesma coisa. -->
+     abrir um segundo sítio, com outro desenho, para dizer a mesma coisa.
+
+     O TEXTO DIZ A VERDADE (auditoria legal de out 2026): dizia «Utilizamos
+     cookies… para melhorar a sua experiência», e o site não instala cookie
+     nenhum — o que se autoriza aqui é só o mapa do Google. E os dois botões
+     são iguais: um «Aceitar» a azul cheio ao lado de um «Recusar» a branco é um
+     consentimento desequilibrado (Lei 41/2004, art. 5.º; RGPD, art. 7.º). -->
 <div class="cc-barra" id="cc-barra" role="dialog" aria-labelledby="cc-t" aria-describedby="cc-d" hidden>
   <div class="cc-barra__corpo">
     <div class="cc-barra__texto">
-      <p class="cc-barra__titulo" id="cc-t">Utilizamos cookies</p>
-      <p class="cc-barra__desc" id="cc-d">Usamos cookies para melhorar a sua experiência.</p>
+      <p class="cc-barra__titulo" id="cc-t">Não usamos cookies</p>
+      <p class="cc-barra__desc" id="cc-d">Só o mapa do Google precisa da sua autorização, e só carrega se a der. Pode mudar de ideias em «Preferências», no fim de cada página.</p>
     </div>
     <div class="cc-barra__acoes">
-      <button class="cc-btn cc-btn--principal" type="button" id="cc-aceitar">Aceitar</button>
       <button class="cc-btn" type="button" id="cc-recusar">Recusar</button>
+      <button class="cc-btn" type="button" id="cc-aceitar">Aceitar</button>
     </div>
   </div>
 </div>
@@ -1143,9 +1202,7 @@ function vitrine(lista) {
     const f = fotos(v)[0];
     const nf = fotos(v).length;
 
-    const g = String(v.garantia || '').trim();
-    const garantia = !g ? '' : /^\d+$/.test(g) ? `Garantia ${g} meses`
-      : (/garantia/i.test(g) ? g : `Garantia ${g}`);
+    const garantia = garantiaDe(v).selo;
 
     const selos = [];
     const est = estadoDe(v);
@@ -1413,6 +1470,9 @@ ${vitrine(lista)}
           <a class="btn btn--contorno" href="${esc(COMO_CHEGAR)}"
              target="_blank" rel="noopener">${ic.pin} Como chegar</a>
         </div>
+        <!-- A nota do custo da chamada junto do botão que liga, como nos
+             Contactos (DL 59/2021, art. 3.º). -->
+        <p class="nota-chamada">(${esc(TELEFONE_1.nota)})</p>
       </div>
       <div class="visita__mapa">${mapa()}</div>
     </div>
@@ -1445,21 +1505,24 @@ ${vitrine(lista)}
 function mapa() {
   const q = encodeURIComponent(MORADA_NUMA_LINHA);
   return `<div class="mapa" id="mapa" data-mapa="https://www.google.com/maps?q=${q}&output=embed">
-    <!-- O texto diz agora que isto é o mapa E porque é que aparece. Motivo: com
-         o aviso de cookies a falar só de cookies, quem carrega em «Apenas
-         necessários» dá a escolha por feita e depois estranha o mapa a pedir
-         outra vez. O mapa é de terceiros, portanto «apenas necessários» tem
-         mesmo de o deixar de fora — o que faltava era dizê-lo aqui. -->
+    <!-- O texto diz que isto é o mapa E porque é que aparece: o mapa é de
+         terceiros, portanto quem recusou no aviso tem de o ver por carregar —
+         o que faltava era dizê-lo aqui. (Falava num botão «Apenas necessários»
+         que o aviso nunca teve; os botões são «Recusar» e «Aceitar».) -->
     <div class="mapa__consentimento" id="mapa-consentimento">
       ${ic.pin}
       <p><b>Mapa do Google</b><br>
          Fica por carregar até o autorizar, porque vem dos servidores do Google e pode
-         instalar cookies. Se escolheu «Apenas necessários» no aviso de cookies, é por isso.</p>
+         instalar cookies. Se escolheu «Recusar» no aviso, é por isso.</p>
       <div style="display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center">
         <button class="btn btn--principal" type="button" id="btn-mapa">Carregar o mapa</button>
         <a class="btn btn--contorno" href="${esc(LINK_DO_MAPA)}" target="_blank" rel="noopener">Abrir no Google Maps</a>
       </div>
     </div>
+    <!-- Retirar a autorização tem de ser tão fácil como dá-la (RGPD, art. 7.º,
+         n.º 3): este botão só aparece com o mapa carregado, tira o iframe na
+         hora e guarda «não» — o mesmo que «Recusar» no aviso. -->
+    <button class="mapa__retirar" type="button" id="btn-mapa-retirar" hidden>Deixar de carregar o mapa</button>
   </div>`;
 }
 
@@ -1610,6 +1673,10 @@ function paginaViatura(v) {
     ['Ano de construção', v.ano_construcao],
     ['Proprietários anteriores', v.registos_anteriores],
     ['Cilindrada', v.cilindrada ? v.cilindrada + ' cm³' : null],
+    /* A garantia legal e a de fábrica, dos campos fechados (garantiaDe): o
+       DL 74/93 pede as duas no anúncio de um usado. Só quando estão preenchidas. */
+    ['Garantia', garantiaDe(v).legal || null],
+    ['Garantia de fábrica', garantiaDe(v).fabrica ? `Até ${garantiaDe(v).fabrica}` : null],
   ].filter(([, val]) => val !== null && val !== undefined && val !== '');
 
   const galeria = fs_.length ? `
@@ -1658,9 +1725,7 @@ function paginaViatura(v) {
 
   /* Etiquetas do cabeçalho — as mesmas do carrossel da inicial, para a viatura
      se ler igual onde quer que apareça. */
-  const g = String(v.garantia || '').trim();
-  const garantiaTxt = !g ? '' : /^\d+$/.test(g) ? `Garantia ${g} meses`
-    : (/garantia/i.test(g) ? g : `Garantia ${g}`);
+  const garantiaTxt = garantiaDe(v).selo;
   const selosFicha = [];
   if (estadoDe(v) !== 'disponivel') {
     selosFicha.push(`<span class="vit-selo vit-selo--${estadoDe(v)}">${ESTADOS[estadoDe(v)].rotulo}</span>`);
@@ -1716,7 +1781,7 @@ function paginaViatura(v) {
           <!-- Sem «Ref.»: o que lá estava era o slug do endereço, um
                identificador técnico que eu tinha posto a fazer de referência.
                Não é referência nenhuma do stand e não dizia nada a ninguém. -->
-          <p class="painel__nota">${esc(garantiaTxt || 'Garantia legal de conformidade nos termos do DL 84/2021.')}</p>
+          <p class="painel__nota">${esc(garantiaDe(v).nota)}</p>
         </div>
       </aside>
       <div class="ficha__corpo">
@@ -1777,6 +1842,10 @@ function paginaViatura(v) {
 <div class="barra-contacto">
   <a class="btn btn--principal" href="${esc(TELEFONE_1.href)}">${ic.tel} Ligar</a>
   <a class="btn btn--zap" href="${esc(waMe())}" rel="noopener">${ic.zap} WhatsApp</a>
+  <!-- O botão «Ligar» não mostra o número, e a nota do custo da chamada tem de
+       estar junto de cada botão que liga (DL 59/2021, art. 3.º): o número com a
+       nota, pela biblioteca legal-comum, numa linha por baixo dos dois botões. -->
+  ${legal('telefone', telefoneHtml(TELEFONE_1.numero, { comIndicativo: false, frase: 'com-a', classe: 'barra-contacto__numero', classeNota: 'nota-chamada' }))}
 </div>`;
 
   /* Product + Offer: é o tipo que ainda produz resultado enriquecido no Google.
@@ -1868,6 +1937,12 @@ function paginaContactos() {
              target="_blank" rel="noopener">${ic.pin} Como chegar</a>
         </div>
         <p class="nota-chamada">(${esc(TELEFONE_1.nota)})</p>
+        <!-- O Livro de Reclamações também na página de apoio ao cliente, como o
+             manual da DGC pede (e a ligação para a resolução de litígios). -->
+        <div class="visita__livro">
+          <p>Se algo correr mal e não chegarmos a acordo, pode reclamar no Livro de Reclamações electrónico ou recorrer à <a href="${u('resolucao-de-litigios/')}">resolução alternativa de litígios</a>.</p>
+          ${LIVRO_PAGINA}
+        </div>
       </div>
       <div class="visita__mapa">${mapa()}</div>
     </div>
@@ -2253,6 +2328,8 @@ ${urls.map((p) => `  <url><loc>${esc(abs(p))}</loc><lastmod>${hoje}</lastmod></u
   }));
   writeFileSync(join(SAIDA, '.nojekyll'), '');
 
+  avisosLegais();
+
   console.log(`gerado em _site/`);
   console.log(`  ${publicadas.length} viaturas publicadas (${todas.length - publicadas.length} em rascunho)`);
   console.log(`  ${urls.length} páginas no sitemap`);
@@ -2263,6 +2340,48 @@ ${urls.map((p) => `  <url><loc>${esc(abs(p))}</loc><lastmod>${hoje}</lastmod></u
       .replace('ficou', n === 1 ? 'ficou' : 'ficaram'));
     for (const f of naoPublicados) console.log(umaLinha(`    - ${f}`));
   }
+}
+
+/* AS GUARDAS DA BIBLIOTECA, EM MODO AVISAR (grupo 1 da auditoria de out 2026;
+   decisão do grupo 4: nos sites já no ar avisa-se, não se bloqueia).
+   ---------------------------------------------------------------------------
+   · a identificação do vendedor (DL 7/2004, art. 10.º; CSC, art. 171.º): o que
+     falta — hoje o email e a conservatória — sai no registo da publicação, para
+     o Renato o pedir ao cliente; nada pára;
+   · cada viatura à venda passa pelo verificarProduto da biblioteca, e só a
+     parte do preço conta aqui (fabricante e referência são das lojas, não de um
+     stand): um «Sob consulta» é «não vendável: sem preço» (DL 138/90). A
+     viatura NÃO se esconde: fica no site como está, e o aviso fica no registo;
+   · as descrições passam pelo procurarFrasesProibidas: «garantia incluída no
+     preço», «dados carecem de confirmação» e as outras frases que vendem um
+     direito legal como vantagem ou tentam afastar a conformidade (DL 57/2008,
+     art. 8.º; DL 84/2021). Avisa-se por viatura; o texto é do dono e não se
+     apaga daqui — tirar as frases é do grupo 2, com o cliente avisado. */
+function avisosLegais() {
+  const avisos = [];
+  const formaJuridica = /unipessoal/i.test(def.empresa.forma_juridica || '') ? 'unipessoal'
+    : /quotas|lda/i.test(def.empresa.forma_juridica || '') ? 'lda'
+      : /an[óo]nima|\bs\.?a\.?\b/i.test(def.empresa.forma_juridica || '') ? 'sa' : undefined;
+  const ident = verificarIdentificacao({
+    nome: def.empresa.denominacao_social,
+    formaJuridica,
+    nif: def.empresa.nif,
+    morada: MORADA_NUMA_LINHA,
+    email: EMAIL,
+    telefone: TELEFONE_1.numero,
+    sociedade: { sede: enderecoDe(SEDE), conservatoria: def.empresa.conservatoria, matricula: def.empresa.nif, capital: def.empresa.capital_social },
+  }, { modo: 'avisar', ecra: 'Dados do stand › Dados legais da empresa' });
+  for (const p of ident.problemas) avisos.push(`identificação (${p.campo}): ${p.mensagem}`);
+
+  for (const v of aVenda) {
+    const produto = verificarProduto({ nome: tituloLongo(v), aVenda: true, preco: v.preco }, { modo: 'avisar' });
+    for (const p of produto.problemas.filter((x) => x.campo === 'preco')) avisos.push(`viaturas/${v.slug}: ${p.mensagem}`);
+    for (const f of procurarFrasesProibidas(v.descricao)) avisos.push(`viaturas/${v.slug} (descrição): «${f.frase}» — ${f.contexto}`);
+  }
+
+  if (!avisos.length) return;
+  console.warn(`\n  ${avisos.length} aviso${avisos.length === 1 ? '' : 's'} da biblioteca legal (legal-comum, só avisa — nada ficou de fora):`);
+  for (const a of avisos) console.warn(umaLinha(`    !! ${a}`));
 }
 
 /* ------------------------------------------- os dados nas páginas legais */
@@ -2296,7 +2415,44 @@ const enderecoDe = (m) => [m.morada, [m.codigo_postal, m.localidade].filter(temT
 const SEDE_A_PARTE = ['morada', 'codigo_postal', 'localidade'].some((k) => temTexto(sedeSocial[k]))
   && enderecoDe(sedeSocial) !== enderecoDe(def.stand);
 const SEDE = SEDE_A_PARTE ? sedeSocial : def.stand;
-/* nome → [valor, o campo do backoffice quando é obrigatório] */
+/* O FORNECEDOR DA CAIXA DE EMAIL, para a tabela dos destinatários da política
+   de privacidade: só quando há email, e pelo domínio dele (um @gmail.com é a
+   Google, um @outlook.pt é a Microsoft, um @sapo.pt o SAPO). Outro domínio —
+   o próprio, por exemplo — fica «por indicar», e a tabela diz «Por confirmar». */
+function fornecedorDeEmail(email) {
+  const dominio = String(email || '').split('@')[1]?.toLowerCase() ?? '';
+  if (!dominio) return {};
+  if (/^(gmail|googlemail)\.com$/.test(dominio)) return { email: 'google' };
+  if (/^(outlook|hotmail|live|msn)\.(com|pt)$/.test(dominio)) return { email: 'microsoft' };
+  if (/^(sapo|mail\.telepac|netcabo|meo)\.pt$/.test(dominio)) return { email: 'sapo' };
+  return { email: 'outro', emailNome: `Fornecedor da caixa de correio de @${dominio}` };
+}
+/* A configuração do site para a privacidade (destinatariosHtml, da biblioteca):
+   os terceiros que recebem MESMO dados — o GitHub (alojamento), o Google (o
+   mapa, só depois do clique), a Meta (o WhatsApp, e as páginas de Instagram e
+   Facebook em co-responsabilidade) e a caixa de email, quando existir. Nada de
+   analytics, pagamentos nem envio de emails: o site não os tem. */
+const PRIVACIDADE = {
+  alojamento: 'github-pages',
+  mapas: 'google',
+  whatsapp: WHATSAPP !== '',
+  instagram: REDES.instagram !== '',
+  facebookPage: REDES.facebook !== '',
+  repositorioPublico: true,
+  ...fornecedorDeEmail(EMAIL),
+};
+
+/* O CONCELHO DO STAND, para o centro de arbitragem (ralHtml): escrito aqui, e
+   não lido da morada, porque a localidade da morada pode ser a freguesia
+   («Prado», que é de Vila Verde) e a biblioteca lança erro num concelho que não
+   conhece, em vez de adivinhar. A página de litígios diz o mesmo concelho. Se o
+   stand mudar de concelho, muda-se aqui e no conteudo/resolucao-de-litigios.md. */
+const CONCELHO_DO_STAND = 'Vila Verde';
+
+/* nome → [valor, o campo do backoffice quando é obrigatório, { html }]
+   `html: true` é para as peças da biblioteca que já vêm em HTML (a tabela dos
+   destinatários, o bloco dos centros de arbitragem): entram tal e qual, fora de
+   um <p>, em vez de escapadas como um dado do stand. */
 const MARCADORES = new Map(Object.entries({
   'empresa.denominacao_social': [def.empresa.denominacao_social, 'Dados legais da empresa › Denominação social'],
   'empresa.nome_comercial': [def.empresa.nome_comercial],
@@ -2314,7 +2470,20 @@ const MARCADORES = new Map(Object.entries({
   'telefone_1.texto': [TELEFONE_1.texto],
   'telefone_1.nota': [TELEFONE_1.nota],
   'contactos.email': [EMAIL],
-}).map(([nome, [valor, obrigatorio]]) => [nome, { valor: valor === undefined || valor === null ? '' : String(valor).trim(), obrigatorio }]));
+  /* «, por email para x@y» quando há email; sem ele, nada (a frase fecha-se
+     com «ou presencialmente no stand»). */
+  'contactos.email_frase': [EMAIL ? `, por email para ${EMAIL}` : ''],
+  /* As peças da biblioteca legal-comum nas páginas legais (grupo 1 da
+     auditoria de out 2026): as frases da garantia como a lei as diz, os centros
+     de arbitragem do concelho do stand (Vila Verde → CIAB, mais o CNIACC
+     supletivo, com a frase do domicílio do consumidor), e a tabela de quem
+     recebe mesmo dados, com a base de cada transferência. */
+  'garantia.bens': [GARANTIA_BENS],
+  'garantia.usados_18': [GARANTIA_USADOS_18],
+  'ral.html': [legal('ral', ralHtml({ ambito: 'local', concelhos: [CONCELHO_DO_STAND] })), undefined, { html: true }],
+  'privacidade.destinatarios': [legal('privacidade', destinatariosHtml(PRIVACIDADE)), undefined, { html: true }],
+  'privacidade.frases': [frasesPrivacidade(PRIVACIDADE).join(' ')],
+}).map(([nome, [valor, obrigatorio, extra = {}]]) => [nome, { valor: valor === undefined || valor === null ? '' : String(valor).trim(), obrigatorio, html: extra.html === true }]));
 const RE_MARCADOR = /\{\{\s*([^{}\s]+)\s*\}\}/g;
 function semMarcadoresPartidos(md, ficheiro) {
   const parar = (porque) => {
@@ -2333,8 +2502,15 @@ function semMarcadoresPartidos(md, ficheiro) {
 }
 /* Depois do markdown: o valor escapado, por função (um «$» num dado não é um
    padrão de substituição) e numa passagem só (um valor com «{{…}}» lá dentro
-   não se volta a ler). */
-const preencherMarcadores = (html) => html.replace(RE_MARCADOR, (_, nome) => esc(MARCADORES.get(nome).valor));
+   não se volta a ler). Um marcador de HTML (as peças da biblioteca) entra sem
+   escapar, e sai de dentro do <p> em que o markdown o embrulhou: uma tabela
+   dentro de um parágrafo não é HTML válido. */
+const RE_MARCADOR_EM_P = /<p>(\{\{\s*([^{}\s]+)\s*\}\})<\/p>/g;
+const preencherMarcadores = (html) => html
+  /* Um parágrafo que é só um marcador: sai o <p> se o valor é HTML, e sai o
+     parágrafo inteiro se o valor está vazio (não fica um <p></p> na página). */
+  .replace(RE_MARCADOR_EM_P, (tudo, marcador, nome) => (!MARCADORES.get(nome)?.valor ? '' : MARCADORES.get(nome).html ? marcador : tudo))
+  .replace(RE_MARCADOR, (_, nome) => (MARCADORES.get(nome).html ? MARCADORES.get(nome).valor : esc(MARCADORES.get(nome).valor)));
 /* Lidas e conferidas antes de main() apagar o _site: um marcador partido pára
    a construção sem ter escrito nada. */
 const PAGINAS_LEGAIS = Object.entries({

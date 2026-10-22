@@ -790,6 +790,22 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
    de um tamanho explícito. */
 .mapa__consentimento svg { width: 44px; height: 44px; color: var(--azul); }
 .mapa__consentimento p { color: var(--tinta-2); font-size: .92rem; max-width: 42ch; margin-bottom: 1rem; }
+/* «Deixar de carregar o mapa»: por cima do mapa carregado, no canto de baixo,
+   para retirar a autorização ser tão fácil como dá-la. Escondido (hidden)
+   enquanto não há mapa. */
+.mapa__retirar {
+  position: absolute; left: .75rem; bottom: .75rem; z-index: 2;
+  min-height: 44px; padding: .5rem .9rem; border-radius: 999px; cursor: pointer;
+  border: 1px solid var(--borda-forte); background: var(--carta); color: var(--tinta);
+  font: inherit; font-size: .84rem; font-weight: 700; box-shadow: 0 6px 18px -10px rgba(14,23,38,.5);
+}
+.mapa__retirar:hover { border-color: var(--azul); color: var(--azul); }
+.mapa__retirar:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
+/* O Livro de Reclamações nos Contactos: um parágrafo curto e o botão (legal-comum). */
+.visita__livro { margin-top: 1.6rem; padding-top: 1.2rem; border-top: 1px solid var(--borda); }
+.visita__livro p { color: var(--tinta-2); font-size: .92rem; max-width: 52ch; margin-bottom: .8rem; }
+.visita__livro a:not(.lr-discreto) { color: var(--azul); text-decoration: underline; }
+.visita__livro .lr-discreto { color: var(--tinta); font-weight: 600; }
 
 /* ------------------------------------------------ peças das páginas soltas */
 /* O `lead` das páginas tinha a margem escrita num `style=` em cada sítio, com
@@ -940,7 +956,10 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
   display: flex; flex-wrap: wrap; gap: .6rem 1.4rem; align-items: center;
   justify-content: space-between; font-size: .85rem;
 }
-.rodape__links { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; }
+.rodape__links { display: flex; flex-wrap: wrap; gap: .5rem 1.2rem; align-items: center; }
+/* O Livro de Reclamações (legal-comum, .lr-discreto, com o CSS dele inline na
+   cabeça da página) é uma ligação como as vizinhas: o `.rodape a` dá-lhe a
+   mesma cor, e a letra é herdada. Sem regra própria, de propósito. */
 /* A entrada do backoffice fica mais apagada do que os links legais: é para o
    pessoal do stand, e não se quer que um visitante lhe carregue por curiosidade.
    Continua a ter 4,6:1 sobre o rodapé escuro, portanto lê-se — apagado não é
@@ -968,7 +987,16 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
   gap: .5rem;
 }
 .barra-contacto .btn { flex: 1; }
-@media (max-width: 760px) { .barra-contacto { display: flex; } body { padding-bottom: 74px; } }
+/* O número com a nota do custo da chamada, por baixo dos dois botões: o «Ligar»
+   não mostra o número, e a nota tem de estar junto de cada botão que liga
+   (DL 59/2021, art. 3.º). Vem da biblioteca legal-comum (telefoneHtml). */
+.barra-contacto { flex-wrap: wrap; row-gap: .25rem; }
+.barra-contacto__numero {
+  flex: 1 0 100%; text-align: center; font-size: .8rem; line-height: 1.3; color: var(--tinta-2);
+  text-decoration: none;
+}
+.barra-contacto__numero .nota-chamada { font-size: inherit; margin: 0; }
+@media (max-width: 760px) { .barra-contacto { display: flex; } body { padding-bottom: 96px; } }
 
 /* ---------------------------------------------------------- utilitários */
 .cartas { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.2rem; }
@@ -1368,6 +1396,9 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 /* Enquanto o aviso de cookies está em baixo, este sai de cena — dois botões
    flutuantes no mesmo canto é um a tapar o outro. */
 body.cc-visivel .subir { opacity: 0; visibility: hidden; transform: translateY(10px); }
+/* Com a barra aberta, o rodapé acaba mais abaixo: no fim da página, as ligações
+   legais (e o Livro de Reclamações) ficam por cima da barra, não por baixo. */
+body.cc-visivel .rodape { padding-bottom: calc(var(--cc-altura, 0px) + 2.5rem); }
 /* Acima da barra de contacto do telemóvel, como a de cookies. */
 @media (max-width: 760px) { .subir { bottom: 84px; } }
 
@@ -1430,7 +1461,7 @@ body.cc-visivel .subir { opacity: 0; visibility: hidden; transform: translateY(1
    para ela em todas as páginas, por isso subir aqui não abre buraco em lado
    nenhum. */
 @media (max-width: 760px) {
-  .cc-barra { bottom: 84px; }
+  .cc-barra { bottom: 106px; }
 }
 
 /* ---- os botões da consola de cookies */
@@ -1445,8 +1476,9 @@ body.cc-visivel .subir { opacity: 0; visibility: hidden; transform: translateY(1
   transition: background var(--t), border-color var(--t), color var(--t);
 }
 .cc-btn:hover { border-color: var(--azul); color: var(--azul); }
-.cc-btn--principal { background: var(--azul); border-color: var(--azul); color: #fff; }
-.cc-btn--principal:hover { background: var(--azul-fundo); border-color: var(--azul-fundo); color: #fff; }
+/* Já não há um botão «principal»: «Recusar» e «Aceitar» são iguais, de
+   propósito — um consentimento em que recusar custa mais do que aceitar não é
+   livre (auditoria legal de out 2026). */
 
 }
 

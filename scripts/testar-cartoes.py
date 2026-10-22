@@ -60,7 +60,10 @@ def montar(pasta_fotos='carro', fotos=None):
     for f in ('regras.mjs', 'consola.mjs'):
         shutil.copy(RAIZ / '.github' / f, arvore / '.github' / f)
     shutil.copy(RAIZ / 'data/definicoes.json', arvore / 'data/definicoes.json')
-    for pasta in ('conteudo', 'assets/css', 'assets/js', 'assets/img'):
+    # E as peças legais comuns (legal-comum), que o gerador importa de
+    # ./legal-comum: o Livro de Reclamações, os centros de arbitragem, a
+    # privacidade e as guardas que só avisam.
+    for pasta in ('conteudo', 'assets/css', 'assets/js', 'assets/img', 'legal-comum'):
         shutil.copytree(RAIZ / pasta, arvore / pasta, dirs_exist_ok=True)
     for nome, cor in CORES.items():
         Image.new('RGB', (2000, 1500), cor).save(arvore / f'assets/veiculos/{pasta_fotos}/{nome}.jpg')

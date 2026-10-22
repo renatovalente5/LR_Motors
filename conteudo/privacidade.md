@@ -5,13 +5,13 @@ descricao: Como a LR Motors trata os dados pessoais de quem visita o site e nos 
 
 # Política de privacidade
 
-_Última actualização: 4 de agosto de 2026_
+_Última actualização: 22 de outubro de 2026_
 
 ## Quem trata os seus dados
 
 O responsável pelo tratamento é a **{{empresa.denominacao_social}}** ({{empresa.nome_comercial}}), {{empresa.forma_juridica}} com sede na {{sede.morada}}, {{sede.codigo_postal}} {{sede.localidade}}, pessoa colectiva n.º {{empresa.nif}}.
 
-Pode contactar-nos pelo telefone {{telefone_1.texto}} ({{telefone_1.nota}}) ou presencialmente no stand.
+Pode contactar-nos pelo telefone {{telefone_1.texto}} ({{telefone_1.nota}}){{contactos.email_frase}} ou presencialmente no stand.
 
 Não temos encarregado de protecção de dados, por não estarmos abrangidos por essa obrigação.
 
@@ -24,7 +24,7 @@ Recolhemos dados apenas quando é o próprio a contactar-nos:
 - **Se nos telefonar ou escrever por WhatsApp**, ficamos com o seu número e com o conteúdo da conversa. A base legal é a execução de diligências pré-contratuais a seu pedido, nos termos do artigo 6.º, n.º 1, alínea b) do RGPD.
 - **Se comprar uma viatura**, tratamos os dados necessários ao contrato, ao registo de propriedade e às obrigações fiscais e de garantia. A base legal é a execução do contrato e o cumprimento de obrigações legais.
 
-Não fazemos decisões automatizadas nem definição de perfis, e não transferimos dados para fora do Espaço Económico Europeu.
+Não fazemos decisões automatizadas nem definição de perfis. Não transferimos dados para fora do Espaço Económico Europeu por nossa iniciativa; os únicos serviços fora dele que podem receber dados são os da tabela abaixo, e cada transferência tem a base legal lá indicada.
 
 ## Durante quanto tempo
 
@@ -33,6 +33,12 @@ Pedidos de informação que não deram origem a negócio: até 1 ano. Documentos
 ## A quem comunicamos
 
 Só a quem é necessário para o serviço: conservatória do registo automóvel, seguradoras e instituições de crédito quando o cliente pede financiamento, contabilidade e autoridades quando a lei obriga. Não vendemos nem cedemos dados para fins comerciais de terceiros.
+
+Além destes, há os serviços de que o site e os nossos canais dependem, e que por isso recebem dados — o alojamento do site, o mapa (só depois de o autorizar), o WhatsApp e as nossas páginas nas redes sociais. São estes, e só estes:
+
+{{privacidade.destinatarios}}
+
+{{privacidade.frases}}
 
 ## Os seus direitos
 
@@ -44,11 +50,11 @@ Se entender que os seus dados não estão a ser tratados correctamente, pode apr
 
 **Este site não instala cookies.** Não temos análise de tráfego, publicidade, redes sociais embutidas nem tipos de letra de terceiros. Não há nada a autorizar para navegar por aqui.
 
-A única excepção é o **mapa**, que aparece na página inicial e na página de contactos. Como é fornecido pelo Google, só é carregado depois de o autorizar — na barra que aparece na primeira visita ou no botão «Carregar o mapa» que fica no lugar do mapa. Enquanto não o autorizar, nada é pedido ao Google e nenhum cookie é instalado. Se o autorizar, aplicam-se as políticas do Google, que pode consultar em [policies.google.com/privacy](https://policies.google.com/privacy).
+A única excepção é o **mapa**, que aparece na página inicial e na página de contactos. Como é fornecido pelo Google, só é carregado depois de o autorizar — com «Aceitar» no aviso que aparece na primeira visita, ou no botão «Carregar o mapa» que fica no lugar do mapa. Enquanto não o autorizar, nada é pedido ao Google e nenhum cookie é instalado. Se o autorizar, o Google (Google Ireland Ltd.) recebe o seu endereço IP e pode gravar cookies no seu aparelho; aplicam-se as políticas do Google, que pode consultar em [policies.google.com/privacy](https://policies.google.com/privacy).
 
-**O que guardamos no seu navegador.** Se responder à barra, a sua escolha sobre o mapa fica guardada no *armazenamento local* (`localStorage`) do seu navegador, com a chave `lr:mapa` e o valor «sim» ou «não». Não é um cookie — nunca é enviada para nós nem para ninguém, serve só para não lhe voltarmos a perguntar em cada página. Fica no seu equipamento até a apagar, o que pode fazer nas definições do navegador, e é a única coisa que este site escreve no seu lado.
+**O que guardamos no seu navegador.** Se responder ao aviso, a sua escolha sobre o mapa fica guardada no *armazenamento local* (`localStorage`) do seu navegador, com a chave `lr:mapa` e o valor «sim» ou «não». Não é um cookie — nunca é enviada para nós nem para ninguém, serve só para não lhe voltarmos a perguntar em cada página. Fica no seu equipamento até a apagar, o que pode fazer nas definições do navegador, e é a única coisa que este site escreve no seu lado.
 
-Pode mudar de ideias quando quiser, em **«Preferências»**, no fim de qualquer página.
+**Retirar a autorização é tão fácil como dá-la.** Pode mudar de ideias quando quiser: em **«Deixar de carregar o mapa»**, o botão que aparece sobre o mapa depois de carregado, ou em **«Preferências»**, no fim de qualquer página, que volta a mostrar o aviso. Nos dois casos o mapa é retirado na hora e a escolha guardada passa a «não».
 
 ## Alojamento
 

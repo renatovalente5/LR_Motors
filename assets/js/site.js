@@ -622,6 +622,9 @@
       clearTimeout(aEsconder);
       barra.hidden = false;
       document.body.classList.add('cc-visivel');
+      /* A altura da barra, para o rodapé ganhar esse espaço por baixo: no fim
+         da página, a barra não pode tapar o Livro de Reclamações (estilo.css). */
+      document.body.style.setProperty('--cc-altura', barra.offsetHeight + 'px');
       /* O `hidden` sai primeiro e a classe só depois de um reflow: posta no
          mesmo quadro, o browser não vê estado nenhum de onde animar e a barra
          aparece de repente. É a mesma lição do menu de ecrã inteiro. */
@@ -664,6 +667,11 @@
      preferências, depois de o ter aceite, tem de voltar a ver o botão em vez de
      um buraco. Sem isto, desligar não desligava nada até recarregar a página. */
   var avisoMapa = null;
+  /* O botão «Deixar de carregar o mapa» só aparece com o mapa carregado. */
+  function mostrarRetirar(sim) {
+    var b = $('#btn-mapa-retirar');
+    if (b) b.hidden = !sim;
+  }
   function carregarMapa() {
     var caixa = $('#mapa');
     if (!caixa || caixa.querySelector('iframe')) return;
@@ -676,6 +684,7 @@
     var aviso = $('#mapa-consentimento');
     if (aviso) { avisoMapa = aviso; aviso.remove(); }
     caixa.appendChild(f);
+    mostrarRetirar(true);
   }
   function descarregarMapa() {
     var caixa = $('#mapa');
@@ -683,12 +692,22 @@
     var f = caixa.querySelector('iframe');
     if (f) f.remove();
     if (avisoMapa && !$('#mapa-consentimento')) caixa.appendChild(avisoMapa);
+    mostrarRetirar(false);
   }
   (function () {
     var btn = $('#btn-mapa');
     if (btn) btn.addEventListener('click', function () {
       try { localStorage.setItem(CHAVE_MAPA, 'sim'); } catch (e) { }
       carregarMapa();
+    });
+    /* Retirar a autorização: o mesmo que «Recusar» no aviso — guarda «não» e
+       tira o iframe na hora (RGPD, art. 7.º, n.º 3: retirar é tão fácil como dar). */
+    var retirar = $('#btn-mapa-retirar');
+    if (retirar) retirar.addEventListener('click', function () {
+      try { localStorage.setItem(CHAVE_MAPA, 'nao'); } catch (e) { }
+      descarregarMapa();
+      var consentimento = $('#btn-mapa');
+      if (consentimento) consentimento.focus();
     });
     if (mapaAutorizado()) carregarMapa();
   })();

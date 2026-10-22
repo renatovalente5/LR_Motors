@@ -148,7 +148,7 @@ try {
     `o horário do JSON-LD sai dos dados e é, nas ${paginasComDealer.length} páginas com o stand, o que estava escrito à mão (segunda a sexta 9-19, sábado 9-13, o domingo fechado não vai)`);
   certo(lixoEm(hoje).length === 0, `nenhuma das ${hoje.paginas().length} páginas tem «undefined», ligações vazias, separadores soltos ou linhas em branco`, lixoEm(hoje).slice(0, 5).join(' | '));
   const inicio = hoje.ler('index.html');
-  certo(contar(inicio, /\(Chamada para a rede móvel nacional\)/g) === 5 && contar(inicio, /rede fixa/g) === 0, 'a página inicial tem a nota «rede móvel» nos 5 sítios onde há número (cabeçalho, menu, rodapé ×2, «Venha ver ao vivo») e nenhuma «rede fixa»');
+  certo(contar(inicio, /\(Chamada para a rede móvel nacional\)/g) === 6 && contar(inicio, /rede fixa/g) === 0, 'a página inicial tem a nota «rede móvel» nos 6 sítios onde há número ou botão que liga (cabeçalho, menu, rodapé ×2, «Venha ver ao vivo» e o «Ligar agora» dela) e nenhuma «rede fixa»');
   hoje.apagar();
 
   /* ================================================================== */
@@ -192,8 +192,8 @@ try {
     const pag = (p) => g.ler(p);
     const notasDe = (html) => [...html.matchAll(/253 123 456[\s\S]{0,260}?\(Chamada para a rede (fixa|móvel) nacional\)/g)].map((m) => m[1]);
     const inicio = pag('index.html');
-    certo(contar(inicio, /\(Chamada para a rede fixa nacional\)/g) === 4 && contar(inicio, /\(Chamada para a rede móvel nacional\)/g) === 1,
-      'página inicial: 4 notas «rede fixa» (cabeçalho, menu, rodapé, «Venha ver ao vivo») e 1 «rede móvel» (o telemóvel do rodapé)');
+    certo(contar(inicio, /\(Chamada para a rede fixa nacional\)/g) === 5 && contar(inicio, /\(Chamada para a rede móvel nacional\)/g) === 1,
+      'página inicial: 5 notas «rede fixa» (cabeçalho, menu, rodapé, «Venha ver ao vivo» e o «Ligar agora» dela) e 1 «rede móvel» (o telemóvel do rodapé)');
     const topo = inicio.match(/<span class="topo__tel">[\s\S]*?<\/span><\/span>/)[0];
     const menu = inicio.match(/<p class="nota-chamada">[^<]*<\/p>/)[0];
     const rodape = inicio.match(/<h3>Contactos<\/h3>[\s\S]*?<\/ul>/)[0];
