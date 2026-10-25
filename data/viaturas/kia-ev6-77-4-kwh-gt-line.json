@@ -7,7 +7,9 @@
   "estado": "brevemente",
   "destaque": false,
   "ordem": 50,
-  "fotos": [],
+  "fotos": [
+    "assets/veiculos/kia-ev6-77-4-kwh-gt-line/kia-ev6-77-4-kwh-gt-line-d790c069.jpg"
+  ],
   "ano": 2023,
   "mes": "Junho",
   "km": 97000,
