@@ -4,7 +4,7 @@
   "versao": "1.2 Edition",
   "tipo": "carro",
   "carrocaria": "Citadino",
-  "preco": 13500,
+  "preco": 12990,
   "iva_dedutivel": false,
   "publicado": true,
   "estado": "disponivel",
@@ -42,7 +42,7 @@
   "lugares": 5,
   "portas": 5,
   "origem": "Nacional",
-  "garantia": "36 meses",
+  "garantia": "Garantia 18 meses + Preço Especial 🍂Outono🍂",
   "equipamento": [
     "AC manual",
     "Cruise Control",
