@@ -797,7 +797,6 @@ function cabecalho(pag) {
    que as vizinhas. O ícone é o genérico da biblioteca; se a DGC publicar o
    oficial, muda-se lá. */
 const LIVRO_RODAPE = legal('livro', livroReclamacoes());
-const LIVRO_PAGINA = legal('livro', livroReclamacoes());
 /* O CSS da biblioteca (.lr-discreto e o texto só para leitores de ecrã). Vai
    inline na cabeça de cada página: é pequeno e não depende da cache da folha. */
 const CSS_LIVRO = livroCss();
@@ -1937,12 +1936,6 @@ function paginaContactos() {
              target="_blank" rel="noopener">${ic.pin} Como chegar</a>
         </div>
         <p class="nota-chamada">(${esc(TELEFONE_1.nota)})</p>
-        <!-- O Livro de Reclamações também na página de apoio ao cliente, como o
-             manual da DGC pede (e a ligação para a resolução de litígios). -->
-        <div class="visita__livro">
-          <p>Se algo correr mal e não chegarmos a acordo, pode reclamar no Livro de Reclamações electrónico ou recorrer à <a href="${u('resolucao-de-litigios/')}">resolução alternativa de litígios</a>.</p>
-          ${LIVRO_PAGINA}
-        </div>
       </div>
       <div class="visita__mapa">${mapa()}</div>
     </div>

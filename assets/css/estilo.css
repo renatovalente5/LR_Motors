@@ -802,10 +802,6 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 .mapa__retirar:hover { border-color: var(--azul); color: var(--azul); }
 .mapa__retirar:focus-visible { outline: 3px solid var(--azul); outline-offset: 2px; }
 /* O Livro de Reclamações nos Contactos: um parágrafo curto e o botão (legal-comum). */
-.visita__livro { margin-top: 1.6rem; padding-top: 1.2rem; border-top: 1px solid var(--borda); }
-.visita__livro p { color: var(--tinta-2); font-size: .92rem; max-width: 52ch; margin-bottom: .8rem; }
-.visita__livro a:not(.lr-discreto) { color: var(--azul); text-decoration: underline; }
-.visita__livro .lr-discreto { color: var(--tinta); font-weight: 600; }
 
 /* ------------------------------------------------ peças das páginas soltas */
 /* O `lead` das páginas tinha a margem escrita num `style=` em cada sítio, com
