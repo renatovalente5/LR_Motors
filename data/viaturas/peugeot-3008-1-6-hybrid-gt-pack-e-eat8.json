@@ -4,7 +4,8 @@
   "versao": "1.6 Hybrid GT Pack e-EAT8",
   "tipo": "carro",
   "carrocaria": "SUV",
-  "preco": 22490,
+  "preco": 21900,
+  "iva_dedutivel": false,
   "publicado": true,
   "estado": "disponivel",
   "fotos": [
