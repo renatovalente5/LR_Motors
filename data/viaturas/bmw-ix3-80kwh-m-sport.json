@@ -1,0 +1,21 @@
+{
+  "marca": "BMW",
+  "modelo": "IX3 80KWH M SPORT",
+  "tipo": "carro",
+  "carrocaria": "SUV",
+  "iva_dedutivel": false,
+  "publicado": true,
+  "estado": "brevemente",
+  "destaque": false,
+  "ordem": 50,
+  "fotos": [
+    "assets/veiculos/bmw-ix3-80kwh-m-sport/bmw-ix3-80kwh-m-sport-9f6bda74.jpg"
+  ],
+  "ano": 2021,
+  "mes": "Junho",
+  "km": 126000,
+  "combustivel": "Elétrico",
+  "potencia": 286,
+  "lugares": 5,
+  "origem": "Importado"
+}
