@@ -1,0 +1,22 @@
+{
+  "marca": "Citroen",
+  "modelo": "Berlingo Longa",
+  "tipo": "carro",
+  "carrocaria": "Comercial",
+  "iva_dedutivel": true,
+  "publicado": true,
+  "estado": "brevemente",
+  "destaque": false,
+  "ordem": 50,
+  "fotos": [
+    "assets/veiculos/citroen-berlingo-longa/citroen-berlingo-longa-a7e7f4d0.jpg",
+    "assets/veiculos/citroen-berlingo-longa/citroen-berlingo-longa-1dce8012.jpg",
+    "assets/veiculos/citroen-berlingo-longa/citroen-berlingo-longa-d8270f76.jpg"
+  ],
+  "ano": 2023,
+  "km": 84000,
+  "combustivel": "Diesel",
+  "potencia": 102,
+  "lugares": 5,
+  "origem": "Importado"
+}
