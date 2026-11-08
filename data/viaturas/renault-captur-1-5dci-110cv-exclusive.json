@@ -1,6 +1,7 @@
 {
   "marca": "Renault",
-  "modelo": "Captur 1.5dci 110cv Exclusive",
+  "modelo": "Captur 1.5dci 110cv",
+  "versao": "Exclusive",
   "tipo": "carro",
   "carrocaria": "SUV",
   "preco": 13750,
