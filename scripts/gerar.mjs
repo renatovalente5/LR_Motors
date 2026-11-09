@@ -300,25 +300,36 @@ const precoAntes = (v) => { const p = promoAtiva(v); return p ? ` <s class="prec
    ---------------------------------------------------------------------------
    Três campos no painel. O «garantia» é texto livre e é do dono — trazia «3
    anos», «36 meses» e «18 meses» ao mesmo tempo que a descrição dizia «Garantia
-   de 18 meses incluída no preço!». Agora há dois campos fechados: a garantia
-   LEGAL (uma de duas frases, GARANTIAS_LEGAIS) e a garantia de FÁBRICA (o mês e
-   o ano em que acaba). Quando a legal está escolhida, é ela que o site mostra
-   — no selo e na nota do painel —, e o texto livre fica de lado; sem ela, o
-   site mostra o texto livre como sempre mostrou. Os valores existentes não se
-   tocam: são do cliente, e a escolha certa é dele, viatura a viatura. */
+   de 18 meses incluída no preço!». Agora a garantia LEGAL é uma de duas frases
+   (GARANTIAS_LEGAIS), e a da MARCA (garantia_fabrica) é um texto curto do dono.
+   Sem nenhuma das duas, o site mostra o texto livre como sempre mostrou. Os
+   valores existentes não se tocam: são do cliente, e a escolha é dele.
+
+   A da marca, quando há, é a única que o site mostra (o Luís, 9 nov 2026: o
+   Peugeot 2008 tem a garantia Spoticar, de 3 anos a contar da compra, e é
+   essa que o cliente usa). Sem «legal»: é um extra da marca, não o direito
+   da lei. A legal do stand continua a valer, mas o anúncio não tem de a dizer
+   (DL 74/93: vai no papel afixado no carro).
+
+   Só a legal, o selo diz «legal» — «Garantia de 3 anos» sozinho seria a
+   garantia da lei anunciada como vantagem do stand (DL 57/2008, art. 8.º) — e a
+   linha da ficha diz só o prazo, porque já se chama «Garantia». */
 const SELO_GARANTIA_LEGAL = { [GARANTIAS_LEGAIS[0]]: 'Garantia legal de 3 anos', [GARANTIAS_LEGAIS[1]]: 'Garantia de 18 meses, por acordo' };
+const PRAZO_GARANTIA_LEGAL = { [GARANTIAS_LEGAIS[0]]: '3 anos', [GARANTIAS_LEGAIS[1]]: '18 meses, por acordo' };
 function garantiaDe(v) {
   const legal = GARANTIAS_LEGAIS.includes(String(v.garantia_legal ?? '').trim()) ? String(v.garantia_legal).trim() : '';
-  const fabrica = RE_GARANTIA_FABRICA.test(String(v.garantia_fabrica ?? '').trim()) ? String(v.garantia_fabrica).trim() : '';
+  const f = String(v.garantia_fabrica ?? '').trim();
+  const marca = !f || /legal|conformidade/i.test(f) ? ''
+    : RE_GARANTIA_FABRICA.test(f) ? `Garantia de fábrica até ${f}`
+    : /garantia/i.test(f) ? f : /^\d/.test(f) ? `Garantia de ${f}` : `Garantia ${f}`;
   const g = String(v.garantia || '').trim();
   const livre = !g ? '' : /^\d+$/.test(g) ? `Garantia ${g} meses` : (/garantia/i.test(g) ? g : `Garantia ${g}`);
-  /* Com garantia de fábrica em vigor, é ela que vai no selo (o cartão e o topo
-     da ficha): é o que distingue a viatura. A legal fica na nota e na tabela
-     da ficha — as duas, sempre (9 nov 2026, o Peugeot 2008 do Luís). */
-  const selo = fabrica ? `Garantia de fábrica até ${fabrica}` : legal ? SELO_GARANTIA_LEGAL[legal] : livre;
-  const nota = [legal || livre || 'Garantia legal de conformidade nos termos do DL 84/2021.', fabrica ? `Garantia de fábrica até ${fabrica}.` : '']
-    .filter(Boolean).map((t) => (/[.!?]$/.test(t) ? t : `${t}.`)).join(' ');
-  return { legal, fabrica, livre, selo, nota };
+  /* O selo (o cartão e o topo da ficha) leva a da marca até à primeira vírgula
+     ou parêntese — «Garantia de 3 anos da Peugeot» —, e a linha da ficha leva-a
+     toda, sem o «Garantia de» do princípio. */
+  const selo = marca ? marca.split(/\s*[,(]/)[0].trim() : legal ? SELO_GARANTIA_LEGAL[legal] : livre;
+  const linha = marca ? marca.replace(/^garantia\s+de\s+(?=\d)/i, '') : legal ? PRAZO_GARANTIA_LEGAL[legal] : '';
+  return { legal, marca, livre, selo, linha };
 }
 
 /* Só um número dá quilómetros: um texto num commit à mão saía «NaN km». */
@@ -1675,10 +1686,8 @@ function paginaViatura(v) {
     ['Ano de construção', v.ano_construcao],
     ['Proprietários anteriores', v.registos_anteriores],
     ['Cilindrada', v.cilindrada ? v.cilindrada + ' cm³' : null],
-    /* A garantia legal e a de fábrica, dos campos fechados (garantiaDe): o
-       DL 74/93 pede as duas no anúncio de um usado. Só quando estão preenchidas. */
-    ['Garantia', garantiaDe(v).legal || null],
-    ['Garantia de fábrica', garantiaDe(v).fabrica ? `Até ${garantiaDe(v).fabrica}` : null],
+    /* A garantia (garantiaDe): a da marca, ou só o prazo da legal. */
+    ['Garantia', garantiaDe(v).linha || null],
   ].filter(([, val]) => val !== null && val !== undefined && val !== '');
 
   const galeria = fs_.length ? `
@@ -1784,7 +1793,6 @@ function paginaViatura(v) {
           <!-- Sem «Ref.»: o que lá estava era o slug do endereço, um
                identificador técnico que eu tinha posto a fazer de referência.
                Não é referência nenhuma do stand e não dizia nada a ninguém. -->
-          <p class="painel__nota">${esc(garantiaDe(v).nota)}</p>
         </div>
       </aside>
       <div class="ficha__corpo">

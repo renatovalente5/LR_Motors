@@ -399,6 +399,7 @@ try {
     ['garantia de «3 anos»', viat(J, (v) => { delete v.garantia_legal; v.garantia = '3 anos'; }), 'avisa', `viatura:${J}:garantia-3-anos`, undefined, true],
     ['garantia de «três anos»', viat(J, (v) => { delete v.garantia_legal; v.garantia = 'Três anos'; }), 'avisa', `viatura:${J}:garantia-3-anos`, undefined, true],
     ['garantia de 36 meses', viat(J, (v) => { delete v.garantia_legal; v.garantia = '36 meses'; }), 'avisa', `viatura:${J}:garantia-3-anos`, undefined, true],
+    ['garantia da marca a dizer «legal» (a do stand escolhe-se no campo dela)', viat(J, (v) => { v.garantia_fabrica = 'Garantia legal de 3 anos'; }), 'avisa', `viatura:${J}:garantia_fabrica:legal`],
     // --- os ficheiros das viaturas ---
     ['viatura ilegível', (d) => { d.viaturas[J] = '{"marca": "Jaguar",'; }, 'bloqueia', `viatura:${J}:ilegivel`],
     ['viatura que é uma lista', (d) => { d.viaturas[J] = '[]'; }, 'bloqueia', `viatura:${J}:forma`],
@@ -483,6 +484,7 @@ try {
     ['garantia «Garantia mútuo acordo»', viat(J, (v) => { delete v.garantia_legal; v.garantia = 'Garantia mútuo acordo'; })],
     ['garantia «Garantia de fábrica até 2027»', viat(J, (v) => { delete v.garantia_legal; v.garantia = 'Garantia de fábrica até 2027'; })],
     ['garantia vazia (o site mostra a garantia legal)', viat(J, (v) => { delete v.garantia; })],
+    ['garantia da marca em texto, e no formato antigo «03/2027»', viat(J, (v) => { v.garantia_fabrica = 'Garantia de 3 anos da Peugeot (Spoticar), a contar da compra'; }), viat(J, (v) => { v.garantia_fabrica = '03/2027'; })],
     [`ano ${anoSeguinte} (o ano seguinte)`, viat(J, (v) => { v.ano = anoSeguinte; })],
     ['ano de construção igual ao da matrícula', viat(J, (v) => { v.ano_construcao = 2013; })],
     ['ano de construção um ano antes', viat(J, (v) => { v.ano_construcao = 2012; })],

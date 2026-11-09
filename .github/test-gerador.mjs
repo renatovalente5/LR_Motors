@@ -414,6 +414,37 @@ try {
   }
 
   /* ================================================================== */
+  secao('a garantia: a da marca sem «legal»; só com a legal, o selo diz «legal» e a ficha só o prazo');
+  {
+    const copia = (extra) => ({ ...clonar(VIATURAS[J]), garantia_fabrica: '', ...extra });
+    const vs = {
+      [J]: VIATURAS[J],
+      'g-marca': copia({ garantia_legal: R.GARANTIAS_LEGAIS[0], garantia_fabrica: 'Garantia de 3 anos da Peugeot (Spoticar), a contar da compra' }),
+      'g-legal-3': copia({ garantia_legal: R.GARANTIAS_LEGAIS[0] }),
+      'g-legal-18': copia({ garantia_legal: R.GARANTIAS_LEGAIS[1] }),
+      'g-fabrica': copia({ garantia_legal: R.GARANTIAS_LEGAIS[1], garantia_fabrica: '03/2027' }),
+      'g-marca-legal': copia({ garantia_legal: R.GARANTIAS_LEGAIS[1], garantia_fabrica: 'Garantia legal de 3 anos' }),
+    };
+    const g = gerar({ viaturas: vs });
+    certo(g.status === 0, 'o gerador corre', g.err.slice(-300));
+    const pag = (s) => g.ler(`viaturas/${s}/index.html`) || '';
+    const selo = (s) => (pag(s).match(/vit-selo--garantia">([^<]*)</) || [])[1];
+    const linha = (s) => (pag(s).match(/<dt>Garantia<\/dt><dd>([^<]*)<\/dd>/) || [])[1];
+    const texto = (s) => pag(s).replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' ');
+    certo(selo('g-marca') === 'Garantia de 3 anos da Peugeot' && linha('g-marca') === '3 anos da Peugeot (Spoticar), a contar da compra' && !/legal|DL 84\/2021/i.test(texto('g-marca')),
+      'com a garantia da marca: o selo até à vírgula, a linha da ficha toda, e «legal» em lado nenhum da página', `${selo('g-marca')} | ${linha('g-marca')}`);
+    certo(selo('g-legal-3') === 'Garantia legal de 3 anos' && linha('g-legal-3') === '3 anos' && selo('g-legal-18') === 'Garantia de 18 meses, por acordo' && linha('g-legal-18') === '18 meses, por acordo',
+      'só com a legal: o selo diz-se legal (3 anos) ou por acordo (18 meses), e a ficha diz só o prazo', `${selo('g-legal-3')} | ${linha('g-legal-3')} | ${selo('g-legal-18')} | ${linha('g-legal-18')}`);
+    certo(selo('g-fabrica') === 'Garantia de fábrica até 03/2027' && linha('g-fabrica') === 'Garantia de fábrica até 03/2027',
+      'o formato antigo da de fábrica («03/2027») lê-se como «Garantia de fábrica até 03/2027»', `${selo('g-fabrica')} | ${linha('g-fabrica')}`);
+    certo(selo('g-marca-legal') === 'Garantia de 18 meses, por acordo' && linha('g-marca-legal') === '18 meses, por acordo',
+      'um «legal» escrito na garantia da marca não passa por garantia da marca: fica a legal escolhida', `${selo('g-marca-legal')} | ${linha('g-marca-legal')}`);
+    certo(Object.keys(vs).every((s) => !pag(s).includes('painel__nota') && !/conformidade/i.test(texto(s))),
+      'sem a nota da garantia por baixo dos botões, nem «garantia legal de conformidade» nas fichas');
+    g.apagar();
+  }
+
+  /* ================================================================== */
   secao('os marcadores das páginas legais');
   {
     const termos = readFileSync(join(RAIZ, 'conteudo', 'termos.md'), 'utf8');

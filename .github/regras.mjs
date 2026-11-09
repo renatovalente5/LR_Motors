@@ -122,8 +122,11 @@ export const CAMPOS_VIATURA = [
    grupo 1): o que o anúncio diz vincula o stand (DL 84/2021, art. 43.º), e o
    campo livre «garantia» trazia «3 anos», «36 meses» e «18 meses incluída no
    preço» ao mesmo tempo. Quando está escolhida, o site mostra esta frase em vez
-   do texto livre (que fica como o dono o escreveu). A garantia do fabricante é
-   outra coisa — acresce à legal — e tem campo próprio: o mês e o ano em que acaba. */
+   do texto livre (que fica como o dono o escreveu). A garantia da MARCA — a de
+   fábrica, ou a de um programa como o Spoticar da Peugeot — é outra coisa:
+   acresce à legal, e tem campo próprio, «garantia_fabrica», em texto curto do
+   dono. O nome do campo ficou do tempo em que era só o mês e o ano em que a de
+   fábrica acabava; um «03/2027» lê-se ainda como «Garantia de fábrica até 03/2027». */
 export const GARANTIAS_LEGAIS = [
   'Garantia legal de conformidade de 3 anos (DL 84/2021)',
   'Garantia legal de conformidade reduzida a 18 meses, por acordo escrito (DL 84/2021)',
@@ -164,7 +167,7 @@ export const NOMES_CAMPOS = {
   km: 'Quilómetros', combustivel: 'Combustível', caixa: 'Caixa', potencia: 'Potência (cv)',
   cilindrada: 'Cilindrada (cm³)', cor: 'Cor', lugares: 'Lugares', portas: 'Portas', origem: 'Origem',
   matricula: 'Matrícula', ano_construcao: 'Ano de construção', registos_anteriores: 'Donos anteriores',
-  garantia: 'Garantia', garantia_legal: 'Garantia legal', garantia_fabrica: 'Garantia de fábrica (até mm/aaaa)',
+  garantia: 'Garantia', garantia_legal: 'Garantia legal', garantia_fabrica: 'Garantia da marca',
   equipamento: 'Equipamento', descricao: 'Descrição',
 };
 
@@ -197,7 +200,7 @@ export const LIMITES = {
 /* Tamanhos máximos dos textos, em caracteres. Folgados: o maior de hoje é a
    descrição do Mercedes E 300 de, com 1428. */
 export const TAMANHOS = {
-  marca: 40, modelo: 60, versao: 120, cor: 40, garantia: 60, garantiaFabrica: 7, matricula: 15, promocao: 40,
+  marca: 40, modelo: 60, versao: 120, cor: 40, garantia: 60, garantiaFabrica: 80,matricula: 15, promocao: 40,
   equipamento: 120, equipamentoItens: 60, descricao: 6000, fotos: 50, caminhoFoto: 300,
   telefoneTexto: 20, email: 160, url: 500,
   morada: 120, localidade: 60, distrito: 40, pais: 40,
@@ -706,12 +709,13 @@ export function problemasDaViatura(v, ctx = {}) {
   texto('garantia_fabrica', TAMANHOS.garantiaFabrica);
   texto('matricula', TAMANHOS.matricula);
   texto('descricao', TAMANHOS.descricao, { linha: false });
-  /* Os dois campos fechados da garantia (GARANTIAS_LEGAIS): uma frase fora da
-     lista não se publica como garantia, e o fim da garantia de fábrica é um mês
-     e um ano — «até 03/2027» — e não um texto qualquer. */
+  /* A garantia legal é um campo fechado (GARANTIAS_LEGAIS): uma frase fora da
+     lista não se publica como garantia. A da marca é texto do dono, mas é a da
+     marca: com ela, o site deixa de mostrar a legal (o Luís, 9 nov 2026), e um
+     «legal» escrito aqui seria a do stand anunciada como vantagem dele. */
   deLista('garantia_legal', GARANTIAS_LEGAIS, false, 'A garantia legal tem de ser uma das duas da lista: 3 anos (a garantia legal), ou reduzida a 18 meses por acordo escrito (ou nenhuma).');
-  if (temTexto(v.garantia_fabrica) && !RE_GARANTIA_FABRICA.test(v.garantia_fabrica.trim())) {
-    avisa('garantia_fabrica:formato', 'garantia_fabrica', 'A garantia de fábrica é o mês e o ano em que acaba, assim: 03/2027 (vazio se já não tem).');
+  if (temTexto(v.garantia_fabrica) && /legal|conformidade/i.test(v.garantia_fabrica)) {
+    avisa('garantia_fabrica:legal', 'garantia_fabrica', 'Aqui vai só a garantia da marca (de fábrica, ou de um programa como o Spoticar). A do stand escolhe-se em «Garantia legal».');
   }
   /* A promoção: com um dos quatro campos e não os quatro certos, não aparece. */
   texto('promocao', TAMANHOS.promocao);
@@ -758,7 +762,7 @@ export function problemasDaViatura(v, ctx = {}) {
       lembra('garantia-curta', 'garantia', `A garantia anunciada («${v.garantia.trim()}») é menor do que ${GARANTIA_MINIMA_USADOS} meses: num usado, a lei só deixa reduzir a garantia até ${GARANTIA_MINIMA_USADOS} meses, e por acordo escrito com o comprador (DL 84/2021, art. 12.º).`);
     }
     if (meses === 36) {
-      lembra('garantia-3-anos', 'garantia', `A garantia diz «${v.garantia.trim()}». O stand não anuncia 3 anos de garantia nos usados (são ${GARANTIA_MINIMA_USADOS} meses, por acordo). Se for a garantia de fábrica da marca, escreva-o assim (ex.: «Garantia de fábrica até 2027»).`);
+      lembra('garantia-3-anos', 'garantia', `A garantia diz «${v.garantia.trim()}». O stand não anuncia 3 anos de garantia nos usados (são ${GARANTIA_MINIMA_USADOS} meses, por acordo). Se for a garantia da marca, escreva-a no campo «Garantia da marca».`);
     }
   }
   return out;
