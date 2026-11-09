@@ -311,11 +311,14 @@ const precoAntes = (v) => { const p = promoAtiva(v); return p ? ` <s class="prec
    da lei. A legal do stand continua a valer, mas o anúncio não tem de a dizer
    (DL 74/93: vai no papel afixado no carro).
 
-   Só a legal, o selo diz «legal» — «Garantia de 3 anos» sozinho seria a
-   garantia da lei anunciada como vantagem do stand (DL 57/2008, art. 8.º) — e a
-   linha da ficha diz só o prazo, porque já se chama «Garantia». */
-const SELO_GARANTIA_LEGAL = { [GARANTIAS_LEGAIS[0]]: 'Garantia legal de 3 anos', [GARANTIAS_LEGAIS[1]]: 'Garantia de 18 meses, por acordo' };
-const PRAZO_GARANTIA_LEGAL = { [GARANTIAS_LEGAIS[0]]: '3 anos', [GARANTIAS_LEGAIS[1]]: '18 meses, por acordo' };
+   Só a legal de 3 anos, o selo diz «legal» — «Garantia de 3 anos» sozinho
+   seria a garantia da lei anunciada como vantagem do stand (DL 57/2008, art.
+   8.º). Os 18 meses dizem-se sem mais (o Renato, 9 nov 2026): são a garantia
+   reduzida por acordo, menos do que a lei dá, e o «por acordo» vinha do «mútuo
+   acordo» do Luís, não de uma regra. A linha da ficha diz só o prazo, porque
+   já se chama «Garantia». */
+const SELO_GARANTIA_LEGAL = { [GARANTIAS_LEGAIS[0]]: 'Garantia legal de 3 anos', [GARANTIAS_LEGAIS[1]]: 'Garantia de 18 meses' };
+const PRAZO_GARANTIA_LEGAL = { [GARANTIAS_LEGAIS[0]]: '3 anos', [GARANTIAS_LEGAIS[1]]: '18 meses' };
 function garantiaDe(v) {
   const legal = GARANTIAS_LEGAIS.includes(String(v.garantia_legal ?? '').trim()) ? String(v.garantia_legal).trim() : '';
   const f = String(v.garantia_fabrica ?? '').trim();
