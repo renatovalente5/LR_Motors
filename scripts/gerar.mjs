@@ -1344,13 +1344,27 @@ function paginaInicial() {
   const marcasOrdenadas = [...contaMarcas.keys()].sort((a, b) =>
     contaMarcas.get(b) - contaMarcas.get(a) || a.localeCompare(b, 'pt'));
 
+  /* NATAL NA PÁGINA INICIAL (o Luís, 9 nov 2026: «alguma coisa muito simples
+     alusiva ao Natal», «uma neve ou assim»). Só enquanto houver uma promoção
+     de Natal em vigor: uma neve leve no topo e uma faixa com a promoção. As
+     duas levam o fim em data-promo-fim, e o site.js tira-as no dia a seguir,
+     mesmo sem o site ser publicado outra vez. A neve fica por trás do texto,
+     não apanha toques e pára com o movimento reduzido (no CSS). */
+  const natal = aVenda.map(promoAtiva).filter((p) => p && /natal/i.test(p.nome));
+  const fimNatal = natal.length ? new Date(Math.max(...natal.map((p) => p.fim.getTime()))) : null;
+  const diaLongo = (d) => new Intl.DateTimeFormat('pt-PT', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(d);
+  const neve = fimNatal ? `<div class="hero__neve" aria-hidden="true" data-promo-fim="${isoDia(fimNatal)}">${'<i></i>'.repeat(14)}</div>` : '';
+  const faixaNatal = fimNatal ? `<p class="faixa-natal" data-promo-fim="${isoDia(fimNatal)}"><span><svg class="faixa-natal__estrela" viewBox="0 0 24 24" width="16" height="16" aria-hidden="true"><path fill="currentColor" d="M12 2l2.4 6.9H22l-6 4.6 2.3 7.1L12 16.3l-6.3 4.3L8 13.5 2 8.9h7.6z"/></svg>${esc(natal[0].nome)} em viaturas selecionadas, até ${diaLongo(fimNatal)}</span><a href="${u('viaturas/')}">Ver viaturas</a></p>` : '';
+
   const corpo = `
 <section class="hero hero--curto">
   <div class="hero__fundo">
     <img src="${u('assets/img/hero-2000.webp')}" srcset="${u('assets/img/hero-1200.webp')} 1200w, ${u('assets/img/hero-2000.webp')} 2000w"
          sizes="100vw" alt="" width="2000" height="1000" fetchpriority="high" decoding="async">
   </div>
+  ${neve}
   <div class="hero__corpo">
+    ${faixaNatal}
     <!-- A linha de cima leva o NOME e o sítio. É a única forma de o nome da
          marca aparecer como texto visível na página inicial: o logótipo é um
          SVG e o h1 passou a ser uma frase sem marca. Para quem procura «lr

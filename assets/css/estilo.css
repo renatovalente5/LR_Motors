@@ -369,6 +369,47 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 }
 .hero__texto { margin-top: 1.1rem; max-width: 52ch; color: #C9D6E8; font-size: 1.06rem; }
 .hero__acoes { margin-top: 1.9rem; display: flex; flex-wrap: wrap; gap: .7rem; }
+/* Natal (só com uma promoção de Natal em vigor; o gerador decide). A neve
+   fica entre a fotografia e o texto, não apanha toques, e pára com o
+   movimento reduzido. A faixa assenta no escuro do hero. */
+.hero__neve { position: absolute; inset: 0; overflow: hidden; pointer-events: none; }
+.hero__neve i {
+  position: absolute; top: -14px; left: 50%; width: 8px; height: 8px; border-radius: 50%;
+  background: #fff; opacity: .8; box-shadow: 0 0 8px rgba(255,255,255,.6);
+  animation: neve 13s linear infinite;
+}
+.hero__neve i:nth-child(1)  { left: 4%;  animation-duration: 11s; animation-delay: -2s; }
+.hero__neve i:nth-child(2)  { left: 11%; width: 5px; height: 5px; animation-duration: 15s; animation-delay: -9s; opacity: .5; }
+.hero__neve i:nth-child(3)  { left: 19%; width: 10px; height: 10px; animation-duration: 12s; animation-delay: -5s; }
+.hero__neve i:nth-child(4)  { left: 27%; width: 6px; height: 6px; animation-duration: 16s; animation-delay: -12s; opacity: .55; }
+.hero__neve i:nth-child(5)  { left: 34%; animation-duration: 13s; animation-delay: -7s; }
+.hero__neve i:nth-child(6)  { left: 42%; width: 5px; height: 5px; animation-duration: 14s; animation-delay: -1s; opacity: .5; }
+.hero__neve i:nth-child(7)  { left: 50%; width: 10px; height: 10px; animation-duration: 12s; animation-delay: -10s; }
+.hero__neve i:nth-child(8)  { left: 58%; width: 6px; height: 6px; animation-duration: 17s; animation-delay: -4s; opacity: .6; }
+.hero__neve i:nth-child(9)  { left: 65%; animation-duration: 11s; animation-delay: -8s; }
+.hero__neve i:nth-child(10) { left: 72%; width: 5px; height: 5px; animation-duration: 15s; animation-delay: -13s; opacity: .5; }
+.hero__neve i:nth-child(11) { left: 79%; width: 10px; height: 10px; animation-duration: 13s; animation-delay: -3s; }
+.hero__neve i:nth-child(12) { left: 86%; width: 6px; height: 6px; animation-duration: 16s; animation-delay: -11s; opacity: .55; }
+.hero__neve i:nth-child(13) { left: 92%; animation-duration: 12s; animation-delay: -6s; }
+.hero__neve i:nth-child(14) { left: 97%; width: 5px; height: 5px; animation-duration: 14s; animation-delay: -14s; opacity: .5; }
+@keyframes neve {
+  from { transform: translate3d(0, 0, 0); }
+  50%  { transform: translate3d(14px, 330px, 0); }
+  to   { transform: translate3d(-6px, 680px, 0); }
+}
+@media (prefers-reduced-motion: reduce) { .hero__neve { display: none; } }
+.faixa-natal {
+  display: inline-flex; align-items: center; flex-wrap: wrap; gap: .4rem .6rem;
+  margin-bottom: 1.2rem; padding: .45rem .5rem .45rem .8rem; border-radius: 14px;
+  background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
+  color: #fff; font-size: .9rem; font-weight: 600; line-height: 1.35;
+}
+.faixa-natal__estrela { display: inline-block; color: #F5C451; vertical-align: -2px; margin-right: .4rem; }
+.faixa-natal a {
+  padding: .3rem .75rem; border-radius: 999px; background: #fff; color: var(--azul);
+  font-weight: 700; text-decoration: none; white-space: nowrap;
+}
+.faixa-natal a:hover { background: var(--azul-tenue); }
 /* Os quatro selos do hero — garantia, oficina, retoma, financiamento — foram
    retirados a pedido do cliente. O que diziam continua dito onde é procurado:
    nas cartas do «Porquê a LR Motors» e na página de Serviços. */

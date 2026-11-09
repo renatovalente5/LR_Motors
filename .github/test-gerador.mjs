@@ -453,6 +453,29 @@ try {
   }
 
   /* ================================================================== */
+  secao('o Natal na página inicial: a neve e a faixa só com uma promoção de Natal em vigor');
+  {
+    const dia = (d) => d.toISOString().slice(0, 10).split('-').reverse().join('/');
+    const agora = Date.now();
+    const fim = new Date(agora + 20 * 864e5);
+    const fimIso = fim.toISOString().slice(0, 10);
+    const comPromo = (nome) => ({ ...clonar(VIATURAS[J]), preco: 10000, preco_anterior: 11000, promocao: nome, promocao_inicio: dia(new Date(agora - 864e5)), promocao_fim: dia(fim) });
+    const longo = new Intl.DateTimeFormat('pt-PT', { day: 'numeric', month: 'long', timeZone: 'UTC' }).format(new Date(`${fimIso}T00:00:00Z`));
+    const g1 = gerar({ viaturas: { [J]: comPromo('Preço Especial Natal') } });
+    const i1 = g1.ler('index.html') || '';
+    certo(g1.status === 0 && i1.includes(`<div class="hero__neve" aria-hidden="true" data-promo-fim="${fimIso}">`) && contar(i1, /<p class="faixa-natal" data-promo-fim="/g) === 1
+      && i1.includes(`Preço Especial Natal em viaturas selecionadas, até ${longo}</span><a href="/viaturas/">Ver viaturas</a>`),
+      'com uma promoção de Natal em vigor: a neve e a faixa, as duas com o fim em data-promo-fim (o site.js tira-as no dia a seguir)', g1.err.slice(-300));
+    g1.apagar();
+    const g2 = gerar({ viaturas: { [J]: comPromo('Preço Especial Outono') } });
+    const g3 = gerar({ viaturas: { [J]: VIATURAS[J] } });
+    const semNatal = [g2, g3].map((g) => g.ler('index.html') || '');
+    certo(g2.status === 0 && g3.status === 0 && semNatal.every((h) => h.includes('hero__titulo') && !h.includes('hero__neve') && !h.includes('faixa-natal')),
+      'sem promoção de Natal (outra promoção, ou nenhuma): nem neve nem faixa');
+    g2.apagar(); g3.apagar();
+  }
+
+  /* ================================================================== */
   secao('os marcadores das páginas legais');
   {
     const termos = readFileSync(join(RAIZ, 'conteudo', 'termos.md'), 'utf8');
