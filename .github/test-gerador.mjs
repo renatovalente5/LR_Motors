@@ -414,9 +414,10 @@ try {
   }
 
   /* ================================================================== */
-  secao('a garantia: a da marca sem «legal»; só com a legal, o selo diz «legal» e a ficha só o prazo');
+  secao('a garantia: só a da marca tem selo, sem «legal»; a do stand fica só na ficha, com o prazo');
   {
     const copia = (extra) => ({ ...clonar(VIATURAS[J]), garantia_fabrica: '', ...extra });
+    const soLivre = copia({ garantia: '18 meses' }); delete soLivre.garantia_legal;
     const vs = {
       [J]: VIATURAS[J],
       'g-marca': copia({ garantia_legal: R.GARANTIAS_LEGAIS[0], garantia_fabrica: 'Garantia de 3 anos da Peugeot (Spoticar), a contar da compra' }),
@@ -424,6 +425,7 @@ try {
       'g-legal-18': copia({ garantia_legal: R.GARANTIAS_LEGAIS[1] }),
       'g-fabrica': copia({ garantia_legal: R.GARANTIAS_LEGAIS[1], garantia_fabrica: '03/2027' }),
       'g-marca-legal': copia({ garantia_legal: R.GARANTIAS_LEGAIS[1], garantia_fabrica: 'Garantia legal de 3 anos' }),
+      'g-livre': soLivre,
     };
     const g = gerar({ viaturas: vs });
     certo(g.status === 0, 'o gerador corre', g.err.slice(-300));
@@ -433,12 +435,18 @@ try {
     const texto = (s) => pag(s).replace(/<!--[\s\S]*?-->/g, '').replace(/<script[\s\S]*?<\/script>/g, '').replace(/<[^>]+>/g, ' ');
     certo(selo('g-marca') === 'Garantia de 3 anos da Peugeot' && linha('g-marca') === '3 anos da Peugeot (Spoticar), a contar da compra' && !/legal|DL 84\/2021/i.test(texto('g-marca')),
       'com a garantia da marca: o selo até à vírgula, a linha da ficha toda, e «legal» em lado nenhum da página', `${selo('g-marca')} | ${linha('g-marca')}`);
-    certo(selo('g-legal-3') === 'Garantia legal de 3 anos' && linha('g-legal-3') === '3 anos' && selo('g-legal-18') === 'Garantia de 18 meses' && linha('g-legal-18') === '18 meses',
-      'só com a legal: o selo diz «legal» nos 3 anos (e não nos 18 meses), e a ficha diz só o prazo', `${selo('g-legal-3')} | ${linha('g-legal-3')} | ${selo('g-legal-18')} | ${linha('g-legal-18')}`);
+    certo(selo('g-legal-3') === undefined && linha('g-legal-3') === '3 anos' && selo('g-legal-18') === undefined && linha('g-legal-18') === '18 meses'
+      && !/legal/i.test(texto('g-legal-3')),
+      'só com a do stand: sem selo, e a ficha diz só o prazo («3 anos», «18 meses»), sem «legal»', `${selo('g-legal-3')} | ${linha('g-legal-3')} | ${selo('g-legal-18')} | ${linha('g-legal-18')}`);
+    certo(selo('g-livre') === undefined && linha('g-livre') === '18 meses',
+      'só com o texto livre («18 meses»): também sem selo, e na ficha', `${selo('g-livre')} | ${linha('g-livre')}`);
     certo(selo('g-fabrica') === 'Garantia de fábrica até 03/2027' && linha('g-fabrica') === 'Garantia de fábrica até 03/2027',
       'o formato antigo da de fábrica («03/2027») lê-se como «Garantia de fábrica até 03/2027»', `${selo('g-fabrica')} | ${linha('g-fabrica')}`);
-    certo(selo('g-marca-legal') === 'Garantia de 18 meses' && linha('g-marca-legal') === '18 meses',
-      'um «legal» escrito na garantia da marca não passa por garantia da marca: fica a legal escolhida', `${selo('g-marca-legal')} | ${linha('g-marca-legal')}`);
+    certo(selo('g-marca-legal') === undefined && linha('g-marca-legal') === '18 meses',
+      'um «legal» escrito na garantia da marca não passa por garantia da marca: fica a legal escolhida, sem selo', `${selo('g-marca-legal')} | ${linha('g-marca-legal')}`);
+    const nosCartoes = [...new Set([...`${g.ler('viaturas/index.html')}${g.ler('index.html')}`.matchAll(/vit-selo--garantia">([^<]*)</g)].map((m) => m[1]))].sort();
+    certo(JSON.stringify(nosCartoes) === JSON.stringify(['Garantia de 3 anos da Peugeot', 'Garantia de fábrica até 03/2027']),
+      'nos cartões da lista e da inicial, só os selos das garantias da marca', nosCartoes.join(' | '));
     certo(Object.keys(vs).every((s) => !pag(s).includes('painel__nota') && !/conformidade/i.test(texto(s))),
       'sem a nota da garantia por baixo dos botões, nem «garantia legal de conformidade» nas fichas');
     g.apagar();
