@@ -305,13 +305,14 @@ const precoAntes = (v) => { const p = promoAtiva(v); return p ? ` <s class="prec
    Sem nenhuma das duas, o site mostra o texto livre como sempre mostrou. Os
    valores existentes não se tocam: são do cliente, e a escolha é dele.
 
-   O SELO (o cartão e o topo da ficha) é só para a garantia da marca — a de
+   O SELO (o cartão e o topo da ficha) leva a garantia da marca — a de
    fábrica, ou a de um programa como o Spoticar do Peugeot 2008 —, até à
    primeira vírgula ou parêntese: é um extra da marca, e diz-se sem «legal».
-   A do stand não tem selo (o Luís, 9 nov 2026: «retiramos de todos os
-   anúncios a garantia neste sítio e deixamos só nas informações gerais»):
-   «Garantia de 3 anos» num selo seria a garantia da lei anunciada como
-   vantagem do stand (DL 57/2008, art. 8.º), e ele não queria o «legal».
+   Sem ela, os 18 meses têm selo, «Garantia de 18 meses» (o Luís, 9 nov 2026:
+   «podia estar como no início»): são a garantia reduzida por acordo, menos do
+   que a lei dá. Os 3 anos só do stand não têm: «Garantia de 3 anos» num selo
+   seria a garantia da lei anunciada como vantagem do stand (DL 57/2008, art.
+   8.º), e ele não quer o «legal». Ficam na linha da ficha.
 
    A LINHA «Garantia» da ficha diz a da marca, quando há — é a única que o site
    mostra; a legal do stand continua a valer, mas o anúncio não tem de a dizer
@@ -329,7 +330,7 @@ function garantiaDe(v) {
   const g = String(v.garantia || '').trim();
   const livre = !g ? '' : /^\d+$/.test(g) ? `Garantia ${g} meses` : (/garantia/i.test(g) ? g : `Garantia ${g}`);
   const semPrefixo = (t) => t.replace(/^garantia\s+(?:de\s+)?(?=\d)/i, '');
-  const selo = marca ? marca.split(/\s*[,(]/)[0].trim() : '';
+  const selo = marca ? marca.split(/\s*[,(]/)[0].trim() : legal === GARANTIAS_LEGAIS[1] ? 'Garantia de 18 meses' : '';
   const linha = marca ? semPrefixo(marca) : legal ? PRAZO_GARANTIA_LEGAL[legal] : livre ? semPrefixo(livre) : '';
   return { legal, marca, livre, selo, linha };
 }
