@@ -400,7 +400,7 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 @media (prefers-reduced-motion: reduce) { .hero__neve { display: none; } }
 .faixa-natal {
   display: inline-flex; align-items: center; flex-wrap: wrap; gap: .4rem .6rem;
-  margin-bottom: 1.2rem; padding: .45rem .5rem .45rem .8rem; border-radius: 14px;
+  margin-top: 1.6rem; padding: .45rem .5rem .45rem .8rem; border-radius: 14px;
   background: rgba(255,255,255,.1); border: 1px solid rgba(255,255,255,.2);
   color: #fff; font-size: .9rem; font-weight: 600; line-height: 1.35;
 }

@@ -1346,7 +1346,8 @@ function paginaInicial() {
 
   /* NATAL NA PÁGINA INICIAL (o Luís, 9 nov 2026: «alguma coisa muito simples
      alusiva ao Natal», «uma neve ou assim»). Só enquanto houver uma promoção
-     de Natal em vigor: uma neve leve no topo e uma faixa com a promoção. As
+     de Natal em vigor: uma neve leve no topo e uma faixa com a promoção, no
+     fim do texto do hero (o Renato: «fica melhor no final»). As
      duas levam o fim em data-promo-fim, e o site.js tira-as no dia a seguir,
      mesmo sem o site ser publicado outra vez. A neve fica por trás do texto,
      não apanha toques e pára com o movimento reduzido (no CSS). */
@@ -1364,7 +1365,6 @@ function paginaInicial() {
   </div>
   ${neve}
   <div class="hero__corpo">
-    ${faixaNatal}
     <!-- A linha de cima leva o NOME e o sítio. É a única forma de o nome da
          marca aparecer como texto visível na página inicial: o logótipo é um
          SVG e o h1 passou a ser uma frase sem marca. Para quem procura «lr
@@ -1380,6 +1380,7 @@ function paginaInicial() {
     <p class="sobretitulo sobretitulo--claro">${[def.empresa.nome_comercial, def.stand.localidade].filter(temTexto).map(esc).join(' · ')}</p>
     <h1 class="hero__titulo">${esc(def.textos.hero_titulo)}</h1>
     <p class="hero__texto">${esc(def.textos.hero_texto)}</p>
+    ${faixaNatal}
   </div>
 </section>
 

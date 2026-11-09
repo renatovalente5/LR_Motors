@@ -464,8 +464,9 @@ try {
     const g1 = gerar({ viaturas: { [J]: comPromo('Preço Especial Natal') } });
     const i1 = g1.ler('index.html') || '';
     certo(g1.status === 0 && i1.includes(`<div class="hero__neve" aria-hidden="true" data-promo-fim="${fimIso}">`) && contar(i1, /<p class="faixa-natal" data-promo-fim="/g) === 1
-      && i1.includes(`Preço Especial Natal em viaturas selecionadas, até ${longo}</span><a href="/viaturas/">Ver viaturas</a>`),
-      'com uma promoção de Natal em vigor: a neve e a faixa, as duas com o fim em data-promo-fim (o site.js tira-as no dia a seguir)', g1.err.slice(-300));
+      && i1.includes(`Preço Especial Natal em viaturas selecionadas, até ${longo}</span><a href="/viaturas/">Ver viaturas</a>`)
+      && i1.indexOf('class="faixa-natal"') > i1.indexOf('class="hero__texto"'),
+      'com uma promoção de Natal em vigor: a neve e a faixa (no fim do texto do hero), as duas com o fim em data-promo-fim (o site.js tira-as no dia a seguir)', g1.err.slice(-300));
     g1.apagar();
     const g2 = gerar({ viaturas: { [J]: comPromo('Preço Especial Outono') } });
     const g3 = gerar({ viaturas: { [J]: VIATURAS[J] } });
