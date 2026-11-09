@@ -160,22 +160,9 @@ const SITE = process.env.SITE ?? `https://renatovalente5.github.io${BASE}`;
 const codificar = (p) => String(p).replace(/ /g, '%20').replace(/,/g, '%2C');
 const u = (p = '') => codificar((BASE + '/' + String(p).replace(/^\//, '')).replace(/\/{2,}/g, '/'));
 
-/* A HORA DA ÚLTIMA PUBLICAÇÃO, no rodapé de todas as páginas.
-   ---------------------------------------------------------------------------
-   Serve duas pessoas ao mesmo tempo. Ao visitante, diz que a listagem está a
-   dia — num stand, saber que o stock é de hoje e não de Março vale mais do que
-   parece. E ao dono, resolve uma confusão real: o GitHub Pages manda o HTML com
-   `max-age=600`, portanto o telemóvel dele guarda a página DEZ MINUTOS e nem
-   sequer pergunta se há coisa nova. A 1/9/2026 isso levou-o a dizer que o site
-   estava avariado quando não estava — tinha acabado de gravar e via o de antes.
-   Com a hora à vista, olha para o rodapé e sabe se está a ver uma página velha.
-
-   Em hora de Lisboa e não em UTC: a Action corre em UTC e mostrava menos uma
-   hora, o que era pior do que não mostrar nada. */
-const ACTUALIZADO = new Intl.DateTimeFormat('pt-PT', {
-  day: 'numeric', month: 'long', hour: '2-digit', minute: '2-digit',
-  timeZone: 'Europe/Lisbon',
-}).format(new Date());
+/* (A «hora da última publicação» no rodapé saiu a 9 nov 2026, a pedido do
+   Renato: a lei não a pede, e o painel já diz ao dono «Publicado ✓» quando a
+   página nova está no ar.) */
 const abs = (p = '') => codificar(SITE.replace(/\/$/, '') + '/' + String(p).replace(/^\//, ''));
 
 /* O PAINEL (backoffice), desde out 2026: onde o stand grava as viaturas, os
@@ -325,7 +312,10 @@ function garantiaDe(v) {
   const fabrica = RE_GARANTIA_FABRICA.test(String(v.garantia_fabrica ?? '').trim()) ? String(v.garantia_fabrica).trim() : '';
   const g = String(v.garantia || '').trim();
   const livre = !g ? '' : /^\d+$/.test(g) ? `Garantia ${g} meses` : (/garantia/i.test(g) ? g : `Garantia ${g}`);
-  const selo = legal ? SELO_GARANTIA_LEGAL[legal] : livre;
+  /* Com garantia de fábrica em vigor, é ela que vai no selo (o cartão e o topo
+     da ficha): é o que distingue a viatura. A legal fica na nota e na tabela
+     da ficha — as duas, sempre (9 nov 2026, o Peugeot 2008 do Luís). */
+  const selo = fabrica ? `Garantia de fábrica até ${fabrica}` : legal ? SELO_GARANTIA_LEGAL[legal] : livre;
   const nota = [legal || livre || 'Garantia legal de conformidade nos termos do DL 84/2021.', fabrica ? `Garantia de fábrica até ${fabrica}.` : '']
     .filter(Boolean).map((t) => (/[.!?]$/.test(t) ? t : `${t}.`)).join(' ');
   return { legal, fabrica, livre, selo, nota };
@@ -876,8 +866,7 @@ function rodape() {
     </div>
 
     <div class="rodape__legal">
-      <p class="rodape__copy">&copy; ${new Date().getFullYear()} ${esc(e.nome_comercial)}
-        <span class="rodape__stock">Stock actualizado a ${ACTUALIZADO}</span></p>
+      <p class="rodape__copy">&copy; ${new Date().getFullYear()} ${esc(e.nome_comercial)}</p>
       <ul class="rodape__links">
         <li><a href="${u('privacidade/')}">Política de privacidade</a></li>
         <li><a href="${u('termos/')}">Termos e condições</a></li>
