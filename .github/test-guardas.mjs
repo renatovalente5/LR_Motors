@@ -69,7 +69,20 @@ const correr = (cmd, args, opcoes = {}) => {
 const git = (...a) => execFileSync('git', ['-C', RAIZ, ...a], { encoding: 'utf8', maxBuffer: 256 * 1024 * 1024 });
 
 /* Os dados de hoje, como a guarda os lê (texto), e lidos (objectos). */
-const { dados: TEXTO } = G.lerDados(RAIZ);
+const { dados: TEXTO_REAL } = G.lerDados(RAIZ);   // o repositório como está (para a guarda verdadeira, lá em baixo)
+const TEXTO = { ...TEXTO_REAL, viaturas: { ...TEXTO_REAL.viaturas }, vendidas: { ...TEXTO_REAL.vendidas } };
+/* AS VIATURAS DE ENSAIO (.github/ensaio/): J, P, V e N são cópias fixas, e não
+   as do dono — ele vende, apaga e muda as dele quando quer (a 9 nov 2026 vendeu
+   o Jaguar e o Ford Puma e esta bateria rebentou). As dele com o mesmo nome
+   saem dos dados lidos, para não haver duas; tudo o resto é o de hoje. */
+const ENSAIO = join(RAIZ, '.github', 'ensaio');
+for (const pasta of ['viaturas', 'vendidas']) {
+  for (const f of readdirSync(join(ENSAIO, pasta)).filter((x) => x.endsWith('.json'))) {
+    const nome = f.slice(0, -5);
+    delete TEXTO.viaturas[nome]; delete TEXTO.vendidas[nome];
+    TEXTO[pasta][nome] = readFileSync(join(ENSAIO, pasta, f), 'utf8');
+  }
+}
 const lerTudo = (t) => ({
   definicoes: JSON.parse(t.definicoes),
   viaturas: Object.fromEntries(Object.entries(t.viaturas).map(([k, v]) => [k, JSON.parse(v)])),
@@ -224,7 +237,8 @@ try {
     const todos = [['data/definicoes.json', TEXTO.definicoes], ...Object.entries(TEXTO.viaturas).map(([n, t]) => [R.ficheiroDaViatura('viaturas', n), t]), ...Object.entries(TEXTO.vendidas).map(([n, t]) => [R.ficheiroDaViatura('vendidas', n), t])];
     const diferentes = todos.filter(([, t]) => R.serializar(JSON.parse(t), R.terminacaoDe(t)) !== t).map(([f]) => f);
     const semFim = todos.filter(([f, t]) => f.includes('/viaturas/') && !t.endsWith('\n')).length;
-    certo(todos.length >= 20 && diferentes.length === 0, `serializar() reproduz os ${todos.length} ficheiros byte a byte, cada um com a sua terminação (${semFim} viaturas sem \\n no fim, como o Pages CMS as deixa; o definicoes.json com)`, diferentes.join(', '));
+    /* (os mínimos são os que as viaturas de ensaio garantem com o stand vazio) */
+    certo(todos.length >= 5 && diferentes.length === 0, `serializar() reproduz os ${todos.length} ficheiros byte a byte, cada um com a sua terminação (${semFim} viaturas sem \\n no fim, como o Pages CMS as deixa; o definicoes.json com)`, diferentes.join(', '));
     certo(R.terminacaoDe(TEXTO.definicoes) === '\n', '   o definicoes.json acaba em \\n');
   }
   {
@@ -232,11 +246,14 @@ try {
     const r = correr('node', [GUARDA, '--relatorio-em', relF]);
     const rel = JSON.parse(readFileSync(relF, 'utf8'));
     certo(r.status === 0, 'a guarda verdadeira, sobre o repositório, sai com 0', r.err);
-    certo(rel.bloqueia === 0 && rel.neutraliza === 0 && rel.neutralizados.length === 0 && rel.lembretes === lembretes(hoje).length && rel.problemas.length === rel.lembretes,
+    /* A guarda verdadeira lê o repositório como está: compara-se com as regras
+       sobre os mesmos dados, sem as viaturas de ensaio. */
+    const real = R.problemas(TEXTO_REAL, OP);
+    certo(rel.bloqueia === 0 && rel.neutraliza === 0 && rel.neutralizados.length === 0 && rel.lembretes === lembretes(real).length && rel.problemas.length === rel.lembretes,
       `o relatório diz 0 que param, 0 neutralizados, 0 avisos e ${rel.lembretes} lembretes (e lê-se)`);
-    const antes = Object.fromEntries(Object.keys(TEXTO.viaturas).map((n) => [n, statSync(join(RAIZ, R.ficheiroDaViatura('viaturas', n))).mtimeMs]));
+    const antes = Object.fromEntries(Object.keys(TEXTO_REAL.viaturas).map((n) => [n, statSync(join(RAIZ, R.ficheiroDaViatura('viaturas', n))).mtimeMs]));
     const n = correr('node', [GUARDA, '--neutralizar', RAIZ]);
-    const depois = Object.fromEntries(Object.keys(TEXTO.viaturas).map((n2) => [n2, statSync(join(RAIZ, R.ficheiroDaViatura('viaturas', n2))).mtimeMs]));
+    const depois = Object.fromEntries(Object.keys(TEXTO_REAL.viaturas).map((n2) => [n2, statSync(join(RAIZ, R.ficheiroDaViatura('viaturas', n2))).mtimeMs]));
     certo(n.status === 2 && /só numa cópia/.test(n.err) && JSON.stringify(antes) === JSON.stringify(depois), '--neutralizar recusa-se a escrever no próprio repositório fora do CI (sai com 2, sem tocar em nada)', `${n.status} ${n.err}`);
   }
 
@@ -608,7 +625,8 @@ try {
         }
       }
     }
-    certo(f.length === 0 && n > 300, `viaturas: ${n} chaves apagadas; marca e modelo escondem, tipo e estado avisam, os campos da lei lembram nas que estão à venda, o resto passa — e cada mensagem nomeia o ecrã`, f.slice(0, 6).join(' | '));
+    /* (os mínimos são os que as viaturas de ensaio garantem com o stand vazio) */
+    certo(f.length === 0 && n >= 92, `viaturas: ${n} chaves apagadas; marca e modelo escondem, tipo e estado avisam, os campos da lei lembram nas que estão à venda, o resto passa — e cada mensagem nomeia o ecrã`, f.slice(0, 6).join(' | '));
   }
   {
     const caminhos = (o, pre = '') => Object.entries(o).flatMap(([k, v]) => {
@@ -757,6 +775,7 @@ try {
     const DADOS = /Ver os detalhes|exemplo\.pt|<img|renatovalente5|negrito|itálico|cerca|crase|Puma/;
     const d = dadosDeHoje();
     d.viaturas[J].marca = HOSTIS[0];                             // o ecrã (Viaturas › …)
+    delete d.viaturas[J].garantia_legal;                         // escolhida, o texto livre não conta (e não lembra)
     d.viaturas[J].garantia = `36 meses ${HOSTIS.join(' ')}`;     // o lembrete dos 3 anos cita a garantia inteira
     d.viaturas[P].modelo = 'Puma | ``` |';                      // o ecrã, e o nome em «mudam no site»
     d.viaturas[P].fotos.push(HOSTIS[2]);                         // a foto-invalida cita o nome, nos motivos e na tabela
@@ -768,7 +787,7 @@ try {
     const lido = lerComoGfm(md);
     certo(r.status === 0 && n.status === 0 && /^\| no site \|/m.test(md) && /### A cópia que o gerador lê/.test(md) && lido.partidas.length === 0 && !DADOS.test(lido.fora),
       'no resumo, nenhum valor dos dados fica fora do código: nem ligação, nem imagem, nem HTML, nem ênfase, nem menção — e a tabela fica com três colunas', [...lido.partidas, ...lido.fora.split('\n').filter((l) => DADOS.test(l))].slice(0, 3).join(' ‖ '));
-    certo(lido.codigos.some((c) => c.includes(`A garantia diz «36 meses ${HOSTIS.join(' ')}»`)) && lido.codigos.some((c) => c === 'Viaturas › Ford Puma | ``` | 1.0 EcoBoost Titanium'),
+    certo(lido.codigos.some((c) => c.includes(`A garantia diz «36 meses ${HOSTIS.join(' ')}»`)) && lido.codigos.some((c) => c === `Viaturas › ${R.nomeDaViatura(d.viaturas[P], P)}`),
       '   e o que lá está diz exactamente o que os dados dizem (as barras e as crases inteiras)', lido.codigos.filter((c) => /Puma|garantia/.test(c)).slice(0, 2).join(' ‖ '));
     rmSync(dir, { recursive: true, force: true });
     const muitos = Array.from({ length: 6000 }, (_, i) => ({ classe: 'avisa', ecra: `Viaturas › ${HOSTIS[i % HOSTIS.length]}`, mensagem: `${'x'.repeat(150)} ${HOSTIS[(i + 4) % HOSTIS.length]}` }));

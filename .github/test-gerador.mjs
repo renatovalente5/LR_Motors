@@ -89,6 +89,13 @@ const lerPasta = (rel) => Object.fromEntries(readdirSync(join(RAIZ, rel)).filter
 const DEF = lerJson('data/definicoes.json');
 const VIATURAS = lerPasta('data/viaturas');
 const VENDIDAS = lerPasta('data/viaturas/vendidas');
+/* As viaturas de ensaio (.github/ensaio/): J e P são cópias fixas, e não as do
+   dono — ele vende e muda as dele quando quer (a 9 nov 2026 vendeu as duas).
+   As dele com o mesmo nome saem, para não haver duas. */
+for (const [pasta, mapa] of [['viaturas', VIATURAS], ['vendidas', VENDIDAS]]) {
+  const rel = `.github/ensaio/${pasta}`;
+  for (const [nome, v] of Object.entries(lerPasta(rel))) { delete VIATURAS[nome]; delete VENDIDAS[nome]; mapa[nome] = v; }
+}
 const J = 'jaguar-xf-2-2-d-premium-luxury';   // à venda, com preço
 const P = 'ford-puma-titanium';               // brevemente, sem preço
 
@@ -144,7 +151,8 @@ try {
     { '@type': 'OpeningHoursSpecification', dayOfWeek: 'Saturday', opens: '09:00', closes: '13:00' },
   ];
   const paginasComDealer = hoje.paginas().filter((p) => dealer(hoje.ler(p)));
-  certo(paginasComDealer.length >= 15 && paginasComDealer.every((p) => JSON.stringify(dealer(hoje.ler(p)).openingHoursSpecification) === JSON.stringify(aMao)),
+  /* (os mínimos são os que as viaturas de ensaio garantem com o stand vazio) */
+  certo(paginasComDealer.length >= 5 && paginasComDealer.every((p) => JSON.stringify(dealer(hoje.ler(p)).openingHoursSpecification) === JSON.stringify(aMao)),
     `o horário do JSON-LD sai dos dados e é, nas ${paginasComDealer.length} páginas com o stand, o que estava escrito à mão (segunda a sexta 9-19, sábado 9-13, o domingo fechado não vai)`);
   certo(lixoEm(hoje).length === 0, `nenhuma das ${hoje.paginas().length} páginas tem «undefined», ligações vazias, separadores soltos ou linhas em branco`, lixoEm(hoje).slice(0, 5).join(' | '));
   const inicio = hoje.ler('index.html');
@@ -296,7 +304,8 @@ try {
        primeiro «</script>» já não o tem, mas deixa de ser JSON. Por isso a
        prova é que todos os blocos se lêem — e a ida e volta, logo a seguir. */
     const blocos = pags.flatMap((p) => jsonLD(g.ler(p)).map((b) => ({ p, ...b })));
-    certo(blocos.length > 30 && blocos.every((b) => b.obj !== null && !/<!--/.test(b.cru)), `os ${blocos.length} blocos JSON-LD lêem-se todos como JSON, sem um «<!--» por escapar (um «</script» de um texto partia-os a meio)`,
+    /* (os mínimos são os que as viaturas de ensaio garantem com o stand vazio) */
+    certo(blocos.length >= 16 && blocos.every((b) => b.obj !== null && !/<!--/.test(b.cru)), `os ${blocos.length} blocos JSON-LD lêem-se todos como JSON, sem um «<!--» por escapar (um «</script» de um texto partia-os a meio)`,
       blocos.filter((b) => b.obj === null).slice(0, 3).map((b) => `${b.p}: ${b.cru.slice(-80)}`).join(' | '));
     const ld = dealer(g.ler('index.html')) || {};
     certo(ld.legalName === d.empresa.denominacao_social && ld.name === d.empresa.nome_comercial && (ld.address || {}).streetAddress === d.stand.morada,
@@ -451,7 +460,8 @@ try {
     const mal = comRodape.map((p) => [p, (g.ler(p).match(/<a class="rodape__gestao"[^>]*>Gestão<\/a>/) || [''])[0]])
       .filter(([, a]) => !(a.includes('href="https://backoffice.lrmotorsautomoveis.pt/"') && /\srel="[^"]*\bnofollow\b[^"]*"/.test(a)));
     const comPagesCms = g.paginas().filter((p) => /pagescms/i.test(g.ler(p)));
-    certo(g.status === 0 && comRodape.length >= 20 && mal.length === 0 && comPagesCms.length === 0,
+    /* (os mínimos são os que as viaturas de ensaio garantem com o stand vazio) */
+    certo(g.status === 0 && comRodape.length >= 12 && mal.length === 0 && comPagesCms.length === 0,
       `nas ${comRodape.length} páginas com rodapé, «Gestão» leva ao painel, com rel="nofollow"; nenhuma página fala do Pages CMS`, [...mal.map(([p, a]) => `${p}: ${a || '(sem a ligação)'}`), ...comPagesCms].slice(0, 3).join(' | '));
     g.apagar();
   }
