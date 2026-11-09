@@ -199,7 +199,8 @@ try {
     const rodape = inicio.match(/<h3>Contactos<\/h3>[\s\S]*?<\/ul>/)[0];
     certo(topo.includes('href="tel:+351253123456">253 123 456</a>') && topo.includes(FIXA) && menu === `<p class="nota-chamada">253 123 456 · ${FIXA}</p>`,
       '   o cabeçalho e o menu: o número fixo, a ligar para ele, com a nota dele', topo + menu);
-    const linhasRodape = [...rodape.matchAll(/<li class="rodape__contacto">([\s\S]*?)<\/li>/g)].map((m) => m[1]);
+    /* Só as linhas dos telefones (desde 9 nov 2026 há também a do email). */
+    const linhasRodape = [...rodape.matchAll(/<li class="rodape__contacto">([\s\S]*?)<\/li>/g)].map((m) => m[1]).filter((l) => l.includes('href="tel:'));
     certo(linhasRodape.length === 2 && linhasRodape[0].includes('253 123 456') && linhasRodape[0].includes(FIXA) && linhasRodape[1].includes('916 228 513') && linhasRodape[1].includes(MOVEL),
       '   o rodapé: cada número com a nota da rede dele', rodape);
     const contactos = pag('contactos/index.html');
@@ -233,7 +234,8 @@ try {
     const g = gerar({ definicoes: d });
     certo(g.status === 0, 'sem os dois campos do telefone 2: o gerador corre', g.err.slice(-300));
     const rodape = g.ler('index.html').match(/<h3>Contactos<\/h3>[\s\S]*?<\/ul>/)[0];
-    certo(contar(rodape, /<li class="rodape__contacto">/g) === 1 && rodape.includes('961 053 363'), 'o rodapé tem uma linha de telefone, a do 1 (antes eram duas, uma vazia a ligar para «tel:+351»)', rodape);
+    const telefones = [...rodape.matchAll(/<li class="rodape__contacto">([\s\S]*?)<\/li>/g)].filter((m) => m[1].includes('href="tel:'));
+    certo(telefones.length === 1 && rodape.includes('961 053 363'), 'o rodapé tem uma linha de telefone, a do 1 (antes eram duas, uma vazia a ligar para «tel:+351»)', rodape);
     const contactos = g.ler('contactos/index.html');
     const factos = contactos.match(/<ul class="visita__factos">([\s\S]*?)<\/ul>/)[1];
     certo(contar(factos, /href="tel:/g) === 1 && !/·\s*<a/.test(factos) && !/·\s*<\/b>/.test(factos), 'Contactos: só o telefone 1, sem «·» solto', factos);
@@ -416,7 +418,7 @@ try {
     g2.apagar();
     const d3 = clonar(DEF); delete d3.empresa.cae;
     const g3 = gerar({ definicoes: d3 });
-    certo(g3.status === 0 && !/<li>CAE/.test(g3.ler('termos/index.html')) && g3.ler('termos/index.html').includes('<li>Pessoa colectiva e matrícula n.º 517541904</li><li>Telefones:'), 'sem CAE, a linha do CAE sai inteira (não fica «CAE » sozinho)');
+    certo(g3.status === 0 && !/<li>CAE/.test(g3.ler('termos/index.html')) && g3.ler('termos/index.html').includes('<li>Pessoa colectiva e matrícula n.º 517541904</li><li>Conservatória do Registo Comercial de Braga</li><li>Telefones:'), 'sem CAE, a linha do CAE sai inteira (não fica «CAE » sozinho)');
     g3.apagar();
     const resto = ['privacidade.md', 'termos.md', 'garantia.md', 'resolucao-de-litigios.md'].map((f) => readFileSync(join(RAIZ, 'conteudo', f), 'utf8'));
     certo(resto.every((t) => !/961|916|517541904|Febros|20\.000/.test(t)), 'nos conteudo/*.md já não há telefone, NIF, morada nem capital escritos à mão');

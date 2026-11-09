@@ -712,6 +712,16 @@
     if (mapaAutorizado()) carregarMapa();
   })();
 
+  /* Uma promoção acabada sai sozinha no dia a seguir ao fim, mesmo que o site
+     não volte a ser publicado (o gerador escreve a data em data-promo-fim). */
+  (function () {
+    var hoje = new Date(); hoje.setHours(0, 0, 0, 0);
+    document.querySelectorAll('[data-promo-fim]').forEach(function (el) {
+      var p = String(el.getAttribute('data-promo-fim')).split('-');
+      if (p.length === 3 && hoje > new Date(+p[0], +p[1] - 1, +p[2])) el.remove();
+    });
+  })();
+
 
 
 })();

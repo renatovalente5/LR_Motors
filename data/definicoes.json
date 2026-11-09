@@ -5,7 +5,14 @@
     "nif": "517541904",
     "capital_social": "20.000,00 €",
     "forma_juridica": "Sociedade por Quotas",
-    "cae": "45110 — Comércio de automóveis ligeiros"
+    "cae": "47811 — Comércio a retalho de veículos automóveis ligeiros",
+    "conservatoria": "Conservatória do Registo Comercial de Braga"
+  },
+  "sede_social": {
+    "morada": "Rua Dom Egas Pais, n.º 837",
+    "codigo_postal": "4730-531",
+    "localidade": "São Miguel Carreiras",
+    "distrito": "Braga"
   },
   "stand": {
     "morada": "Rua 1, Lugar de Febros 52",
@@ -23,7 +30,7 @@
     "telefone_2": "916228513",
     "telefone_2_texto": "916 228 513",
     "whatsapp": "351961053363",
-    "email": ""
+    "email": "lrmotorsautomoveis@gmail.com"
   },
   "redes": {
     "facebook": "https://www.facebook.com/profile.php?id=100073047242113",

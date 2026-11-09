@@ -15,6 +15,7 @@ Este sítio é propriedade da **{{empresa.denominacao_social}}**, que usa comerc
 - {{sede.rotulo}}: {{sede.endereco}}
 - Stand: {{stand.endereco_se_a_sede_e_outra}}
 - Pessoa colectiva e matrícula n.º {{empresa.nif}}
+- {{empresa.conservatoria}}
 - CAE {{empresa.cae}}
 - {{telefones}}
 - Email: {{contactos.email}}
@@ -31,7 +32,7 @@ Por isso não se aplica o direito de livre resolução previsto para os contrato
 
 Todas as viaturas anunciadas são **usadas**, salvo indicação expressa em contrário.
 
-Os preços indicados são em euros, correspondem ao **preço final a pronto pagamento** e incluem todos os impostos, taxas e encargos aplicáveis. Não incluem despesas de legalização de viaturas importadas quando essa situação for expressamente assinalada no anúncio.
+Os preços indicados são em euros, correspondem ao **preço final a pronto pagamento** e incluem todos os impostos, taxas e encargos aplicáveis. Incluem também o registo (averbamento) da viatura em nome do comprador.
 
 Esforçamo-nos por manter o stock e as características de cada viatura rigorosamente actualizados. Ainda assim, pode acontecer que uma viatura seja vendida antes de o anúncio ser retirado, ou que exista um erro de escrita. **Nenhum anúncio vincula a LR Motors a vender por preço manifestamente errado.** Confirme sempre connosco a disponibilidade e as características antes de se deslocar.
 

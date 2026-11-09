@@ -24,7 +24,7 @@ import { fileURLToPath } from 'node:url';
    o site diz ao Google do horário, a nota do custo da chamada de cada telefone,
    e o que é um email ou um endereço que se possa pôr num link. Um sítio só —
    o que as regras dizem que não se percebe é exactamente o que aqui fica de fora. */
-import { lerHorario, notaDaChamada, emailValido, urlHttps, GARANTIAS_LEGAIS, RE_GARANTIA_FABRICA } from '../.github/regras.mjs';
+import { lerHorario, notaDaChamada, emailValido, urlHttps, GARANTIAS_LEGAIS, RE_GARANTIA_FABRICA, promocaoDe } from '../.github/regras.mjs';
 /* O que este script escreve na consola do CI leva dados (marcas, estados,
    caminhos de fotografias, nomes de ficheiros), e o runner lê comandos no que
    lá se escreve: cada aviso com dados passa pelo umaLinha() — ver
@@ -300,6 +300,14 @@ const nEuro = (n) => new Intl.NumberFormat('pt-PT').format(n) + ' €';
    o DL 138/90 exige a quem anuncia preços. */
 const temPreco = (v) => typeof v.preco === 'number' && v.preco > 0;
 const precoTexto = (v) => temPreco(v) ? nEuro(v.preco) : 'Sob consulta';
+/* A PROMOÇÃO À VISTA (regras.mjs, promocaoDe): só dentro das datas, no dia em
+   que o site se gera; o site.js tira-a no dia a seguir ao fim, sem esperar por
+   outra publicação (tudo o que leva data-promo-fim). */
+const HOJE = new Date();
+const promoAtiva = (v) => { const p = temPreco(v) ? promocaoDe(v, HOJE) : null; return p && p.ativa ? p : null; };
+const isoDia = (d) => d.toISOString().slice(0, 10);
+const diaPt = (d) => isoDia(d).split('-').reverse().join('/');
+const precoAntes = (v) => { const p = promoAtiva(v); return p ? ` <s class="preco-antes" data-promo-fim="${isoDia(p.fim)}">${esc(nEuro(p.antes))}</s>` : ''; };
 
 /* A GARANTIA DE UMA VIATURA, como o site a diz (auditoria legal de out 2026).
    ---------------------------------------------------------------------------
@@ -1085,6 +1093,10 @@ function cartao(v, { prioridade = false } = {}) {
      destaque não informa quem compra de nada, e ficava a competir com as
      etiquetas que informam: reservado, vendido, eléctrico. */
   if (/Elétrico/i.test(v.combustivel)) selos.push(`<span class="selo selo--eletrico">100% elétrico</span>`);
+  /* A promoção diz no cartão até quando dura (DL 70/2007): o preço anterior
+     vai riscado ao lado do preço, e as datas inteiras na ficha. */
+  const promoCartao = promoAtiva(v);
+  if (promoCartao) selos.push(`<span class="selo selo--promo" data-promo-fim="${isoDia(promoCartao.fim)}">${esc(promoCartao.nome)} · até ${diaPt(promoCartao.fim).slice(0, 5)}</span>`);
 
   const spec = (icone, txt) => txt ? `<span class="cartao__spec">${icone}${esc(txt)}</span>` : '';
   const nf = fotos(v).length;
@@ -1120,7 +1132,7 @@ function cartao(v, { prioridade = false } = {}) {
         ${spec(ic.raio, v.potencia ? v.potencia + ' cv' : '')}
       </div>
       ${estaVendida(v) ? '' : `<div class="cartao__pe">
-        <span class="cartao__preco${temPreco(v) ? '' : ' cartao__preco--consulta'}">${esc(precoTexto(v))}</span>
+        <span class="cartao__preco${temPreco(v) ? '' : ' cartao__preco--consulta'}">${esc(precoTexto(v))}${precoAntes(v)}</span>
         <span class="cartao__ver">Ver ${ic.seta}</span>
       </div>`}
     </div>`;
@@ -1211,6 +1223,8 @@ function vitrine(lista) {
     if (/el[éeê]ctric|el[éeê]tric/i.test(v.combustivel || '')) selos.push('<span class="vit-selo vit-selo--eletrico">100% elétrico</span>');
     if (garantia) selos.push(`<span class="vit-selo vit-selo--garantia">${esc(garantia)}</span>`);
     if (v.iva_dedutivel) selos.push('<span class="vit-selo vit-selo--iva">IVA dedutível</span>');
+    const promo = promoAtiva(v);
+    if (promo) selos.push(`<span class="vit-selo vit-selo--promo" data-promo-fim="${isoDia(promo.fim)}">${esc(promo.nome)}</span>`);
 
     const specs = [
       ['Ano', v.ano],
@@ -1241,7 +1255,7 @@ function vitrine(lista) {
         <div class="vit-cartao__cabeca">
           <h3 class="vit-cartao__linha">
             <span class="vit-cartao__nome">${esc([v.marca, v.modelo].filter(Boolean).join(' '))}</span>
-            <span class="vit-cartao__preco">${esc(precoTexto(v))}</span>
+            <span class="vit-cartao__preco">${esc(precoTexto(v))}${precoAntes(v)}</span>
           </h3>
           <p class="vit-cartao__versao">${esc(v.versao || v.carrocaria || '')}</p>
           <p class="vit-cartao__selos">${selos.join('')}</p>
@@ -1764,6 +1778,7 @@ function paginaViatura(v) {
       <aside class="ficha__lado">
         <div class="painel">
           <p class="painel__preco${temPreco(v) ? '' : ' painel__preco--consulta'}">${esc(precoTexto(v))}</p>
+          ${(() => { const p = promoAtiva(v); return p ? `<p class="painel__promo" data-promo-fim="${isoDia(p.fim)}"><strong>${esc(p.nome)}</strong>, de ${diaPt(p.inicio)} a ${diaPt(p.fim)}. Antes: <s>${esc(nEuro(p.antes))}</s>.</p>` : ''; })()}
           <p class="painel__iva">${temPreco(v)
             ? (eBrevemente(v)
                 ? 'Preço final, com todos os impostos incluídos. Ainda não chegou ao stand.'
@@ -2453,6 +2468,7 @@ const MARCADORES = new Map(Object.entries({
   'empresa.capital_social': [def.empresa.capital_social, 'Dados legais da empresa › Capital social'],
   'empresa.nif': [def.empresa.nif, 'Dados legais da empresa › NIF'],
   'empresa.cae': [def.empresa.cae],
+  'empresa.conservatoria': [def.empresa.conservatoria],
   'sede.rotulo': [SEDE_A_PARTE ? 'Sede' : 'Sede e stand'],
   'sede.endereco': [enderecoDe(SEDE), 'Morada do stand (ou Sede social)'],
   'sede.morada': [SEDE.morada],

@@ -1483,3 +1483,11 @@ body.cc-visivel .rodape { padding-bottom: calc(var(--cc-altura, 0px) + 2.5rem); 
 .rodape .horario span:first-child { color: #A8BBD2; }
 .rodape .horario span:last-child { color: #fff; }
 .rodape .horario li { border-bottom-color: rgba(255,255,255,.1); }
+
+/* A promoção (gerar.mjs, promoAtiva): o preço anterior riscado ao lado do
+   preço, o nome num selo e, na ficha, as datas. */
+.preco-antes { margin-inline-start: .35rem; font-size: .72em; font-weight: 600; color: var(--tinta-3); text-decoration: line-through; white-space: nowrap; }
+.vit-selo--promo { background: #FFF4E5; color: #8A4B00; }
+.painel__promo { font-size: .86rem; color: var(--tinta-2); margin-top: .35rem; }
+.painel__promo s { color: var(--tinta-3); }
+.selo--promo { background: #FFF4E5; color: #8A4B00; }

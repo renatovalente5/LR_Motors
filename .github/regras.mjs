@@ -112,7 +112,8 @@ export const EXTENSOES_FOTO = ['jpg', 'jpeg', 'png', 'webp', 'heic'];
    chave nova entra por esta ordem (ordenarComo()); as que já estão no ficheiro
    ficam onde estão. */
 export const CAMPOS_VIATURA = [
-  'marca', 'modelo', 'versao', 'tipo', 'carrocaria', 'preco', 'iva_dedutivel', 'publicado', 'estado',
+  'marca', 'modelo', 'versao', 'tipo', 'carrocaria', 'preco', 'preco_anterior', 'promocao', 'promocao_inicio', 'promocao_fim',
+  'iva_dedutivel', 'publicado', 'estado',
   'destaque', 'ordem', 'fotos', 'ano', 'mes', 'km', 'combustivel', 'caixa', 'potencia', 'cilindrada',
   'cor', 'lugares', 'portas', 'origem', 'matricula', 'ano_construcao', 'registos_anteriores',
   'garantia', 'garantia_legal', 'garantia_fabrica', 'equipamento', 'descricao',
@@ -128,6 +129,28 @@ export const GARANTIAS_LEGAIS = [
   'Garantia legal de conformidade reduzida a 18 meses, por acordo escrito (DL 84/2021)',
 ];
 export const RE_GARANTIA_FABRICA = /^(0[1-9]|1[0-2])\/(20[0-9]{2})$/;
+
+/* A PROMOÇÃO DE UMA VIATURA (o Renato, 9 nov 2026): o «Preço Especial Outono»
+   do Audi Q2 e do Opel Corsa vivia no campo livre da garantia, sem o preço
+   anterior nem as datas. O DL 70/2007 (art. 5.º) pede o preço anterior — o mais
+   baixo dos 30 dias antes — e a duração. Quatro campos; o site só a mostra com
+   os quatro certos e dentro das datas (dd/mm/aaaa, como o dono as escreve). */
+export const RE_DATA_PT = /^(0[1-9]|[12][0-9]|3[01])\/(0[1-9]|1[0-2])\/(20[0-9]{2})$/;
+export function dataPt(s) {
+  const m = RE_DATA_PT.exec(String(s ?? '').trim());
+  if (!m) return null;
+  const d = new Date(Date.UTC(Number(m[3]), Number(m[2]) - 1, Number(m[1])));
+  return d.getUTCDate() === Number(m[1]) ? d : null;   // 31/02 não existe
+}
+export function promocaoDe(v, hoje = new Date()) {
+  if (!v || typeof v !== 'object') return null;
+  const nome = typeof v.promocao === 'string' ? v.promocao.trim() : '';
+  const agora = v.preco, antes = v.preco_anterior;
+  const inicio = dataPt(v.promocao_inicio), fim = dataPt(v.promocao_fim);
+  if (!nome || !(typeof agora === 'number' && agora > 0) || !(typeof antes === 'number' && antes > agora) || !inicio || !fim || fim < inicio) return null;
+  const dia = Date.UTC(hoje.getFullYear(), hoje.getMonth(), hoje.getDate());
+  return { nome, antes, agora, inicio, fim, ativa: dia >= inicio.getTime() && dia <= fim.getTime() };
+}
 /* Sempre escritos pelo painel, com o valor explícito. Ausentes valem o valor por
    omissão do .pages.yml (é o que o gerador faz). */
 export const BOOLEANOS_VIATURA = ['iva_dedutivel', 'publicado', 'destaque'];
@@ -135,7 +158,8 @@ export const POR_OMISSAO = { tipo: 'carro', iva_dedutivel: false, publicado: tru
 
 export const NOMES_CAMPOS = {
   marca: 'Marca', modelo: 'Modelo', versao: 'Versão', tipo: 'Tipo de veículo', carrocaria: 'Carroçaria',
-  preco: 'Preço', iva_dedutivel: 'IVA dedutível', publicado: 'Publicado no site', estado: 'Estado',
+  preco: 'Preço', preco_anterior: 'Preço anterior', promocao: 'Promoção', promocao_inicio: 'Início da promoção',
+  promocao_fim: 'Fim da promoção', iva_dedutivel: 'IVA dedutível', publicado: 'Publicado no site', estado: 'Estado',
   destaque: 'Destaque na página inicial', ordem: 'Ordem', fotos: 'Fotografias', ano: 'Ano', mes: 'Mês',
   km: 'Quilómetros', combustivel: 'Combustível', caixa: 'Caixa', potencia: 'Potência (cv)',
   cilindrada: 'Cilindrada (cm³)', cor: 'Cor', lugares: 'Lugares', portas: 'Portas', origem: 'Origem',
@@ -173,13 +197,13 @@ export const LIMITES = {
 /* Tamanhos máximos dos textos, em caracteres. Folgados: o maior de hoje é a
    descrição do Mercedes E 300 de, com 1428. */
 export const TAMANHOS = {
-  marca: 40, modelo: 60, versao: 120, cor: 40, garantia: 60, garantiaFabrica: 7, matricula: 15,
+  marca: 40, modelo: 60, versao: 120, cor: 40, garantia: 60, garantiaFabrica: 7, matricula: 15, promocao: 40,
   equipamento: 120, equipamentoItens: 60, descricao: 6000, fotos: 50, caminhoFoto: 300,
   telefoneTexto: 20, email: 160, url: 500,
   morada: 120, localidade: 60, distrito: 40, pais: 40,
   horarioLinhas: 10, dias: 40, horas: 40,
   reclamo: 80, titulo: 80, heroTexto: 300, sobreTexto: 1500, locais: 120, avisoVisita: 200,
-  nomeComercial: 80, denominacao: 160, formaJuridica: 80, capitalSocial: 40, cae: 120,
+  nomeComercial: 80, denominacao: 160, formaJuridica: 80, capitalSocial: 40, cae: 120, conservatoria: 120,
 };
 /* O que o Worker do painel aceita gravar (recusa acima); aqui só se lembra, a
    partir de 80 %. */
@@ -652,6 +676,7 @@ export function problemasDaViatura(v, ctx = {}) {
     if (!ok) avisa(campo, campo, mensagem);
   };
   numero('preco', LIMITES.preco, `O preço é só o número, sem € nem pontos (ex.: 18990), de 0 a ${milhares(LIMITES.preco[1])} €.`, { casas: 2 });
+  numero('preco_anterior', LIMITES.preco, `O preço anterior é só o número, sem € nem pontos (ex.: 20249), de 0 a ${milhares(LIMITES.preco[1])} €.`, { casas: 2 });
   numero('km', LIMITES.km, 'Os quilómetros são só o número, sem pontos (ex.: 94000).');
   numero('potencia', LIMITES.potencia, `A potência é um número inteiro de cavalos, de 1 a ${LIMITES.potencia[1]}.`);
   numero('cilindrada', LIMITES.cilindrada, `A cilindrada é um número inteiro de cm³, de 1 a ${LIMITES.cilindrada[1]} (vazia nos eléctricos).`);
@@ -687,6 +712,11 @@ export function problemasDaViatura(v, ctx = {}) {
   deLista('garantia_legal', GARANTIAS_LEGAIS, false, 'A garantia legal tem de ser uma das duas da lista: 3 anos (a garantia legal), ou reduzida a 18 meses por acordo escrito (ou nenhuma).');
   if (temTexto(v.garantia_fabrica) && !RE_GARANTIA_FABRICA.test(v.garantia_fabrica.trim())) {
     avisa('garantia_fabrica:formato', 'garantia_fabrica', 'A garantia de fábrica é o mês e o ano em que acaba, assim: 03/2027 (vazio se já não tem).');
+  }
+  /* A promoção: com um dos quatro campos e não os quatro certos, não aparece. */
+  texto('promocao', TAMANHOS.promocao);
+  if (['promocao', 'preco_anterior', 'promocao_inicio', 'promocao_fim'].some((k) => !ausente(v[k]) && v[k] !== '') && !promocaoDe(v)) {
+    avisa('promocao', 'promocao', 'A promoção precisa do nome, do preço anterior (maior do que o preço) e das datas de início e de fim (dd/mm/aaaa, o fim depois do início): sem isso não aparece no site.');
   }
   if (temTexto(v.matricula) && !(RE_MATRICULA.test(v.matricula.trim()) && /[0-9]/.test(v.matricula) && v.matricula.trim().length >= 4)) {
     avisa('matricula:formato', 'matricula', 'A matrícula escreve-se como no livrete, só letras, algarismos e hífens (ex.: AA-00-BB).');
@@ -909,6 +939,7 @@ export function problemasDasDefinicoes(d) {
     }
     textoSimples(e.nome_comercial, 'empresa.nome_comercial', 'empresa', 'empresa.nome_comercial', 'Nome comercial', TAMANHOS.nomeComercial, { vazio: 'avisa', porque: 'é o nome que aparece no topo da página inicial e no rodapé.' });
     textoSimples(e.cae, 'empresa.cae', 'empresa', 'empresa.cae', 'CAE', TAMANHOS.cae);
+    textoSimples(e.conservatoria, 'empresa.conservatoria', 'empresa', 'empresa.conservatoria', 'Conservatória', TAMANHOS.conservatoria);
   }
 
   // --- sede social (opcional: hoje não está no ficheiro) ---------------------

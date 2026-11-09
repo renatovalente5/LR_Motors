@@ -209,7 +209,8 @@ try {
       'sem-preco': aVenda.filter(([, v]) => !(typeof v.preco === 'number' && v.preco > 0)).length,
       'sem-km': aVenda.filter(([, v]) => falta(v.km)).length,
       'sem-fotos': aVenda.filter(([, v]) => !(v.fotos || []).some((c) => typeof c === 'string' && c.trim())).length,
-      'garantia-3-anos': aVenda.filter(([, v]) => /\b(3\s*anos|36\s*meses)\b/i.test(v.garantia || '')).length,
+      /* Só quando a garantia legal não está escolhida: escolhida, é ela que o site diz. */
+      'garantia-3-anos': aVenda.filter(([, v]) => !v.garantia_legal && /\b(3\s*anos|36\s*meses)\b/i.test(v.garantia || '')).length,
       'garantia-curta': aVenda.filter(([, v]) => /\b([0-9]|1[0-7])\s*meses\b|\b1\s*ano\b/i.test(v.garantia || '')).length,
     };
     const veio = {};
@@ -375,12 +376,12 @@ try {
     ['à venda sem quilómetros', viat(J, (v) => { v.km = null; }), 'avisa', `viatura:${J}:sem-km`, undefined, true],
     ['à venda sem fotografias', viat(J, (v) => { v.fotos = []; }), 'avisa', `viatura:${J}:sem-fotos`, undefined, true],
     ['reservada sem matrícula', viat(J, (v) => { v.estado = 'reservado'; }), 'avisa', `viatura:${J}:sem-matricula`, undefined, true],
-    ['garantia de 12 meses', viat(J, (v) => { v.garantia = '12 meses'; }), 'avisa', `viatura:${J}:garantia-curta`, undefined, true],
-    ['garantia de «1 ano»', viat(J, (v) => { v.garantia = 'Garantia 1 ano'; }), 'avisa', `viatura:${J}:garantia-curta`, undefined, true],
-    ['garantia «12» (só algarismos são meses, como no site)', viat(J, (v) => { v.garantia = '12'; }), 'avisa', `viatura:${J}:garantia-curta`, undefined, true],
-    ['garantia de «3 anos»', viat(J, (v) => { v.garantia = '3 anos'; }), 'avisa', `viatura:${J}:garantia-3-anos`, undefined, true],
-    ['garantia de «três anos»', viat(J, (v) => { v.garantia = 'Três anos'; }), 'avisa', `viatura:${J}:garantia-3-anos`, undefined, true],
-    ['garantia de 36 meses', viat(J, (v) => { v.garantia = '36 meses'; }), 'avisa', `viatura:${J}:garantia-3-anos`, undefined, true],
+    ['garantia de 12 meses', viat(J, (v) => { delete v.garantia_legal; v.garantia = '12 meses'; }), 'avisa', `viatura:${J}:garantia-curta`, undefined, true],
+    ['garantia de «1 ano»', viat(J, (v) => { delete v.garantia_legal; v.garantia = 'Garantia 1 ano'; }), 'avisa', `viatura:${J}:garantia-curta`, undefined, true],
+    ['garantia «12» (só algarismos são meses, como no site)', viat(J, (v) => { delete v.garantia_legal; v.garantia = '12'; }), 'avisa', `viatura:${J}:garantia-curta`, undefined, true],
+    ['garantia de «3 anos»', viat(J, (v) => { delete v.garantia_legal; v.garantia = '3 anos'; }), 'avisa', `viatura:${J}:garantia-3-anos`, undefined, true],
+    ['garantia de «três anos»', viat(J, (v) => { delete v.garantia_legal; v.garantia = 'Três anos'; }), 'avisa', `viatura:${J}:garantia-3-anos`, undefined, true],
+    ['garantia de 36 meses', viat(J, (v) => { delete v.garantia_legal; v.garantia = '36 meses'; }), 'avisa', `viatura:${J}:garantia-3-anos`, undefined, true],
     // --- os ficheiros das viaturas ---
     ['viatura ilegível', (d) => { d.viaturas[J] = '{"marca": "Jaguar",'; }, 'bloqueia', `viatura:${J}:ilegivel`],
     ['viatura que é uma lista', (d) => { d.viaturas[J] = '[]'; }, 'bloqueia', `viatura:${J}:forma`],
@@ -460,10 +461,10 @@ try {
     ['carroçaria «SUV » com um espaço (o gerador apara)', viat(J, (v) => { v.carrocaria = 'SUV '; })],
     ['preço com 2 casas', viat(J, (v) => { v.preco = 13990.5; })],
     ['0 quilómetros e 0 donos anteriores (zero é uma escolha)', viat(J, (v) => { v.km = 0; v.registos_anteriores = 0; })],
-    ['garantia «18 meses»', viat(J, (v) => { v.garantia = '18 meses'; })],
-    ['garantia «24 meses»', viat(J, (v) => { v.garantia = '24 meses'; })],
-    ['garantia «Garantia mútuo acordo»', viat(J, (v) => { v.garantia = 'Garantia mútuo acordo'; })],
-    ['garantia «Garantia de fábrica até 2027»', viat(J, (v) => { v.garantia = 'Garantia de fábrica até 2027'; })],
+    ['garantia «18 meses»', viat(J, (v) => { delete v.garantia_legal; v.garantia = '18 meses'; })],
+    ['garantia «24 meses»', viat(J, (v) => { delete v.garantia_legal; v.garantia = '24 meses'; })],
+    ['garantia «Garantia mútuo acordo»', viat(J, (v) => { delete v.garantia_legal; v.garantia = 'Garantia mútuo acordo'; })],
+    ['garantia «Garantia de fábrica até 2027»', viat(J, (v) => { delete v.garantia_legal; v.garantia = 'Garantia de fábrica até 2027'; })],
     ['garantia vazia (o site mostra a garantia legal)', viat(J, (v) => { delete v.garantia; })],
     [`ano ${anoSeguinte} (o ano seguinte)`, viat(J, (v) => { v.ano = anoSeguinte; })],
     ['ano de construção igual ao da matrícula', viat(J, (v) => { v.ano_construcao = 2013; })],
@@ -580,7 +581,22 @@ try {
           const v = clonar(v0); delete v[k]; n++;
           let lista;
           try { lista = R.problemas({ [pasta]: { [nome]: v } }, OP); } catch (e) { f.push(`${nome} sem ${k}: rebentou (${e.message})`); continue; }
-          const novos = lista.filter((x) => !base.some((b) => b.chave === x.chave && b.classe === x.classe));
+          /* A promoção (9 nov 2026): sem um dos seus quatro campos — ou sem o
+             preço — deixa de aparecer, e o dono é avisado (classe avisa,
+             chave …:promocao). Sem a garantia legal escolhida, o texto livre
+             volta a falar e pode lembrar (ex.: «3 anos» da marca). */
+          const ePromo = (x) => x.classe === 'avisa' && x.chave.endsWith(':promocao');
+          const comPromo = R.promocaoDe(v0) !== null;
+          const todos = lista.filter((x) => !base.some((b) => b.chave === x.chave && b.classe === x.classe));
+          if (comPromo && ['promocao', 'preco_anterior', 'promocao_inicio', 'promocao_fim'].includes(k)) {
+            if (!(todos.length > 0 && todos.every(ePromo))) f.push(`${nome} sem ${k}: esperava o aviso da promoção, veio ${todos.map((x) => `${x.classe} ${x.chave}`).join(',') || 'nada'}`);
+            continue;
+          }
+          if (k === 'garantia_legal') {
+            if (!todos.every((x) => x.lembrete)) f.push(`${nome} sem garantia_legal: esperava só lembretes, veio ${todos.map((x) => `${x.classe} ${x.chave}`).join(',')}`);
+            continue;
+          }
+          const novos = comPromo && k === 'preco' ? todos.filter((x) => !ePromo(x)) : todos;
           const esperado = k === 'marca' || k === 'modelo' ? 'neutraliza'
             : k === 'tipo' || k === 'estado' ? 'avisa'
               : LEMBRETE_SE_A_VENDA[k] && aVenda ? 'lembrete' : null;
@@ -606,6 +622,8 @@ try {
       if (/^stand\.(morada|codigo_postal|localidade)$/.test(c)) return 'bloqueia';
       if (/^empresa\.(denominacao_social|nif|capital_social|forma_juridica)$/.test(c)) return 'bloqueia';
       if (/^stand\.(distrito|latitude|longitude)$/.test(c) || /^horario\.\d+\.(dias|horas)$/.test(c)) return 'avisa';
+      /* A sede social é opcional, mas meia morada da sede avisa (desde 9 nov 2026 está preenchida). */
+      if (/^sede_social\.(morada|codigo_postal|localidade)$/.test(c)) return 'avisa';
       if (/^textos\.(reclamo|hero_titulo|hero_texto|sobre_titulo|sobre_texto)$/.test(c) || c === 'opcoes.mostrar_vendidos' || c === 'empresa.nome_comercial') return 'avisa';
       return null;   // contactos.email, stand.pais, stand.mapa, redes.*, textos.locais, textos.aviso_visita, empresa.cae, horario.N, tecnico…
     };
@@ -816,6 +834,19 @@ try {
   certo(R.mesesDeGarantia('18 meses') === 18 && R.mesesDeGarantia('Garantia 3 anos Peugeot') === 36 && R.mesesDeGarantia('36 meses') === 36 && R.mesesDeGarantia('12') === 12 && R.mesesDeGarantia('um ano') === 12
     && R.mesesDeGarantia('Garantia mútuo acordo') === null && R.mesesDeGarantia('') === null && R.mesesDeGarantia('18 meses - BREVEMENTE') === 18 && R.mesesDeGarantia('2024 anos?') === null, 'mesesDeGarantia: meses, anos, por extenso, só algarismos; null quando não diz um prazo');
   certo(R.negritoCerto('a **b** c') && !R.negritoCerto('a **b c') && !R.negritoCerto('**a\nb**') && R.negritoCerto('**a**\n\n**b**') && R.negritoCerto('5* de 5') && R.negritoCerto('Em **Vila do\nConde**', { porParagrafo: false }), 'negritoCerto: como o gerador o lê (na descrição, o negrito não atravessa linhas)');
+  {
+    /* A promoção (9 nov 2026): activa de início a fim, inclusive, e só com os
+       quatro campos certos. Datas fixas aqui — nada depende do dia de hoje. */
+    const v = { preco: 19990, preco_anterior: 20249, promocao: 'Preço Especial Outono', promocao_inicio: '24/10/2026', promocao_fim: '01/12/2026' };
+    const em = (a, m, d) => R.promocaoDe(v, new Date(a, m - 1, d));
+    certo(em(2026, 11, 9)?.ativa && em(2026, 10, 24)?.ativa && em(2026, 12, 1)?.ativa && !em(2026, 10, 23).ativa && !em(2026, 12, 2).ativa,
+      'promocaoDe: activa de 24/10 a 01/12, os dois dias incluídos, e só aí');
+    certo(R.promocaoDe({ ...v, preco_anterior: 19990 }) === null && R.promocaoDe({ ...v, promocao_fim: '31/02/2026' }) === null
+      && R.promocaoDe({ ...v, promocao_inicio: '02/12/2026' }) === null && R.promocaoDe({ ...v, promocao: ' ' }) === null && R.promocaoDe({ ...v, preco: 0 }) === null,
+      '   sem redução, com um dia que não existe, com o fim antes do início, sem nome ou sem preço: não há promoção');
+    certo(R.dataPt('24/10/2026')?.toISOString().slice(0, 10) === '2026-10-24' && R.dataPt('2026-10-24') === null && R.dataPt('29/02/2027') === null,
+      '   dataPt: dd/mm/aaaa, e só dias que existem');
+  }
   {
     const puma = HOJE.viaturas[P];   // destaque e ordem no fim, à moda antiga
     const depois = { ...puma, preco: 18990, registos_anteriores: 1, iva_dedutivel: false, extra: 1 };

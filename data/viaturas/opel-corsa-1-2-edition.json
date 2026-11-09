@@ -5,6 +5,10 @@
   "tipo": "carro",
   "carrocaria": "Citadino",
   "preco": 12990,
+  "preco_anterior": 13500,
+  "promocao": "Preço Especial Outono",
+  "promocao_inicio": "24/10/2026",
+  "promocao_fim": "01/12/2026",
   "iva_dedutivel": false,
   "publicado": true,
   "estado": "disponivel",
@@ -43,7 +47,8 @@
   "lugares": 5,
   "portas": 5,
   "origem": "Nacional",
-  "garantia": "Garantia 18 meses + Preço Especial 🍂Outono🍂",
+  "garantia": "18 meses",
+  "garantia_legal": "Garantia legal de conformidade reduzida a 18 meses, por acordo escrito (DL 84/2021)",
   "equipamento": [
     "AC manual",
     "Cruise Control",
@@ -56,7 +61,7 @@
     "Sensores de estacionamento traseiros",
     "Câmara de marcha-atrás"
   ],
-  "descricao": "Garantia de 18 meses incluída no preço!\n\nOpel Corsa 1.2 Edition, nacional, c/novo! Primeira matrícula em 08/2023, 1 registo, manuais, 2 chaves e revisões todas na marca, apenas 36.969km!\n\nPossibilidade de financiamento!\n\nEcrã touch\nCâmera traseira\nAr condicionado Cruise control Bluetooth Reconhecimento de sinais de trânsito Assistente de faixa Travagem de emergência para peões Sensores de estacionamento traseiros Vidros elétricos dianteiros e traseiros Espelhos elétricos Controlo de tração Monitorização da pressão dos pneus Volante multifunções Sistema de som Estofos em tecido Jantes especiais\nISOFIX\nUSB\nStart&Stop\nESP/ABS\n\nPode ser visto em Braga ou Vila do Conde!\n\nEste anúncio foi publicado por rotina informática. Todos os dados carecem de confirmação junto do comercial.\n",
+  "descricao": "Opel Corsa 1.2 Edition, nacional, c/novo! Primeira matrícula em 08/2023, 1 registo, manuais, 2 chaves e revisões todas na marca, apenas 36.969km!\n\nPossibilidade de financiamento!\n\nEcrã touch\nCâmera traseira\nAr condicionado Cruise control Bluetooth Reconhecimento de sinais de trânsito Assistente de faixa Travagem de emergência para peões Sensores de estacionamento traseiros Vidros elétricos dianteiros e traseiros Espelhos elétricos Controlo de tração Monitorização da pressão dos pneus Volante multifunções Sistema de som Estofos em tecido Jantes especiais\nISOFIX\nUSB\nStart&Stop\nESP/ABS\n\nPode ser visto em Braga ou Vila do Conde!\n\nEste anúncio foi publicado por rotina informática. Todos os dados carecem de confirmação junto do comercial.\n",
   "destaque": true,
   "ordem": 2
 }
