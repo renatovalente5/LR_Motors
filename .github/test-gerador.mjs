@@ -99,9 +99,14 @@ for (const [pasta, mapa] of [['viaturas', VIATURAS], ['vendidas', VENDIDAS]]) {
 const J = 'jaguar-xf-2-2-d-premium-luxury';   // à venda, com preço
 const P = 'ford-puma-titanium';               // brevemente, sem preço
 
+/* Um relógio de ensaio para o gerador: `hoje` (ISO) passa a ser o new Date() e o
+   Date.now() dele, por um --import no NODE_OPTIONS. O gerador não sabe de nada. */
+const relogio = (hoje) => `--import=data:text/javascript,${encodeURIComponent(
+  `const D=Date,t=D.parse(${JSON.stringify(hoje)});globalThis.Date=class extends D{constructor(...a){super(...(a.length?a:[t]))}static now(){return t}};`)}`;
+
 /* Gera o site de um caso: os dados (por omissão, os de hoje), mais ficheiros
-   soltos (fotografias de ensaio, um conteúdo/ mudado). */
-function gerar({ definicoes = DEF, viaturas = VIATURAS, vendidas = VENDIDAS, ficheiros = {} } = {}) {
+   soltos (fotografias de ensaio, um conteúdo/ mudado) e, se for preciso, outro dia. */
+function gerar({ definicoes = DEF, viaturas = VIATURAS, vendidas = VENDIDAS, ficheiros = {}, hoje = null } = {}) {
   const dir = mkdtempSync(join(TMP, 'caso-'));
   cpSync(BASE_REPO, dir, { recursive: true });
   mkdirSync(join(dir, 'data', 'viaturas', 'vendidas'), { recursive: true });
@@ -110,7 +115,8 @@ function gerar({ definicoes = DEF, viaturas = VIATURAS, vendidas = VENDIDAS, fic
     for (const [nome, v] of Object.entries(mapa)) writeFileSync(join(dir, R.ficheiroDaViatura(pasta, nome)), JSON.stringify(v, null, 2));
   }
   for (const [rel, t] of Object.entries(ficheiros)) { mkdirSync(dirname(join(dir, rel)), { recursive: true }); writeFileSync(join(dir, rel), t); }
-  const r = spawnSync('node', ['scripts/gerar.mjs'], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...ENV } });
+  const relogioEnv = hoje ? { NODE_OPTIONS: [process.env.NODE_OPTIONS, relogio(hoje)].filter(Boolean).join(' ') } : {};
+  const r = spawnSync('node', ['scripts/gerar.mjs'], { cwd: dir, encoding: 'utf8', env: { ...process.env, ...ENV, ...relogioEnv } });
   const ler = (rel) => (existsSync(join(dir, '_site', rel)) ? readFileSync(join(dir, '_site', rel), 'utf8') : null);
   const paginas = () => {
     const out = [];
@@ -474,6 +480,28 @@ try {
     certo(g2.status === 0 && g3.status === 0 && semNatal.every((h) => h.includes('hero__titulo') && !h.includes('hero__neve') && !h.includes('faixa-natal')),
       'sem promoção de Natal (outra promoção, ou nenhuma): nem neve nem faixa');
     g2.apagar(); g3.apagar();
+  }
+
+  /* ================================================================== */
+  secao('o gorro de Natal no logótipo: na barra e no rodapé até ao Dia de Reis, e depois nada');
+  {
+    const gorros = (h) => [...String(h).matchAll(/<image class="gorro-natal" data-promo-fim="2027-01-06" href="([^"]+)"[^>]*\/><\/svg>/g)].map((m) => m[1]);
+    const logos = (h) => contar(h, /<svg [^>]*aria-label="LR Motors"/g);
+    const g1 = gerar({ hoje: '2026-12-24T18:00:00Z' });
+    const paginas1 = g1.paginas().map((p) => g1.ler(p)).filter((h) => h.includes('class="marca"'));
+    const i1 = g1.ler('index.html') || '';
+    certo(g1.status === 0 && paginas1.length > 5 && paginas1.every((h) => gorros(h).length === 2 && logos(h) === 2)
+      && i1.indexOf('gorro-natal') > i1.indexOf('class="marca"') && i1.lastIndexOf('gorro-natal') > i1.indexOf('class="rodape__marca"'),
+      `na véspera de Natal: em todas as páginas (${paginas1.length}), um gorro dentro do logótipo da barra e outro no do rodapé, com o fim em data-promo-fim`, g1.err.slice(-300));
+    const ref = gorros(i1)[0] || '';
+    certo(/^\/assets\/img\/gorro-natal\.webp\?v=[0-9a-f]{8}$/.test(ref) && existsSync(join(g1.dir, '_site', ref.split('?')[0])),
+      'a imagem do gorro vai para o site, com o sufixo de versão', ref);
+    g1.apagar();
+    const g2 = gerar({ hoje: '2027-01-07T09:00:00Z' });
+    const paginas2 = g2.paginas().map((p) => g2.ler(p)).filter((h) => h.includes('class="marca"'));
+    certo(g2.status === 0 && paginas2.length > 5 && paginas2.every((h) => !h.includes('gorro-natal') && logos(h) === 2),
+      'a 7 de janeiro: sem gorro em página nenhuma, o logótipo como sempre', g2.err.slice(-300));
+    g2.apagar();
   }
 
   /* ================================================================== */

@@ -600,6 +600,38 @@ const ic = {
 const logoSVG = readFileSync(join(RAIZ, 'assets/img/logo.svg'), 'utf8')
   .replace(/<\?xml[^>]*\?>\s*/, '').trim();
 
+/* GORRO DE NATAL NO LOGÓTIPO. O Luís mandou, a 21 nov 2026, o logótipo com um
+   gorro de Pai Natal: «Dará para colocar este logo no site». O gorro é o da
+   imagem dele, recortado com o fundo transparente (assets/img/gorro-natal.webp),
+   e não o logótipo inteiro: o desenho do logótipo continua a ser o logo.svg, nítido
+   e na cor do CSS (azul na barra, branco no rodapé).
+
+   Vai DENTRO do SVG, na posição em que ele o pôs — a aba assente no tejadilho do
+   carro, o pompom pendurado à frente —, medida sobrepondo a imagem dele ao logo.svg
+   (o carro coincide a 84 %). GORRO é o tamanho dele, em unidades do viewBox, e ABA
+   o ponto da aba que assenta no tejadilho: é à volta desse ponto que o gorro
+   encolhe, para continuar sentado no carro. Fica fora da caixa do SVG (o CSS dá
+   `overflow: visible`), por isso o logótipo não encolhe nem sai do sítio.
+
+   Até ao Dia de Reis. O gerador deixa de o pôr no dia 7, e o site.js tira-o
+   nesse dia mesmo sem nova publicação (data-promo-fim, como as promoções). */
+const GORRO_NATAL_ATE = '2027-01-06';
+const GORRO = { x: 66.29, y: 87.05, w: 117.76, h: 91.27 };
+const ABA = [143.82, 141.22];
+function logoComGorro(escala) {
+  if (isoDia(HOJE) > GORRO_NATAL_ATE) return logoSVG;
+  const [ax, ay] = ABA;
+  const n = (v) => +v.toFixed(2);
+  const gorro = `<image class="gorro-natal" data-promo-fim="${GORRO_NATAL_ATE}" href="${versao('assets/img/gorro-natal.webp')}"`
+    + ` x="${n(ax + escala * (GORRO.x - ax))}" y="${n(ay + escala * (GORRO.y - ay))}"`
+    + ` width="${n(escala * GORRO.w)}" height="${n(escala * GORRO.h)}" preserveAspectRatio="none" pointer-events="none"/>`;
+  return logoSVG.replace(/<\/svg>$/, `${gorro}</svg>`);
+}
+/* A 80 % do gorro da imagem dele, na barra e no rodapé: ao tamanho dele subia mais
+   33 px acima do logótipo e o cimo do ecrã cortava-o, e no rodapé do telemóvel o
+   pompom saía pela esquerda. Assim espreita 6 a 10 px por cima da cápsula. */
+const logoNatal = logoComGorro(0.8);
+
 /* Logótipos dos fabricantes, embutidos no HTML a partir de assets/img/marcas/.
    Embutidos e não em <img> de propósito: só assim é que o `currentColor` os
    deixa herdar a cor do CSS, e a faixa fica monocromática em vez de uma colecção
@@ -776,7 +808,7 @@ function cabecalho(pag) {
   return `<a class="saltar" href="#principal">Saltar para o conteúdo</a>
 <header class="topo" id="topo">
   <div class="topo__barra">
-    <a class="marca" href="${u('')}" aria-label="LR Motors — página inicial">${logoSVG}</a>
+    <a class="marca" href="${u('')}" aria-label="LR Motors — página inicial">${logoNatal}</a>
     <nav class="topo__nav" aria-label="Principal">${nav('topo__link')}</nav>
     <div class="topo__dir">
       <span class="topo__tel">${ic.tel}
@@ -835,7 +867,7 @@ function rodape() {
   <div class="envolve">
     <div class="rodape__grelha">
       <div>
-        <div class="rodape__marca">${logoSVG}</div>
+        <div class="rodape__marca">${logoNatal}</div>
         <p class="rodape__texto">${frase}</p>
         <div class="rodape__redes">
           ${rede(REDES.instagram, ic.ig, 'Instagram')}

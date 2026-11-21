@@ -199,6 +199,9 @@ button, input, select, textarea { font: inherit; color: inherit; }
    com 20 px de raio, o que o deixava espremido contra a curva. */
 .marca { display: inline-flex; align-items: center; color: var(--azul); justify-self: start; }
 .marca svg, .marca img { height: 52px; width: auto; transition: height var(--t); }
+/* O gorro de Natal (no Natal) sai da caixa do SVG, para cima e para a esquerda:
+   assim o logótipo não encolhe para lhe dar lugar. Encolhe com ele ao descer. */
+.marca svg, .rodape__marca svg { overflow: visible; }
 .topo--encolhido .marca svg, .topo--encolhido .marca img { height: 38px; }
 
 /* ---- navegação, ao centro da barra */
