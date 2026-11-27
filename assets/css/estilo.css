@@ -70,6 +70,11 @@ body {
   margin: 0; font-family: var(--f); color: var(--tinta); background: var(--fundo);
   line-height: 1.55; -webkit-font-smoothing: antialiased;
 }
+
+/* A página acaba na última linha do rodapé: nada de faixa nem espaço vazio por baixo dele. Nas páginas curtas o
+   rodapé fica no fundo do ecrã e o espaço que sobra fica dentro da página. */
+body { display: flex; flex-direction: column; min-height: 100vh; min-height: 100dvh; }
+body > main { flex: 1 0 auto; }
 h1, h2, h3, h4, p, figure, ul, ol { margin: 0; }
 ul, ol { padding: 0; list-style: none; }
 /* O `hidden` do HTML só esconde por causa de uma regra da folha do browser, e
@@ -1035,7 +1040,11 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
   text-decoration: none;
 }
 .barra-contacto__numero .nota-chamada { font-size: inherit; margin: 0; }
-@media (max-width: 760px) { .barra-contacto { display: flex; } body { padding-bottom: 96px; } }
+@media (max-width: 760px) { .barra-contacto { display: flex; } }
+/* Sai de cena quando chega o rodapé (que tem os mesmos contactos), em vez de o corpo ganhar espaço vazio por
+   baixo dele (site.js, fimDoRodape): a página acaba no rodapé. */
+.barra-contacto { transition: opacity .25s; }
+.barra-contacto.no-fim { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .25s, visibility 0s .25s; }
 
 /* ---------------------------------------------------------- utilitários */
 .cartas { display: grid; grid-template-columns: repeat(auto-fit, minmax(230px, 1fr)); gap: 1.2rem; }
@@ -1433,9 +1442,11 @@ main > .hero:first-child { margin-top: calc(-1 * var(--h-topo)); padding-top: va
 /* Enquanto o aviso de cookies está em baixo, este sai de cena — dois botões
    flutuantes no mesmo canto é um a tapar o outro. */
 body.cc-visivel .subir { opacity: 0; visibility: hidden; transform: translateY(10px); }
-/* Com a barra aberta, o rodapé acaba mais abaixo: no fim da página, as ligações
-   legais (e o Livro de Reclamações) ficam por cima da barra, não por baixo. */
-body.cc-visivel .rodape { padding-bottom: calc(var(--cc-altura, 0px) + 2.5rem); }
+/* A barra de cookies (e o botão de subir, se calhar por cima delas) sai de cena
+   quando a última linha do rodapé, com as ligações legais e o Livro de
+   Reclamações, chega até ela, e volta ao subir (site.js, fimDoRodape). A
+   página acaba no rodapé, sem espaço vazio por baixo. */
+.cc-barra.no-fim, .subir.no-fim { opacity: 0; visibility: hidden; pointer-events: none; transition: opacity .25s, visibility 0s .25s; }
 /* Acima da barra de contacto do telemóvel, como a de cookies. */
 @media (max-width: 760px) { .subir { bottom: 84px; } }
 
@@ -1494,9 +1505,7 @@ body.cc-visivel .rodape { padding-bottom: calc(var(--cc-altura, 0px) + 2.5rem); 
 }
 /* Nas páginas de viatura há uma segunda barra fixa em baixo, a de ligar e do
    WhatsApp. Sem isto, a de cookies assentava-lhe por cima — e é a barra de
-   contacto que faz o telefone tocar. Abaixo de 760 px o corpo já reserva 74 px
-   para ela em todas as páginas, por isso subir aqui não abre buraco em lado
-   nenhum. */
+   contacto que faz o telefone tocar. */
 @media (max-width: 760px) {
   .cc-barra { bottom: 106px; }
 }

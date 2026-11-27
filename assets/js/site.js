@@ -600,6 +600,31 @@
     });
   })();
 
+  /* ------------------------------------------------------ fim do rodapé */
+  /* O que está fixo em baixo sai de cena quando chega o rodapé, em vez de a
+     página ganhar espaço vazio por baixo dele: a barra de ligar e do WhatsApp
+     das viaturas (no telemóvel) logo que o rodapé, que tem os mesmos
+     contactos, lhe chega; a de cookies e o botão de subir quando a última
+     linha (as ligações legais e o Livro de Reclamações) lhes passa por baixo.
+     Voltam ao subir. */
+  function fimDoRodape() {
+    var rodape = $('.rodape'), ultima = $('.rodape__legal'), alto = window.innerHeight;
+    if (!rodape || !ultima) return;
+    var r = ultima.getBoundingClientRect();
+    var contacto = $('.barra-contacto');
+    if (contacto) contacto.classList.toggle('no-fim', rodape.getBoundingClientRect().top < contacto.getBoundingClientRect().top);
+    [$('#cc-barra'), $('#subir')].forEach(function (el) {
+      if (!el || el.hidden) return;
+      // onde o fixo fica quando está à vista (ainda pode vir a deslizar para dentro)
+      var q = el.getBoundingClientRect(), topo = alto - el.offsetHeight - (parseFloat(getComputedStyle(el).bottom) || 0);
+      el.classList.toggle('no-fim', r.top < alto && r.bottom > topo && r.left < q.right && r.right > q.left);
+    });
+  }
+  window.addEventListener('scroll', fimDoRodape, { passive: true });
+  window.addEventListener('resize', fimDoRodape);
+  if ('ResizeObserver' in window) new ResizeObserver(fimDoRodape).observe(document.body);
+  fimDoRodape();
+
   /* ------------------------------------------------------- consentimento */
   /* Este site não instala cookies. A única coisa que vem de fora é o mapa do
      Google, e é isso que esta escolha guarda. Aparece uma vez; a resposta fica
@@ -622,9 +647,9 @@
       clearTimeout(aEsconder);
       barra.hidden = false;
       document.body.classList.add('cc-visivel');
-      /* A altura da barra, para o rodapé ganhar esse espaço por baixo: no fim
-         da página, a barra não pode tapar o Livro de Reclamações (estilo.css). */
-      document.body.style.setProperty('--cc-altura', barra.offsetHeight + 'px');
+      /* No fim da página, a barra não pode tapar o Livro de Reclamações: sai de
+         cena quando a última linha do rodapé chega até ela (fimDoRodape). */
+      fimDoRodape();
       /* O `hidden` sai primeiro e a classe só depois de um reflow: posta no
          mesmo quadro, o browser não vê estado nenhum de onde animar e a barra
          aparece de repente. É a mesma lição do menu de ecrã inteiro. */
